@@ -1,0 +1,25 @@
+# Environment secrets and local Python tools
+.env
+*.env
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# IDE and operating-system files
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Android / Gradle generated files
+.gradle/
+**/build/
+local.properties
+*.apk
+*.aab
+
+# Local database files
+*.db
+*.sqlite
