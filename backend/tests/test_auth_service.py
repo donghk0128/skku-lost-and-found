@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 # These must exist before application modules read their settings.
-os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
+os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-that-is-long-enough")
 
 from app.auth.schemas import LoginRequest, SignUpRequest
@@ -31,6 +31,10 @@ class FakeEmailClient:
 
 @pytest.fixture()
 def db() -> Session:
+
+    if engine.dialect.name != "sqlite":
+        raise RuntimeError("Auth tests must use SQLite; refusing to modify another database.")
+
     Base.metadata.create_all(bind=engine)
     session = SessionLocal()
     try:
