@@ -12,11 +12,12 @@ export default function AppTabs() {
       backgroundColor={colors.background}
       indicatorColor={colors.backgroundElement}
       labelStyle={{ selected: { color: colors.text } }}
+      tintColor={Colors.primary}
     >
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>홈</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          src={require("@/assets/images/tabIcons/home.png")}
+          src={require("@/assets/images/tabIcons/home-line.png")}
           renderingMode="template"
         />
       </NativeTabs.Trigger>
@@ -24,7 +25,7 @@ export default function AppTabs() {
       <NativeTabs.Trigger name="chat">
         <NativeTabs.Trigger.Label>채팅</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          src={require("@/assets/images/tabIcons/explore.png")}
+          src={require("@/assets/images/tabIcons/chat.png")}
           renderingMode="template"
         />
       </NativeTabs.Trigger>
