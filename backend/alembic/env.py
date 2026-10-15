@@ -5,6 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import get_settings
 from app.core.database import Base
+from app.posts import model as posts_model  # noqa: F401 - registers post models
 from app.users import model  # noqa: F401 - registers all authentication models
 
 config = context.config
