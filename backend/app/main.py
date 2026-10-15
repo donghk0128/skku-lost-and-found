@@ -1,10 +1,11 @@
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.auth.router import router as auth_router
 from app.core.errors import ApiError
-from app.posts.router import router as posts_router
+from app.posts.router import categories_router, router as posts_router
 from app.users.router import router as users_router
 
 app = FastAPI(title="찾자 API", version="0.1.0", openapi_url="/api/v1/openapi.json", docs_url="/docs")
@@ -22,7 +23,7 @@ async def api_error_handler(_: Request, error: ApiError) -> JSONResponse:
 async def validation_error_handler(_: Request, error: RequestValidationError) -> JSONResponse:
     return JSONResponse(
         status_code=422,
-        content={"error": {"code": "validation_error", "message": "요청 형식이 올바르지 않습니다.", "details": error.errors()}},
+        content={"error": {"code": "validation_error", "message": "요청 형식이 올바르지 않습니다.", "details": jsonable_encoder(error.errors())}},
     )
 
 
@@ -34,3 +35,4 @@ def health_check() -> dict[str, str]:
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(posts_router, prefix="/api/v1")
+app.include_router(categories_router, prefix="/api/v1")
