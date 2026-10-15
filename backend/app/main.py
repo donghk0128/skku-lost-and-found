@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 
 from app.auth.router import router as auth_router
 from app.core.errors import ApiError
+from app.posts.router import router as posts_router
 from app.users.router import router as users_router
 
 app = FastAPI(title="찾자 API", version="0.1.0", openapi_url="/api/v1/openapi.json", docs_url="/docs")
@@ -32,3 +33,4 @@ def health_check() -> dict[str, str]:
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
+app.include_router(posts_router, prefix="/api/v1")
