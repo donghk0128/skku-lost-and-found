@@ -9,3 +9,4 @@ passlib[argon2]>=1.7.4,<2.0
 email-validator>=2.2,<3.0
 pytest>=8.3,<9.0
 httpx2>=2.13,<2.14
+python-multipart>=0.0.32,<1.0

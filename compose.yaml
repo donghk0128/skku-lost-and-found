@@ -20,6 +20,7 @@ services:
       DATABASE_URL: postgresql+psycopg://skku:local-dev-only@db:5432/skku_lost_and_found
       JWT_SECRET_KEY: local-dev-secret-only-not-for-production
       EMAIL_DELIVERY_MODE: console
+      POST_IMAGE_DIR: /app/post_images
     depends_on:
       db:
         condition: service_healthy
@@ -29,7 +30,9 @@ services:
       - ./backend/app:/app/app
       - ./backend/alembic:/app/alembic
       - ./backend/tests:/app/tests
+      - post_images_data:/app/post_images
     command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:
   postgres_data:
+  post_images_data:

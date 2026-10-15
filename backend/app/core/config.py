@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 14
+    post_image_dir: str = "post_images"
 
     email_delivery_mode: str = "console"
     smtp_host: str = ""
