@@ -1,0 +1,20 @@
+{
+  "checked_at": "2026-10-18",
+  "source": "https://developers.openai.com/api/docs/pricing",
+  "currency": "USD",
+  "unit_tokens": 1000000,
+  "models": {
+    "gpt-6-luna": {
+      "input": 0.10,
+      "output": 0.50
+    },
+    "gpt-6.1-sol": {
+      "input": 2.00,
+      "output": 10.00
+    },
+    "gpt-4o": {
+      "input": 2.50,
+      "output": 10.00
+    }
+  }
+}
