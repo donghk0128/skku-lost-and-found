@@ -47,12 +47,14 @@
 | `GET` | `/posts` | 불필요 | 삭제되지 않은 게시글 목록을 조회합니다. |
 | `GET` | `/posts/{post_id}` | 불필요 | 게시글 상세를 조회합니다. |
 | `PATCH` | `/posts/{post_id}` | 필요 | 작성자만 게시글 정보를 수정할 수 있습니다. |
+| `PATCH` | `/posts/{post_id}/status` | 필요 | 작성자만 게시글을 완료 표시할 수 있습니다. |
 | `DELETE` | `/posts/{post_id}` | 필요 | 작성자만 게시글을 삭제 표시할 수 있습니다. |
 
 - 게시글 생성에는 `post_type`(`LOST` 또는 `FOUND`), `title`, `description`이 필요합니다.
 - 선택 값: `item_name`, `category_id`, `location_text`, 좌표, 발생 시각 범위
-- 목록 조회: `post_type`, `category_id`, `limit`(기본 20), `offset`(기본 0)을 사용할 수 있습니다.
-- 수정·삭제는 본인이 작성한 게시글만 가능합니다.
+- 목록 조회: `post_type`, `category_id`, `status`, `q`, `limit`(기본 20), `offset`(기본 0)을 사용할 수 있습니다. `q`는 제목·설명·물건명에서 공백 차이를 무시하고 검색합니다.
+- 완료 표시 요청 본문은 `{"status": "COMPLETED"}`입니다. 완료된 글은 조회할 수 있지만 `OPEN`으로 되돌릴 수는 없습니다.
+- 수정·완료 표시·삭제는 본인이 작성한 게시글만 가능합니다.
 
 ## 게시글 사진
 

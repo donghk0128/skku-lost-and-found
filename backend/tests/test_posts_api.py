@@ -195,6 +195,86 @@ def test_list_posts_filters_paginates_and_hides_deleted(api_client: tuple[TestCl
     assert client.get("/api/v1/posts?offset=-1").status_code == 422
 
 
+def test_search_matches_spacing_across_fields_and_combines_filters(api_client: tuple[TestClient, Engine]) -> None:
+    client, engine = api_client
+    author_id = create_author(engine)
+    headers = {"Authorization": f"Bearer {create_access_token(author_id)}"}
+    with Session(engine) as db:
+        db.add_all([
+            Category(id=1, code="ELECTRONICS", name="전자기기"),
+            Category(id=2, code="BAG", name="가방"),
+        ])
+        db.commit()
+
+    posts = [
+        {"post_type": "FOUND", "title": "무선 이어폰 습득", "description": "검정 케이스", "item_name": "에어팟 프로", "category_id": 1},
+        {"post_type": "FOUND", "title": "무선이어폰 습득", "description": "흰색 케이스", "item_name": "AirPods", "category_id": 1},
+        {"post_type": "LOST", "title": "무선 이어폰 분실", "description": "검정색", "category_id": 1},
+        {"post_type": "FOUND", "title": "무선 이어폰 파우치", "description": "검정색", "category_id": 2},
+    ]
+    post_ids = []
+    for post in posts:
+        response = client.post("/api/v1/posts", headers=headers, json=post)
+        assert response.status_code == 201
+        post_ids.append(response.json()["id"])
+
+    with Session(engine) as db:
+        for index, post_id in enumerate(post_ids):
+            saved = db.get(Post, UUID(post_id))
+            assert saved is not None
+            saved.created_at = datetime(2026, 1, index + 1, tzinfo=timezone.utc)
+        db.commit()
+
+    compact = client.get("/api/v1/posts", params={"q": "무선이어폰"})
+    assert compact.status_code == 200
+    assert compact.json()["total"] == 4
+
+    combined = client.get("/api/v1/posts", params={"q": "무선이어폰", "post_type": "FOUND", "category_id": 1, "limit": 1})
+    assert combined.status_code == 200
+    assert combined.json()["total"] == 2
+    assert [item["id"] for item in combined.json()["items"]] == [post_ids[1]]
+
+    across_fields = client.get("/api/v1/posts", params={"q": "검정 에어팟프로"})
+    assert across_fields.status_code == 200
+    assert [item["id"] for item in across_fields.json()["items"]] == [post_ids[0]]
+    assert client.get("/api/v1/posts", params={"q": "airpods"}).json()["total"] == 1
+    assert client.get("/api/v1/posts", params={"q": "   "}).status_code == 422
+    assert client.get("/api/v1/posts", params={"q": "%"}).json()["total"] == 0
+
+
+def test_only_author_can_complete_post_and_filter_by_status(api_client: tuple[TestClient, Engine]) -> None:
+    client, engine = api_client
+    author_id = create_author(engine)
+    other_id = create_author(engine, "status-other@g.skku.edu")
+    author_headers = {"Authorization": f"Bearer {create_access_token(author_id)}"}
+    other_headers = {"Authorization": f"Bearer {create_access_token(other_id)}"}
+    created = client.post("/api/v1/posts", headers=author_headers, json=post_payload())
+    assert created.status_code == 201
+    post_id = created.json()["id"]
+    path = f"/api/v1/posts/{post_id}/status"
+
+    assert client.patch(path, json={"status": "COMPLETED"}).status_code == 401
+    assert client.patch(path, headers=other_headers, json={"status": "COMPLETED"}).status_code == 403
+    assert client.patch(path, headers=author_headers, json={"status": "OPEN"}).status_code == 422
+    assert client.patch(path, headers=author_headers, json={"status": "COMPLETED", "author_id": str(other_id)}).status_code == 422
+
+    completed = client.patch(path, headers=author_headers, json={"status": "COMPLETED"})
+    assert completed.status_code == 200
+    assert completed.json()["status"] == "COMPLETED"
+    assert client.patch(path, headers=author_headers, json={"status": "COMPLETED"}).status_code == 200
+    assert client.get("/api/v1/posts", params={"status": "OPEN"}).json()["total"] == 0
+    assert client.get("/api/v1/posts", params={"status": "COMPLETED"}).json()["total"] == 1
+    assert client.get("/api/v1/posts", params={"status": "INVALID"}).status_code == 422
+
+    with Session(engine) as db:
+        saved = db.get(Post, UUID(post_id))
+        assert saved is not None
+        assert saved.status == "COMPLETED"
+
+    assert client.delete(f"/api/v1/posts/{post_id}", headers=author_headers).status_code == 204
+    assert client.patch(path, headers=author_headers, json={"status": "COMPLETED"}).status_code == 404
+
+
 def test_only_author_can_update_post(api_client: tuple[TestClient, Engine]) -> None:
     client, engine = api_client
     author_id = create_author(engine)
