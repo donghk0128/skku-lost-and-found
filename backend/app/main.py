@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 
 from app.auth.router import router as auth_router
 from app.core.errors import ApiError
+from app.matching.router import router as matching_router
 from app.posts.router import categories_router, router as posts_router
 from app.users.router import router as users_router
 
@@ -35,4 +36,5 @@ def health_check() -> dict[str, str]:
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(posts_router, prefix="/api/v1")
+app.include_router(matching_router, prefix="/api/v1")
 app.include_router(categories_router, prefix="/api/v1")
