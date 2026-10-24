@@ -84,6 +84,12 @@ class PostUpdateRequest(BaseModel):
         return self
 
 
+class PostStatusUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["COMPLETED"]
+
+
 class PostResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

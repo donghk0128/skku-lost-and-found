@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import ApiError
 from app.posts.model import Category, Post, PostImage, now_utc
 from app.posts.repository import PostRepository
-from app.posts.schemas import PostCreateRequest, PostType, PostUpdateRequest
+from app.posts.schemas import PostCreateRequest, PostStatus, PostType, PostUpdateRequest
 from app.posts.storage import get_post_image_storage
 from app.users.model import User
 
@@ -97,9 +97,19 @@ class PostService:
 
     @staticmethod
     def list_visible(
-        db: Session, post_type: PostType | None, category_id: int | None, limit: int, offset: int
+        db: Session,
+        post_type: PostType | None,
+        category_id: int | None,
+        post_status: PostStatus | None,
+        search: str | None,
+        limit: int,
+        offset: int,
     ) -> tuple[list[Post], int]:
-        return PostRepository.list_visible(db, post_type, category_id, limit, offset)
+        if search is not None:
+            search = search.strip()
+            if not search:
+                raise ApiError(422, "invalid_search_query", "검색어를 입력해 주세요.")
+        return PostRepository.list_visible(db, post_type, category_id, post_status, search, limit, offset)
 
     @staticmethod
     def list_categories(db: Session) -> list[Category]:
@@ -113,6 +123,15 @@ class PostService:
         PostRepository.update_details(post, request.model_dump(exclude_unset=True))
         PostService._commit(db)
         db.refresh(post)
+        return post
+
+    @staticmethod
+    def complete(db: Session, post_id: UUID, author: User) -> Post:
+        post = PostService._get_owned_post(db, post_id, author)
+        if post.status != "COMPLETED":
+            PostRepository.mark_completed(post)
+            PostService._commit(db)
+            db.refresh(post)
         return post
 
     @staticmethod
