@@ -16,10 +16,14 @@ services:
   backend:
     build:
       context: ./backend
+    env_file:
+      - path: ./backend/.env
+        required: false
     environment:
       DATABASE_URL: postgresql+psycopg://skku:local-dev-only@db:5432/skku_lost_and_found
       JWT_SECRET_KEY: local-dev-secret-only-not-for-production
-      EMAIL_DELIVERY_MODE: console
+      EMAIL_DELIVERY_MODE: ${EMAIL_DELIVERY_MODE:-console}
+      ALLOWED_EMAIL_DOMAIN: ${ALLOWED_EMAIL_DOMAIN:-skku.edu}
       POST_IMAGE_DIR: /app/post_images
     depends_on:
       db:

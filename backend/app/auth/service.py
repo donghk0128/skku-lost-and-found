@@ -39,9 +39,10 @@ def normalize_email(email: str) -> str:
 def validate_university_email(email: str) -> str:
     normalized = normalize_email(email)
     parts = normalized.rsplit("@", 1)
-    if len(parts) != 2 or not parts[0] or parts[1] != get_settings().allowed_email_domain.lower():
+    allowed_domain = get_settings().allowed_email_domain.lower()
+    if len(parts) != 2 or not parts[0] or parts[1] != allowed_domain:
         # This generic response deliberately reveals no account information.
-        raise ApiError(400, "invalid_university_email", "성균관대학교 학생 이메일(@g.skku.edu)만 사용할 수 있습니다.")
+        raise ApiError(400, "invalid_university_email", f"성균관대학교 이메일(@{allowed_domain})만 사용할 수 있습니다.")
     return normalized
 
 
