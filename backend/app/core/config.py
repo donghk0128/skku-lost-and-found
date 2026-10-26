@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 14
     post_image_dir: str = "post_images"
+    cors_allowed_origins: list[str] = ["http://localhost:8081", "http://127.0.0.1:8081"]
 
     email_delivery_mode: str = "console"
     smtp_host: str = ""
@@ -24,7 +25,7 @@ class Settings(BaseSettings):
 
     email_verification_expire_minutes: int = 5
     email_verification_resend_seconds: int = 60
-    allowed_email_domain: str = "g.skku.edu"
+    allowed_email_domain: str = "skku.edu"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

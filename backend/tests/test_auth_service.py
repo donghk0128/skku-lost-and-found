@@ -44,22 +44,24 @@ def db() -> Session:
         Base.metadata.drop_all(bind=engine)
 
 
-def test_only_exact_skku_domain_can_receive_code(db: Session) -> None:
+@pytest.mark.parametrize("email", ["student@not-skku.edu", "student@g.skku.edu", "student@skku.edu.example"])
+def test_only_exact_skku_domain_can_receive_code(db: Session, email: str) -> None:
     service = AuthService(FakeEmailClient())
 
     with pytest.raises(ApiError) as error:
-        service.send_verification_code(db, "student@not-g.skku.edu")
+        service.send_verification_code(db, email)
 
     assert error.value.code == "invalid_university_email"
+    assert "@skku.edu" in error.value.message
 
 
 def test_signup_login_refresh_and_logout_flow(db: Session) -> None:
     email_client = FakeEmailClient()
     service = AuthService(email_client)
-    email = "Student@G.SKku.EDU"
+    email = "Student@SKku.EDU"
 
     service.send_verification_code(db, email)
-    assert email_client.sent_to == "student@g.skku.edu"
+    assert email_client.sent_to == "student@skku.edu"
     assert email_client.last_code is not None
 
     with pytest.raises(ApiError) as error:
@@ -71,7 +73,7 @@ def test_signup_login_refresh_and_logout_flow(db: Session) -> None:
         db,
         SignUpRequest(email=email, nickname="테스터", password="safe-password-123"),
     )
-    assert user.email == "student@g.skku.edu"
+    assert user.email == "student@skku.edu"
     assert access_token
     assert refresh_token
     assert UserRepository.get_by_email(db, user.email) is not None
@@ -93,7 +95,7 @@ def test_expired_code_and_attempt_limit_are_enforced(db: Session) -> None:
     email_client = FakeEmailClient()
     service = AuthService(email_client)
 
-    expired_email = "expired@g.skku.edu"
+    expired_email = "expired@skku.edu"
     service.send_verification_code(db, expired_email)
     expired = AuthRepository.get_latest_unverified_verification(db, expired_email)
     assert expired is not None
@@ -103,7 +105,7 @@ def test_expired_code_and_attempt_limit_are_enforced(db: Session) -> None:
         service.verify_email_code(db, expired_email, email_client.last_code or "000000")
     assert error.value.code == "verification_expired"
 
-    limited_email = "limited@g.skku.edu"
+    limited_email = "limited@skku.edu"
     service.send_verification_code(db, limited_email)
     for _ in range(5):
         with pytest.raises(ApiError) as error:
@@ -121,11 +123,11 @@ def test_unverified_or_consumed_verification_cannot_create_another_account(db: S
     with pytest.raises(ApiError) as error:
         service.signup(
             db,
-            SignUpRequest(email="unverified@g.skku.edu", nickname="미인증", password="safe-password-123"),
+            SignUpRequest(email="unverified@skku.edu", nickname="미인증", password="safe-password-123"),
         )
     assert error.value.code == "email_not_verified"
 
-    email = "consumed@g.skku.edu"
+    email = "consumed@skku.edu"
     service.send_verification_code(db, email)
     service.verify_email_code(db, email, email_client.last_code or "000000")
     user, _, _ = service.signup(
