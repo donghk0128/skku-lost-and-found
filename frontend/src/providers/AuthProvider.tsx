@@ -6,6 +6,7 @@ type AuthContextValue = {
   user: User | null;
   loading: boolean;
   initializationError: string;
+  signOut: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, nickname: string, password: string) => Promise<void>;
 };
@@ -63,8 +64,23 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     await acceptSession(await authApi.signUp(email, nickname, password));
   }
 
+  async function signOut() {
+    const session = await readSession();
+    if (session) {
+      try {
+        await authApi.signOut(session.refresh_token);
+      } catch (error) {
+        // Invalid or expired refresh tokens are already unusable.
+        if (!(error instanceof ApiError) || error.status !== 401) throw error;
+      }
+    }
+    await writeSession(null);
+    setInitializationError("");
+    setUser(null);
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, initializationError, signIn, signUp }}>
+    <AuthContext.Provider value={{ user, loading, initializationError, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

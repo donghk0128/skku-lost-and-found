@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   Alert,
   Keyboard,
@@ -16,34 +17,30 @@ import {
   Fonts,
   MaxContentWidth,
 } from "@/constants/theme";
+import PostBoard from "@/components/post-board";
+import CreatePostButton from "@/components/create-post-button";
 import SettingIcon from "@/assets/icons/setting.svg";
 
 type BoardTab = "lost" | "found";
-type SortOrder = "recommended" | "latest";
 
 export default function HomeScreen() {
-  const [activeTab, setActiveTab] = useState<BoardTab>("lost");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("recommended");
+  const router = useRouter();
+  const params = useLocalSearchParams<{ board?: string; refresh?: string }>();
+  const [selectedTab, setActiveTab] = useState<{
+    tab: BoardTab;
+    version?: string;
+  }>({ tab: "lost" });
+  const activeTab =
+    params.refresh && selectedTab.version !== params.refresh
+      ? params.board === "FOUND"
+        ? "found"
+        : "lost"
+      : selectedTab.tab;
   const [search, setSearch] = useState("");
 
   const changeTab = (tab: BoardTab) => {
     Keyboard.dismiss();
-    setActiveTab(tab);
-  };
-
-  const toggleSort = () => {
-    setSortOrder((current) =>
-      current === "recommended" ? "latest" : "recommended",
-    );
-  };
-
-  const handleWrite = () => {
-    Alert.alert(
-      "글쓰기",
-      activeTab === "lost"
-        ? "분실물 등록 화면을 연결해주세요."
-        : "습득물 등록 화면을 연결해주세요.",
-    );
+    setActiveTab({ tab, version: params.refresh });
   };
 
   return (
@@ -53,11 +50,11 @@ export default function HomeScreen() {
           {/* 헤더 */}
           <View style={styles.header}>
             <ThemedText type="title" style={styles.logo}>
-              Lost & Found
+              SKKU Lost & Found
             </ThemedText>
 
             <Pressable
-              onPress={() => Alert.alert("설정", "설정 화면을 연결해주세요.")}
+              onPress={() => router.push("/settings")}
               accessibilityRole="button"
               accessibilityLabel="설정"
               hitSlop={8}
@@ -112,9 +109,9 @@ export default function HomeScreen() {
           {/* 정렬 · 필터 · 검색 */}
           <View style={styles.toolbar}>
             <Pressable
-              onPress={toggleSort}
+              disabled
               accessibilityRole="button"
-              accessibilityLabel="정렬 방식 변경"
+              accessibilityLabel="최신순 정렬"
               style={({ pressed }) => [
                 styles.toolButton,
                 pressed && styles.pressed,
@@ -123,12 +120,12 @@ export default function HomeScreen() {
               <ThemedText style={styles.sortIcon}>↕</ThemedText>
 
               <ThemedText type="small" style={styles.toolText}>
-                {sortOrder === "recommended" ? "추천순" : "최신순"}
+                최신순
               </ThemedText>
             </Pressable>
 
             <Pressable
-              onPress={() => Alert.alert("필터", "필터 기능을 연결해주세요.")}
+              onPress={null}
               accessibilityRole="button"
               style={({ pressed }) => [
                 styles.toolButton,
@@ -176,23 +173,15 @@ export default function HomeScreen() {
             accessibilityLabel={
               activeTab === "lost" ? "분실물 게시판" : "습득물 게시판"
             }
-          />
-
-          {/* 글쓰기 버튼 */}
-          <Pressable
-            onPress={handleWrite}
-            accessibilityRole="button"
-            accessibilityLabel={
-              activeTab === "lost" ? "분실물 등록" : "습득물 등록"
-            }
-            style={({ pressed }) => [
-              styles.floatingButton,
-              pressed && styles.floatingPressed,
-            ]}
           >
-            <View style={styles.plusHorizontal} />
-            <View style={styles.plusVertical} />
-          </Pressable>
+            <PostBoard
+              key={`${activeTab}-${params.refresh ?? ""}`}
+              type={activeTab === "lost" ? "LOST" : "FOUND"}
+              search={search}
+            />
+          </View>
+
+          <CreatePostButton />
         </View>
       </SafeAreaView>
     </View>
