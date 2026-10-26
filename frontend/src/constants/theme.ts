@@ -63,7 +63,11 @@ const PlatformFonts = Platform.select({
   },
 });
 
-export const Fonts = { ...PlatformFonts, ...PretendardFonts, sans: PretendardFonts.pretendardRegular };
+export const Fonts = {
+  ...PlatformFonts,
+  ...PretendardFonts,
+  sans: PretendardFonts.pretendardRegular,
+};
 
 export const Spacing = {
   half: 2,

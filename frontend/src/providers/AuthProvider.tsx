@@ -1,5 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { ApiError, authApi, type AuthResponse, type User } from "@/lib/auth-api";
+import {
+  ApiError,
+  authApi,
+  type AuthResponse,
+  type User,
+} from "@/lib/auth-api";
 import { readSession, writeSession } from "@/lib/session-storage";
 
 type AuthContextValue = {
@@ -13,7 +18,11 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export default function AuthProvider({ children }: { children: React.ReactNode }) {
+export default function AuthProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [initializationError, setInitializationError] = useState("");
@@ -40,18 +49,27 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           if (error instanceof ApiError && error.status === 401) {
             await writeSession(null).catch(() => undefined);
           }
-          setInitializationError(error instanceof Error ? error.message : "로그인 정보를 확인하지 못했습니다.");
+          setInitializationError(
+            error instanceof Error
+              ? error.message
+              : "로그인 정보를 확인하지 못했습니다.",
+          );
         }
       } finally {
         if (active) setLoading(false);
       }
     }
     void initializeAuth();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, []);
 
   async function acceptSession(response: AuthResponse) {
-    await writeSession({ access_token: response.access_token, refresh_token: response.refresh_token });
+    await writeSession({
+      access_token: response.access_token,
+      refresh_token: response.refresh_token,
+    });
     setInitializationError("");
     setUser(response.user);
   }
@@ -80,7 +98,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, initializationError, signIn, signUp, signOut }}>
+    <AuthContext.Provider
+      value={{ user, loading, initializationError, signIn, signUp, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -88,6 +108,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth는 AuthProvider 안에서 사용해야 합니다.");
+  if (!context)
+    throw new Error("useAuth는 AuthProvider 안에서 사용해야 합니다.");
   return context;
 }

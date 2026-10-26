@@ -45,7 +45,14 @@ function PostRow({ post, category }: { post: Post; category?: string }) {
     };
   }, [post.id]);
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={post.title} onPress={() => router.push({ pathname: "/post/[id]", params: { id: post.id } })} style={styles.row}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={post.title}
+      onPress={() =>
+        router.push({ pathname: "/post/[id]", params: { id: post.id } })
+      }
+      style={styles.row}
+    >
       <View style={styles.copy}>
         <Text numberOfLines={1} style={styles.title}>
           {post.title}
@@ -144,19 +151,21 @@ export default function PostBoard({
     },
     [type, query, requests],
   );
-  useFocusEffect(useCallback(() => {
-    const state = requests.current;
-    const timeout = setTimeout(() => {
-      setPosts([]);
-      setTotal(0);
-      void load(0);
-    }, 0);
-    return () => {
-      clearTimeout(timeout);
-      state.generation++;
-      state.busy = false;
-    };
-  }, [load, requests]));
+  useFocusEffect(
+    useCallback(() => {
+      const state = requests.current;
+      const timeout = setTimeout(() => {
+        setPosts([]);
+        setTotal(0);
+        void load(0);
+      }, 0);
+      return () => {
+        clearTimeout(timeout);
+        state.generation++;
+        state.busy = false;
+      };
+    }, [load, requests]),
+  );
   return (
     <FlatList
       data={posts}
