@@ -15,23 +15,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors, Fonts } from "@/constants/theme";
 import { useAuth } from "@/providers/AuthProvider";
-import { authApi } from "@/lib/auth-api";
 
 export default function Login() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { signIn, signUp, initializationError } = useAuth();
+  const { signIn, initializationError } = useAuth();
   const passwordRef = useRef<TextInput>(null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [nickname, setNickname] = useState("");
-  const [code, setCode] = useState("");
-  const [codeSent, setCodeSent] = useState(false);
-  const [verified, setVerified] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
   const [focusedField, setFocusedField] = useState<"email" | "password" | null>(
     null,
   );
@@ -44,7 +37,6 @@ export default function Login() {
     pending.current = true;
     setBusy(true);
     setError("");
-    setMessage("");
     Keyboard.dismiss();
     try {
       await action();
@@ -63,13 +55,8 @@ export default function Login() {
       return;
     }
 
-    if (isSignUp && (!verified || nickname.trim().length < 2 || nickname.trim().length > 30 || password.length < 8 || password.length > 128)) {
-      setError("이메일 인증을 완료하고 닉네임 2~30자, 비밀번호 8~128자를 입력해주세요.");
-      return;
-    }
     void run(async () => {
-      if (isSignUp) await signUp(email.trim(), nickname.trim(), password);
-      else await signIn(email.trim(), password);
+      await signIn(email.trim(), password);
       router.replace("/");
     });
   };
@@ -105,7 +92,7 @@ export default function Login() {
               </Text>
 
               <Text style={styles.description}>
-                {isSignUp ? "학교 이메일 인증 후 회원가입을 진행해주세요." : "원활한 서비스 이용을 위해 로그인해주세요."}
+                원활한 서비스 이용을 위해 로그인해주세요.
               </Text>
             </View>
 
@@ -125,10 +112,6 @@ export default function Login() {
                   onChangeText={(value) => {
                     setEmail(value);
                     setError("");
-                    setMessage("");
-                    setCodeSent(false);
-                    setVerified(false);
-                    setCode("");
                   }}
                   onFocus={() => setFocusedField("email")}
                   onBlur={() => setFocusedField(null)}
@@ -142,64 +125,6 @@ export default function Login() {
                   accessibilityLabel="이메일"
                 />
               </View>
-
-              {isSignUp && (
-                <>
-                  <Pressable
-                    disabled={busy || !email.trim()}
-                    accessibilityRole="button"
-                    onPress={() => void run(async () => {
-                      const response = await authApi.sendCode(email.trim());
-                      setCodeSent(true);
-                      setVerified(false);
-                      setCode("");
-                      setMessage(response.message);
-                    })}
-                    style={[styles.button, (busy || !email.trim()) && styles.buttonPressed]}
-                  >
-                    <Text style={styles.buttonText}>{codeSent ? "인증 코드 재전송" : "이메일 인증 코드 전송"}</Text>
-                  </Pressable>
-                  {codeSent && (
-                    <View style={styles.field}>
-                      <Text style={styles.label}>이메일 인증 코드</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="6자리 인증 코드"
-                        value={code}
-                        onChangeText={setCode}
-                        editable={!busy && !verified}
-                        keyboardType="number-pad"
-                        maxLength={6}
-                        accessibilityLabel="이메일 인증 코드"
-                      />
-                      <Pressable
-                        disabled={busy || verified || !/^\d{6}$/.test(code)}
-                        accessibilityRole="button"
-                        onPress={() => void run(async () => {
-                          const response = await authApi.verifyCode(email.trim(), code);
-                          setVerified(true);
-                          setMessage(response.message);
-                        })}
-                        style={[styles.button, (busy || verified || !/^\d{6}$/.test(code)) && styles.buttonPressed]}
-                      >
-                        <Text style={styles.buttonText}>{verified ? "이메일 인증 완료" : "인증 코드 확인"}</Text>
-                      </Pressable>
-                    </View>
-                  )}
-                  <View style={styles.field}>
-                    <Text style={styles.label}>닉네임</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="닉네임 2~30자"
-                      value={nickname}
-                      onChangeText={setNickname}
-                      editable={!busy}
-                      maxLength={30}
-                      accessibilityLabel="닉네임"
-                    />
-                  </View>
-                </>
-              )}
 
               <View style={styles.field}>
                 <Text style={styles.label}>비밀번호</Text>
@@ -223,8 +148,8 @@ export default function Login() {
                   secureTextEntry
                   autoCapitalize="none"
                   autoCorrect={false}
-                  autoComplete={isSignUp ? "new-password" : "current-password"}
-                  textContentType={isSignUp ? "newPassword" : "password"}
+                  autoComplete="current-password"
+                  textContentType="password"
                   returnKeyType="go"
                   onSubmitEditing={handleSignIn}
                   accessibilityLabel="비밀번호"
@@ -232,7 +157,7 @@ export default function Login() {
               </View>
 
               <Text style={styles.error} accessibilityLiveRegion="polite">
-                {error || message || initializationError || " "}
+                {error || initializationError || " "}
               </Text>
             </View>
           </View>
@@ -247,7 +172,7 @@ export default function Login() {
                 pressed && styles.buttonPressed,
               ]}
             >
-              <Text style={styles.buttonText}>{busy ? "처리 중…" : isSignUp ? "회원가입" : "로그인"}</Text>
+              <Text style={styles.buttonText}>{busy ? "처리 중…" : "로그인"}</Text>
             </Pressable>
 
             <View style={styles.links}>
@@ -264,16 +189,8 @@ export default function Login() {
 
               <View style={styles.divider} />
 
-              <Pressable disabled={busy} style={styles.link} accessibilityRole="button" onPress={() => {
-                setIsSignUp(!isSignUp);
-                setPassword("");
-                setError("");
-                setMessage("");
-                setCode("");
-                setCodeSent(false);
-                setVerified(false);
-              }}>
-                <Text style={styles.linkText}>{isSignUp ? "로그인으로 돌아가기" : "회원가입"}</Text>
+              <Pressable disabled={busy} style={styles.link} accessibilityRole="button" onPress={() => router.push("/signup")}>
+                <Text style={styles.linkText}>회원가입</Text>
               </Pressable>
             </View>
           </View>
