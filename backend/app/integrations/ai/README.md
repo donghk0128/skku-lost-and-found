@@ -15,7 +15,7 @@
 | Vision provider | 구현 | Ollama `moondream`과 OpenAI 이미지 입력 지원 |
 | Text 평가 harness | 구현 | 한국어 seed 데이터 100건, 자동 지표, JSON·CSV 결과 및 사람 평가표 생성 |
 | Vision 정량 평가 | 계획 | 라벨링 이미지셋, 해상도별 품질·token·비용 및 환각률 비교 필요 |
-| 서비스 통합 | 미구현 | 공용 FastAPI, DB와 Expo 연결은 현재 범위에 포함하지 않음 |
+| 서비스 통합 | 진행 중 | 인증된 `POST /api/v1/ai/post-drafts`가 검증된 초안을 반환하며, 최종 수정 화면·지도 선택 UI는 이어서 연결 필요 |
 
 ## 주요 기능
 
@@ -29,6 +29,14 @@
 - `keywords`, `missing_fields`, `warnings`
 
 모든 provider는 같은 Pydantic schema를 사용합니다. 모호한 시간과 장소는 임의로 확정하지 않고 누락 필드 또는 경고로 반환하도록 prompt를 구성했습니다. 생성된 모든 필드는 Streamlit에서 수정할 수 있습니다.
+
+### FastAPI 초안 API
+
+백엔드는 인증된 사용자에게 `POST /api/v1/ai/post-drafts`를 제공합니다. `post_type`과 자연어 설명을 받아 모델의 초안을 검증하고, 모델의 `category_code`를 DB의 `category_id`로 변환해 반환합니다. 이 요청은 게시글이나 대화 내용을 저장하지 않습니다.
+
+지도에서 사용자가 확정한 장소·위경도와 발생 시각을 함께 보내면 해당 값이 모델의 추론값보다 우선합니다. 최종 확인된 글은 `POST /api/v1/posts/ai-assisted`로 저장할 수 있고, 이 경로는 게시글의 `creation_method`를 `AI_ASSISTED`로 기록합니다.
+
+서비스 API의 provider와 model은 클라이언트가 선택하지 않습니다. `backend/.env`의 `AI_PROVIDER`, `AI_MODEL`, `AI_TIMEOUT_SECONDS`, `OLLAMA_BASE_URL`, `OPENAI_API_KEY`, `OPENAI_BASE_URL` 설정으로 서버에서 선택합니다.
 
 ### 사진 속성 추출
 
@@ -258,7 +266,7 @@ ollama pull moondream
 - vision 분석은 단일 사진을 직접 확인하는 단계이며 정량 image dataset은 아직 없습니다.
 - 이미지 해상도와 OpenAI `detail` 설정에 따른 비용·품질 비교는 아직 수행하지 않았습니다.
 - 모델 간 충돌 해결, human-in-the-loop와 LangGraph 기반 다단계 흐름은 요구사항 확정 후 검토합니다.
-- matching, embedding, GPS, 지도, 채팅과 게시글 DB 저장은 구현하지 않았습니다.
+- 지도 선택 UI, 채팅 다회차 질문과 AI 초안을 기존 수정 화면에 채우는 흐름은 아직 구현하지 않았습니다.
 
 ## 다음 단계
 

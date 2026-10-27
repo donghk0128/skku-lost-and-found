@@ -31,7 +31,11 @@ export default function CreatePostButton() {
   const close = (type?: "LOST" | "FOUND") =>
     animate(0, () => {
       setOpen(false);
-      if (type) router.push({ pathname: "/create-post", params: { type } });
+      if (type)
+        router.push({
+          pathname: "/create-post-method",
+          params: { type },
+        } as never);
     });
   const show = () => {
     trigger.current?.measureInWindow((left, top) => {

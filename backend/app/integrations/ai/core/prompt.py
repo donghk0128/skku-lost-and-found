@@ -2,7 +2,7 @@
 
 import json
 
-from core.schemas import DraftRequest
+from .schemas import DraftRequest
 
 
 SYSTEM_PROMPT = """You structure Korean campus lost-and-found reports as JSON.

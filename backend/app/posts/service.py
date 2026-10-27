@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import ApiError
 from app.posts.model import Category, Post, PostImage, now_utc
 from app.posts.repository import PostRepository
-from app.posts.schemas import PostCreateRequest, PostStatus, PostType, PostUpdateRequest
+from app.posts.schemas import CreationMethod, PostCreateRequest, PostStatus, PostType, PostUpdateRequest
 from app.posts.storage import get_post_image_storage
 from app.users.model import User
 
@@ -68,7 +68,12 @@ class PostService:
         return get_post_image_storage().download(image.storage_key), image.content_type
 
     @staticmethod
-    def create(db: Session, request: PostCreateRequest, author: User) -> Post:
+    def create(
+        db: Session,
+        request: PostCreateRequest,
+        author: User,
+        creation_method: CreationMethod = "MANUAL",
+    ) -> Post:
         PostService._require_category(db, request.category_id)
         post = Post(
             author_id=author.id,
@@ -82,6 +87,7 @@ class PostService:
             longitude=request.longitude,
             event_start_at=request.event_start_at,
             event_end_at=request.event_end_at,
+            creation_method=creation_method,
         )
         PostRepository.create(db, post)
         PostService._commit(db)

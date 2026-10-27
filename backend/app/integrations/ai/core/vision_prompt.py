@@ -1,6 +1,6 @@
 """Prompt shared by local and commercial vision providers."""
 
-from core.schemas import CATEGORY_LABELS
+from .schemas import CATEGORY_LABELS
 
 
 VISION_SYSTEM_PROMPT = f"""You extract observable attributes from a lost-and-found item photo.

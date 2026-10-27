@@ -41,6 +41,10 @@ class PostRepository:
         return db.get(Category, category_id)
 
     @staticmethod
+    def get_category_by_code(db: Session, code: str) -> Category | None:
+        return db.scalar(select(Category).where(Category.code == code))
+
+    @staticmethod
     def create(db: Session, post: Post) -> Post:
         db.add(post)
         return post

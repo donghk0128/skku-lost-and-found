@@ -4,6 +4,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.ai.router import router as ai_router
 from app.auth.router import router as auth_router
 from app.core.errors import ApiError
 from app.core.config import get_settings
@@ -42,6 +43,7 @@ def health_check() -> dict[str, str]:
 
 
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(ai_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(posts_router, prefix="/api/v1")
 app.include_router(matching_router, prefix="/api/v1")

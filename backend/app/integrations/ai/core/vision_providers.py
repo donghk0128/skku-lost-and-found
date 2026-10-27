@@ -8,9 +8,9 @@ from typing import Any
 import httpx
 from pydantic import ValidationError
 
-from core.providers import ProviderError
-from core.vision_prompt import VISION_SYSTEM_PROMPT, VISION_USER_PROMPT
-from core.vision_schemas import ImageAttributes, VisionResult, VisionUsage, vision_json_schema
+from .providers import ProviderError
+from .vision_prompt import VISION_SYSTEM_PROMPT, VISION_USER_PROMPT
+from .vision_schemas import ImageAttributes, VisionResult, VisionUsage, vision_json_schema
 
 
 class VisionProvider(ABC):

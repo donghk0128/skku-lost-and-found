@@ -14,6 +14,8 @@ export type Post = {
   created_at: string;
   item_name: string | null;
   location_text: string | null;
+  latitude: number | null;
+  longitude: number | null;
   event_start_at: string | null;
   event_end_at: string | null;
 };
@@ -27,6 +29,8 @@ export type CreatePost = {
   item_name?: string;
   event_start_at?: string;
   event_end_at?: string;
+  latitude?: number;
+  longitude?: number;
 };
 export type UpdatePost = {
   title: string;
@@ -48,6 +52,8 @@ export const postsApi = {
     ),
   create: (body: CreatePost, token: string) =>
     request<Post>("/posts", body, token),
+  createAiAssisted: (body: CreatePost, token: string) =>
+    request<Post>("/posts/ai-assisted", body, token),
   upload: async (id: string, asset: ImagePickerAsset, token: string) => {
     const form = new FormData();
     if (Platform.OS === "web") {

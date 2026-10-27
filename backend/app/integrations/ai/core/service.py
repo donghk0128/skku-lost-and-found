@@ -4,9 +4,9 @@ import os
 
 from dotenv import load_dotenv
 
-from core.providers import DraftProvider, OllamaProvider, OpenAIProvider
-from core.schemas import DraftRequest, GenerationResult
-from core.vision_providers import OllamaVisionProvider, OpenAIVisionProvider, VisionProvider
+from .providers import DraftProvider, OllamaProvider, OpenAIProvider
+from .schemas import DraftRequest, GenerationResult
+from .vision_providers import OllamaVisionProvider, OpenAIVisionProvider, VisionProvider
 
 
 load_dotenv()

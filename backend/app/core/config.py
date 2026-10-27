@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -26,6 +27,13 @@ class Settings(BaseSettings):
     email_verification_expire_minutes: int = 5
     email_verification_resend_seconds: int = 60
     allowed_email_domain: str = "skku.edu"
+
+    ai_provider: Literal["ollama", "openai"] = "ollama"
+    ai_model: str = "llama3.2:3b"
+    ai_timeout_seconds: float = 120
+    openai_api_key: str = ""
+    openai_base_url: str = "https://api.openai.com/v1"
+    ollama_base_url: str = "http://127.0.0.1:11434"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

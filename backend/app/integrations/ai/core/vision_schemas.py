@@ -4,7 +4,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from core.schemas import CategoryCode
+from .schemas import CategoryCode
 
 
 class ImageAttributes(BaseModel):

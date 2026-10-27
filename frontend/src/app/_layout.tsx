@@ -18,6 +18,8 @@ function AuthContent() {
     <Stack screenOptions={{ headerShown: false, animation: "slide_from_right", gestureEnabled: true, contentStyle: { backgroundColor: "#FFFFFF" } }}>
       <Stack.Protected guard={!!user}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="create-post-method" />
+        <Stack.Screen name="create-post-ai" />
         <Stack.Screen name="create-post" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="post/[id]" />

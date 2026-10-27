@@ -32,6 +32,17 @@ def create_post(
     return PostService.create(db, request, current_user)
 
 
+@router.post("/ai-assisted", response_model=PostResponse, status_code=status.HTTP_201_CREATED)
+def create_ai_assisted_post(
+    request: PostCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Post:
+    """Persist a user-confirmed post that began as an AI draft."""
+
+    return PostService.create(db, request, current_user, creation_method="AI_ASSISTED")
+
+
 @router.get("", response_model=PostListResponse)
 def list_posts(
     post_type: PostType | None = None,

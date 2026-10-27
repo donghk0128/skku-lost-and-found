@@ -7,8 +7,8 @@ from typing import Any
 import httpx
 from pydantic import ValidationError
 
-from core.prompt import build_messages
-from core.schemas import DraftRequest, GenerationResult, PostDraft, Usage, strict_json_schema
+from .prompt import build_messages
+from .schemas import DraftRequest, GenerationResult, PostDraft, Usage, strict_json_schema
 
 
 class ProviderError(Exception):
