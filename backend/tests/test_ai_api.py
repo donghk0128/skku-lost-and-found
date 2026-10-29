@@ -2,7 +2,7 @@
 
 import os
 from collections.abc import Generator
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timezone
 from uuid import UUID
 
 import pytest
@@ -16,10 +16,12 @@ os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-that-is-long-enough")
 
 from app.ai.router import get_draft_provider
+from app.ai.service import AIDraftService
 from app.core.database import Base, get_db
 from app.core.security import create_access_token
 from app.integrations.ai.core.providers import FakeProvider, ProviderError
 from app.integrations.ai.core.schemas import PostDraft
+from app.integrations.ai.knowledge.location_retriever import CampusLocation, LocationMatch
 from app.main import app
 from app.posts.model import Category, Post
 from app.users.model import User
@@ -78,8 +80,11 @@ def fake_provider() -> FakeProvider:
             item_name="에어팟 케이스",
             category_code="ELECTRONICS",
             location_text="모델이 추측한 장소",
-            event_start_at=datetime(2026, 10, 26, 10, tzinfo=timezone.utc),
-            event_end_at=datetime(2026, 10, 26, 10, tzinfo=timezone.utc),
+            event_start_date=date(2026, 10, 26),
+            event_end_date=date(2026, 10, 26),
+            event_start_time=None,
+            event_end_time=None,
+            time_precision="DATE_ONLY",
             keywords=["검은색", "에어팟"],
             missing_fields=[],
             warnings=[],
@@ -90,6 +95,21 @@ def fake_provider() -> FakeProvider:
 class ErrorProvider:
     def generate(self, _request: object) -> object:
         raise ProviderError("timeout")
+
+
+def test_approximate_event_time_expands_to_thirty_minute_kst_range() -> None:
+    draft = fake_provider().draft.model_copy(
+        update={
+            "event_start_time": time(15),
+            "event_end_time": time(15),
+            "time_precision": "APPROXIMATE",
+        }
+    )
+
+    start_at, end_at = AIDraftService._event_range(draft)
+
+    assert start_at is not None and start_at.isoformat() == "2026-10-26T14:30:00+09:00"
+    assert end_at is not None and end_at.isoformat() == "2026-10-26T15:30:00+09:00"
 
 
 def test_ai_draft_uses_confirmed_location_and_time(api_client: tuple[TestClient, Engine]) -> None:
@@ -146,19 +166,75 @@ def test_ai_draft_requires_login_and_converts_provider_errors(api_client: tuple[
     assert response.json()["error"]["code"] == "ai_timeout"
 
 
-def test_ai_chat_asks_for_missing_fact_and_becomes_ready(api_client: tuple[TestClient, Engine]) -> None:
+def test_ai_draft_returns_location_candidates_and_rejects_unretrieved_model_location(
+    api_client: tuple[TestClient, Engine],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, engine = api_client
+    author_id = create_author(engine)
+    with Session(engine) as db:
+        db.add(Category(id=1, code="ELECTRONICS", name="전자기기"))
+        db.commit()
+    app.dependency_overrides[get_draft_provider] = fake_provider
+    token = create_access_token(author_id)
+    first = CampusLocation("삼성학술정보관", ("디도",))
+    second = CampusLocation("학생회관", ("학관",))
+    monkeypatch.setattr(
+        "app.ai.service.find_locations",
+        lambda _query: (LocationMatch(first, "디도", "3층"), LocationMatch(second, "학관")),
+    )
+
+    ambiguous = client.post(
+        "/api/v1/ai/post-drafts",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"post_type": "LOST", "natural_language": "디도 3층 또는 학관에서 잃어버렸어요."},
+    )
+
+    assert ambiguous.status_code == 200
+    assert ambiguous.json()["location_text"] is None
+    assert ambiguous.json()["location_candidates"] == ["삼성학술정보관 3층", "학생회관"]
+    assert "location" in ambiguous.json()["missing_fields"]
+
+    monkeypatch.setattr("app.ai.service.find_locations", lambda _query: ())
+    unknown = client.post(
+        "/api/v1/ai/post-drafts",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"post_type": "LOST", "natural_language": "등록되지 않은 장소에서 잃어버렸어요."},
+    )
+
+    assert unknown.status_code == 200
+    assert unknown.json()["location_text"] is None
+    assert unknown.json()["location_candidates"] == []
+    assert "location" in unknown.json()["missing_fields"]
+
+
+def test_ai_chat_asks_for_missing_fact_and_becomes_ready(
+    api_client: tuple[TestClient, Engine],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     client, engine = api_client
     author_id = create_author(engine)
     with Session(engine) as db:
         db.add(Category(id=1, code="ELECTRONICS", name="전자기기"))
         db.commit()
     token = create_access_token(author_id)
+    campus_location = CampusLocation("중앙학술정보관", ("중앙도서관",))
+
+    def retrieve_location(query: str) -> tuple[LocationMatch, ...]:
+        if "중앙도서관" not in query:
+            return ()
+        return (LocationMatch(campus_location, "중앙도서관", "3층"),)
+
+    monkeypatch.setattr("app.ai.workflow.find_locations", retrieve_location)
 
     incomplete = fake_provider()
     incomplete.draft.missing_fields = ["location", "event_time"]
     incomplete.draft.location_text = None
-    incomplete.draft.event_start_at = None
-    incomplete.draft.event_end_at = None
+    incomplete.draft.event_start_date = None
+    incomplete.draft.event_end_date = None
+    incomplete.draft.event_start_time = None
+    incomplete.draft.event_end_time = None
+    incomplete.draft.time_precision = None
     app.dependency_overrides[get_draft_provider] = lambda: incomplete
     response = client.post(
         "/api/v1/ai/post-draft-chat",
@@ -184,6 +260,8 @@ def test_ai_chat_asks_for_missing_fact_and_becomes_ready(api_client: tuple[TestC
     assert response.status_code == 200
     assert response.json()["status"] == "READY"
     assert response.json()["draft"]["category_code"] == "ELECTRONICS"
+    assert response.json()["draft"]["event_start_at"] == "2026-10-26T00:00:00+09:00"
+    assert response.json()["draft"]["event_end_at"] == "2026-10-26T23:59:59.999999+09:00"
 
 
 def test_ai_chat_requires_login_and_rejects_empty_history(api_client: tuple[TestClient, Engine]) -> None:

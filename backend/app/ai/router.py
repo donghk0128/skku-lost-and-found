@@ -27,6 +27,7 @@ def get_draft_provider() -> DraftProvider:
         settings.openai_api_key,
         settings.openai_base_url,
         settings.ai_timeout_seconds,
+        settings.ai_reasoning_effort,
     )
 
 

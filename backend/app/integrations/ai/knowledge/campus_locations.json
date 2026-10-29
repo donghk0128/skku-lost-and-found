@@ -1,0 +1,16 @@
+{
+  "locations": [
+    {
+      "canonical_name": "삼성학술정보관",
+      "aliases": ["디도", "디지털도서관", "삼성도서관", "율전 도서관"]
+    },
+    {
+      "canonical_name": "학생회관",
+      "aliases": ["학관", "학생회관"]
+    },
+    {
+      "canonical_name": "중앙학술정보관",
+      "aliases": ["명륜 도서관", "중도"]
+    }
+  ]
+}

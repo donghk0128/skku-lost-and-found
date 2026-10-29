@@ -19,6 +19,8 @@ export default function CreatePostAiScreen() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([{ role: "assistant", content: `언제, 어디서, 무엇을 ${postType === "LOST" ? "잃어버렸는지" : "주웠는지"} 설명해주세요.` }]);
   const [draft, setDraft] = useState<AIDraft | null>(null);
+  const [pendingField, setPendingField] = useState<"item_name" | "location" | "event_time" | null>(null);
+  const [collectedFields, setCollectedFields] = useState<Partial<Record<"item_name" | "location" | "event_time", string>>>({});
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -44,8 +46,16 @@ export default function CreatePostAiScreen() {
     setReady(false);
     setError("");
     try {
-      const result = await aiApi.continueChat({ post_type: postType, messages: userMessages }, await authenticatedToken());
+      const result = await aiApi.continueChat({
+        post_type: postType,
+        messages: userMessages,
+        draft: draft ?? undefined,
+        pending_field: pendingField,
+        collected_fields: collectedFields,
+      }, await authenticatedToken());
       setDraft(result.draft);
+      setPendingField(result.pending_field);
+      setCollectedFields(result.collected_fields);
       setReady(result.status === "READY");
       setMessages((current) => [...current, { role: "assistant", content: result.assistant_message }]);
     } catch (cause) {

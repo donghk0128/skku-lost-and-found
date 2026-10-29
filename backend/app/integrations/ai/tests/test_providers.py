@@ -13,8 +13,11 @@ def test_fake_provider_returns_validated_result() -> None:
         item_name="열쇠",
         category_code="KEY",
         location_text="학생회관",
-        event_start_at=None,
-        event_end_at=None,
+        event_start_date=None,
+        event_end_date=None,
+        event_start_time=None,
+        event_end_time=None,
+        time_precision=None,
         keywords=["열쇠"],
         missing_fields=["event_time"],
         warnings=[],
@@ -39,3 +42,42 @@ def test_openai_output_text_detects_refusal() -> None:
         assert error.kind == "refused"
     else:
         raise AssertionError("Expected refusal to raise ProviderError")
+
+
+def test_openai_provider_sends_configured_reasoning_effort(monkeypatch) -> None:
+    draft = PostDraft(
+        title="열쇠 습득",
+        description="학생회관에서 열쇠를 주웠습니다.",
+        item_name="열쇠",
+        category_code="KEY",
+        location_text="학생회관",
+        event_start_date=None,
+        event_end_date=None,
+        event_start_time=None,
+        event_end_time=None,
+        time_precision=None,
+        keywords=["열쇠"],
+        missing_fields=["event_time"],
+        warnings=[],
+    )
+    captured: dict = {}
+
+    def fake_post(_url: str, **kwargs):
+        captured.update(kwargs["json"])
+        return {
+            "status": "completed",
+            "output": [{"content": [{"type": "output_text", "text": draft.model_dump_json()}]}],
+            "usage": {},
+        }, 0.1
+
+    provider = OpenAIProvider("gpt-6-luna", "test-key", reasoning_effort="none")
+    monkeypatch.setattr(provider, "_post", fake_post)
+    provider.generate(
+        DraftRequest(
+            post_type="FOUND",
+            natural_language="학생회관에서 열쇠를 주웠어요.",
+            reference_time=datetime.now(timezone.utc),
+        )
+    )
+
+    assert captured["reasoning"] == {"effort": "none"}

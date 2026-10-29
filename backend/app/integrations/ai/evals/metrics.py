@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from datetime import datetime
+from datetime import date
 from statistics import median
 from typing import Iterable
 
@@ -38,21 +38,21 @@ def set_f1(expected: Iterable[str], actual: Iterable[str]) -> float:
     return 2 * overlap / (len(expected_set) + len(actual_set))
 
 
-def time_match(expected: datetime | None, actual: datetime | None, tolerance_minutes: int = 15) -> float:
-    """Score timestamps within a fixed tolerance as correct."""
+def date_match(expected: date | None, actual: date | None) -> float:
+    """Score extracted calendar dates."""
 
     if expected is None and actual is None:
         return 1.0
     if expected is None or actual is None:
         return 0.0
-    return float(abs((expected - actual).total_seconds()) <= tolerance_minutes * 60)
+    return float(expected == actual)
 
 
 def score_draft(expected: PostDraft, actual: PostDraft) -> dict[str, float]:
     """Score one validated draft against its gold label."""
 
-    start_score = time_match(expected.event_start_at, actual.event_start_at)
-    end_score = time_match(expected.event_end_at, actual.event_end_at)
+    start_score = date_match(expected.event_start_date, actual.event_start_date)
+    end_score = date_match(expected.event_end_date, actual.event_end_date)
     return {
         "category_accuracy": float(expected.category_code == actual.category_code),
         "item_name_f1": token_f1(expected.item_name, actual.item_name),

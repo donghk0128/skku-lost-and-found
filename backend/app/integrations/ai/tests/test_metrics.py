@@ -1,8 +1,8 @@
 """Tests for deterministic baseline metrics."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import date
 
-from evals.metrics import set_f1, time_match, token_f1
+from evals.metrics import date_match, set_f1, token_f1
 
 
 def test_token_f1_handles_equal_and_missing_values() -> None:
@@ -15,7 +15,7 @@ def test_set_f1_ignores_order() -> None:
     assert set_f1(["location", "event_time"], ["event_time", "location"]) == 1
 
 
-def test_time_match_uses_fifteen_minute_tolerance() -> None:
-    expected = datetime(2026, 10, 18, 12, tzinfo=timezone.utc)
-    assert time_match(expected, expected + timedelta(minutes=15)) == 1
-    assert time_match(expected, expected + timedelta(minutes=16)) == 0
+def test_date_match_requires_same_calendar_date() -> None:
+    expected = date(2026, 10, 18)
+    assert date_match(expected, expected) == 1
+    assert date_match(expected, date(2026, 10, 19)) == 0

@@ -14,6 +14,7 @@
 | 서비스 통합 | 텍스트 구현 | 인증된 다회차 채팅, 초안 미리보기, AI-assisted 게시 및 기존 작성 화면 수정 흐름 연결 |
 | 앱 사진 분석 | 후순위 | 프론트 사진 첨부 흐름 구현 후 vision provider와 연결 예정 |
 | LangGraph workflow | 구현 | 텍스트 초안 추출, 누락 정보 질문 및 검토 준비 상태를 조건부 edge로 관리 |
+| 학교 장소 사전 검색 | 기본 구현 | 문장 속 정식 명칭·별칭 후보 검색, 층 정보 보존 및 복수 후보 확인 |
 
 ## 주요 기능
 
@@ -23,10 +24,11 @@
 
 - `title`, `description`, `item_name`
 - `category_code`, `location_text`
-- `event_start_at`, `event_end_at`
+- `event_start_date`, `event_end_date`
+- `event_start_time`, `event_end_time`, `time_precision` (선택 시각과 정밀도)
 - `keywords`, `missing_fields`, `warnings`
 
-모든 provider는 같은 Pydantic schema를 사용합니다. 모호한 시간과 장소는 임의로 확정하지 않고 누락 필드 또는 경고로 반환하도록 prompt를 구성했습니다. 생성된 모든 필드는 Streamlit에서 수정할 수 있습니다.
+모든 provider는 같은 Pydantic schema를 사용합니다. 날짜는 필수 정보이며 `event_start_date`, `event_end_date`에 `YYYY-MM-DD`로 반환합니다. 시각은 사용자가 말한 경우에만 `event_start_time`, `event_end_time`에 기록하고 `time_precision`을 `EXACT`, `APPROXIMATE`, `RANGE` 중 하나로 지정합니다. 날짜만 있으면 시각은 `null`, 정밀도는 `DATE_ONLY`이며 추가 질문을 하지 않습니다. 서비스 API는 `DATE_ONLY`를 한국 시간 기준 시작일 00:00부터 종료일 23:59:59까지, `APPROXIMATE`를 명시 시각 전후 30분으로 변환합니다. 날짜와 장소가 모호하면 임의로 확정하지 않고 누락 필드 또는 경고로 반환하며, 생성된 모든 필드는 Streamlit에서 수정할 수 있습니다.
 
 ### FastAPI 초안 API
 
@@ -34,11 +36,11 @@
 
 지도에서 사용자가 확정한 장소·위경도와 발생 시각을 함께 보내면 해당 값이 모델의 추론값보다 우선합니다. 최종 확인된 글은 `POST /api/v1/posts/ai-assisted`로 저장할 수 있고, 이 경로는 게시글의 `creation_method`를 `AI_ASSISTED`로 기록합니다.
 
-텍스트 채팅 화면은 `POST /api/v1/ai/post-draft-chat`에 현재까지의 사용자 입력만 전송합니다. 서버는 전체 입력을 다시 구조화한 뒤 `NEEDS_INPUT`이면 물품·장소·시간 중 한 가지를 추가 질문하고, `READY`이면 미리보기 가능한 초안을 반환합니다. 대화와 미완성 초안은 DB에 저장하지 않으며 클라이언트 메모리에서만 유지합니다. 준비된 초안은 바로 게시하거나 기존 작성 화면에 채워 사용자가 수정할 수 있습니다.
+텍스트 채팅 화면은 `POST /api/v1/ai/post-draft-chat`에 현재까지의 사용자 입력과 직전 초안, 답변 중인 필드 및 수집된 슬롯을 전송합니다. 최초 요청에서 모델로 초안을 추출하고 `NEEDS_INPUT`이면 물품·장소·시간 중 한 가지를 추가 질문합니다. 중간 답변은 모델을 다시 호출하지 않고 `collect_answer` 노드에서 슬롯에 저장하며, 필수 정보가 모두 모였을 때만 전체 대화를 모델에 보내 최종 초안을 생성합니다. 대화와 미완성 초안은 DB에 저장하지 않으며 클라이언트 메모리에서만 유지합니다. 준비된 초안은 바로 게시하거나 기존 작성 화면에 채워 사용자가 수정할 수 있습니다.
 
-이 분기는 `app/ai/workflow.py`의 LangGraph `StateGraph`가 수행합니다. 현재 버전은 기존 API와 개인정보 보존 정책을 유지하기 위해 매 요청마다 클라이언트의 전체 사용자 입력으로 그래프를 실행하는 stateless 구조입니다. checkpointer, `thread_id` 및 `interrupt()` 기반 대화 재개는 아직 사용하지 않습니다. 이후 학교 장소 RAG와 구조화된 버튼 응답을 별도 노드로 추가한 다음, 앱 종료 후 대화 복구가 필요할 때 Human in the Loop와 checkpointer를 도입합니다.
+이 분기는 `app/ai/workflow.py`의 LangGraph `StateGraph`가 수행합니다. `retrieve_location` 노드는 `knowledge/campus_locations.json`의 정식 명칭과 별칭을 문장에서 검색합니다. 단일 후보만 정식 장소로 확정하고 `디도 3층` 같은 층 표현을 유지하며, 복수 후보는 `location_candidates`로 반환해 사용자에게 확인합니다. 검색 결과가 없으면 모델이 생성한 장소를 폐기하고 장소를 다시 질문합니다. 현재 버전은 매 요청마다 클라이언트가 전달한 대화와 슬롯 상태로 그래프를 실행하는 stateless 구조입니다. checkpointer, `thread_id` 및 `interrupt()` 기반 대화 재개는 아직 사용하지 않습니다. 앱 종료 후 대화 복구가 필요할 때 Human in the Loop와 checkpointer를 도입합니다.
 
-서비스 API의 provider와 model은 클라이언트가 선택하지 않습니다. `backend/.env`의 `AI_PROVIDER`, `AI_MODEL`, `AI_TIMEOUT_SECONDS`, `OLLAMA_BASE_URL`, `OPENAI_API_KEY`, `OPENAI_BASE_URL` 설정으로 서버에서 선택합니다.
+서비스 API의 provider와 model은 클라이언트가 선택하지 않습니다. `backend/.env`의 `AI_PROVIDER`, `AI_MODEL`, `AI_TIMEOUT_SECONDS`, `AI_REASONING_EFFORT`, `OLLAMA_BASE_URL`, `OPENAI_API_KEY`, `OPENAI_BASE_URL` 설정으로 서버에서 선택합니다.
 
 ### 사진 속성 추출 (아직 구현하지 않았음)
 
@@ -95,6 +97,7 @@ ai/
 | `OPENAI_BASE_URL` | 아니요 | OpenAI API 기본 주소 | `https://api.openai.com/v1` |
 | `OLLAMA_BASE_URL` | 아니요 | 로컬 Ollama API 주소 | `http://127.0.0.1:11434` |
 | `AI_TIMEOUT_SECONDS` | 아니요 | provider 호출 제한 시간 | `120` |
+| `AI_REASONING_EFFORT` | 아니요 | OpenAI Responses API 추론 강도 | `none` |
 | `LANGSMITH_TRACING` | 아니요 | LangGraph 실행 추적 활성화 | `false` |
 | `LANGSMITH_API_KEY` | 추적 사용 시 | LangSmith API 인증 key | 빈 값 |
 | `LANGSMITH_PROJECT` | 아니요 | 트레이스를 모을 LangSmith 프로젝트 | `skku-lost-and-found-local` |
