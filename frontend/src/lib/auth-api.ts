@@ -32,9 +32,10 @@ export async function request<T>(
   body?: object,
   token?: string,
   method?: "PATCH" | "DELETE",
+  timeoutMs = 15000,
 ): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${baseUrl}${path}`, {
       method: method ?? (body ? "POST" : "GET"),
@@ -56,6 +57,9 @@ export async function request<T>(
     return data as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("요청 처리 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.");
+    }
     throw new Error(
       "서버에 연결하지 못했습니다. 서버 실행 상태와 API 주소를 확인해주세요.",
     );

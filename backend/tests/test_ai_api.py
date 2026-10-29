@@ -146,6 +146,63 @@ def test_ai_draft_requires_login_and_converts_provider_errors(api_client: tuple[
     assert response.json()["error"]["code"] == "ai_timeout"
 
 
+def test_ai_chat_asks_for_missing_fact_and_becomes_ready(api_client: tuple[TestClient, Engine]) -> None:
+    client, engine = api_client
+    author_id = create_author(engine)
+    with Session(engine) as db:
+        db.add(Category(id=1, code="ELECTRONICS", name="전자기기"))
+        db.commit()
+    token = create_access_token(author_id)
+
+    incomplete = fake_provider()
+    incomplete.draft.missing_fields = ["location", "event_time"]
+    incomplete.draft.location_text = None
+    incomplete.draft.event_start_at = None
+    incomplete.draft.event_end_at = None
+    app.dependency_overrides[get_draft_provider] = lambda: incomplete
+    response = client.post(
+        "/api/v1/ai/post-draft-chat",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"post_type": "LOST", "messages": [{"role": "user", "content": "에어팟을 잃어버렸어요."}]},
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "NEEDS_INPUT"
+    assert "어디" in response.json()["assistant_message"]
+
+    app.dependency_overrides[get_draft_provider] = fake_provider
+    response = client.post(
+        "/api/v1/ai/post-draft-chat",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "post_type": "LOST",
+            "messages": [
+                {"role": "user", "content": "에어팟을 잃어버렸어요."},
+                {"role": "user", "content": "어제 중앙도서관 3층이에요."},
+            ],
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "READY"
+    assert response.json()["draft"]["category_code"] == "ELECTRONICS"
+
+
+def test_ai_chat_requires_login_and_rejects_empty_history(api_client: tuple[TestClient, Engine]) -> None:
+    client, engine = api_client
+    response = client.post(
+        "/api/v1/ai/post-draft-chat",
+        json={"post_type": "FOUND", "messages": [{"role": "user", "content": "열쇠를 주웠어요."}]},
+    )
+    assert response.status_code == 401
+
+    author_id = create_author(engine)
+    response = client.post(
+        "/api/v1/ai/post-draft-chat",
+        headers={"Authorization": f"Bearer {create_access_token(author_id)}"},
+        json={"post_type": "FOUND", "messages": []},
+    )
+    assert response.status_code == 422
+
+
 def test_ai_assisted_post_is_labeled_when_persisted(api_client: tuple[TestClient, Engine]) -> None:
     client, engine = api_client
     author_id = create_author(engine)

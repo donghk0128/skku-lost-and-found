@@ -17,6 +17,12 @@ export type AIDraft = {
   warnings: string[];
 };
 
+export type AIChatResult = {
+  status: "NEEDS_INPUT" | "READY";
+  assistant_message: string;
+  draft: AIDraft;
+};
+
 export const aiApi = {
   createDraft: (
     body: {
@@ -31,5 +37,12 @@ export const aiApi = {
       confirmed_event_end_at?: string;
     },
     token: string,
-  ) => request<AIDraft>("/ai/post-drafts", body, token),
+  ) => request<AIDraft>("/ai/post-drafts", body, token, undefined, 130000),
+  continueChat: (
+    body: {
+      post_type: "LOST" | "FOUND";
+      messages: { role: "user"; content: string }[];
+    },
+    token: string,
+  ) => request<AIChatResult>("/ai/post-draft-chat", body, token, undefined, 130000),
 };

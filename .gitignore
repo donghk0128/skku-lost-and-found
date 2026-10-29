@@ -1,6 +1,7 @@
 # Environment secrets and local Python tools
 .env
 *.env
+.env.local
 !.env.example
 .venv/
 __pycache__/

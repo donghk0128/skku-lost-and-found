@@ -1,8 +1,4 @@
-# AI 게시글 작성 및 모델 평가 프로토타입
-
-성균관대학교 분실물·습득물 서비스의 AI 기능을 독립적으로 검증하기 위한 프로토타입입니다. 한국어 자연어 설명을 구조화된 게시글 초안으로 변환하고, 사진에서 물품 속성을 추출합니다. Ollama 로컬 모델과 OpenAI 모델을 같은 출력 schema로 호출하여 품질, 지연 시간, token 사용량과 비용을 비교할 수 있습니다.
-
-현재 애플리케이션은 `backend`, DB, 인증 및 `frontend`에 연결되지 않은 Streamlit 테스트 환경입니다. 입력과 이미지를 영구 저장하지 않으며 생성 결과는 검토 후 JSON으로 내려받습니다.
+# AI 게시글 작성
 
 ## 구현 현황
 
@@ -15,7 +11,9 @@
 | Vision provider | 구현 | Ollama `moondream`과 OpenAI 이미지 입력 지원 |
 | Text 평가 harness | 구현 | 한국어 seed 데이터 100건, 자동 지표, JSON·CSV 결과 및 사람 평가표 생성 |
 | Vision 정량 평가 | 계획 | 라벨링 이미지셋, 해상도별 품질·token·비용 및 환각률 비교 필요 |
-| 서비스 통합 | 진행 중 | 인증된 `POST /api/v1/ai/post-drafts`가 검증된 초안을 반환하며, 최종 수정 화면·지도 선택 UI는 이어서 연결 필요 |
+| 서비스 통합 | 텍스트 구현 | 인증된 다회차 채팅, 초안 미리보기, AI-assisted 게시 및 기존 작성 화면 수정 흐름 연결 |
+| 앱 사진 분석 | 후순위 | 프론트 사진 첨부 흐름 구현 후 vision provider와 연결 예정 |
+| LangGraph workflow | 구현 | 텍스트 초안 추출, 누락 정보 질문 및 검토 준비 상태를 조건부 edge로 관리 |
 
 ## 주요 기능
 
@@ -36,9 +34,13 @@
 
 지도에서 사용자가 확정한 장소·위경도와 발생 시각을 함께 보내면 해당 값이 모델의 추론값보다 우선합니다. 최종 확인된 글은 `POST /api/v1/posts/ai-assisted`로 저장할 수 있고, 이 경로는 게시글의 `creation_method`를 `AI_ASSISTED`로 기록합니다.
 
+텍스트 채팅 화면은 `POST /api/v1/ai/post-draft-chat`에 현재까지의 사용자 입력만 전송합니다. 서버는 전체 입력을 다시 구조화한 뒤 `NEEDS_INPUT`이면 물품·장소·시간 중 한 가지를 추가 질문하고, `READY`이면 미리보기 가능한 초안을 반환합니다. 대화와 미완성 초안은 DB에 저장하지 않으며 클라이언트 메모리에서만 유지합니다. 준비된 초안은 바로 게시하거나 기존 작성 화면에 채워 사용자가 수정할 수 있습니다.
+
+이 분기는 `app/ai/workflow.py`의 LangGraph `StateGraph`가 수행합니다. 현재 버전은 기존 API와 개인정보 보존 정책을 유지하기 위해 매 요청마다 클라이언트의 전체 사용자 입력으로 그래프를 실행하는 stateless 구조입니다. checkpointer, `thread_id` 및 `interrupt()` 기반 대화 재개는 아직 사용하지 않습니다. 이후 학교 장소 RAG와 구조화된 버튼 응답을 별도 노드로 추가한 다음, 앱 종료 후 대화 복구가 필요할 때 Human in the Loop와 checkpointer를 도입합니다.
+
 서비스 API의 provider와 model은 클라이언트가 선택하지 않습니다. `backend/.env`의 `AI_PROVIDER`, `AI_MODEL`, `AI_TIMEOUT_SECONDS`, `OLLAMA_BASE_URL`, `OPENAI_API_KEY`, `OPENAI_BASE_URL` 설정으로 서버에서 선택합니다.
 
-### 사진 속성 추출
+### 사진 속성 추출 (아직 구현하지 않았음)
 
 첨부한 사진 중 한 장을 선택하여 다음 정보를 구조화합니다.
 
@@ -93,6 +95,10 @@ ai/
 | `OPENAI_BASE_URL` | 아니요 | OpenAI API 기본 주소 | `https://api.openai.com/v1` |
 | `OLLAMA_BASE_URL` | 아니요 | 로컬 Ollama API 주소 | `http://127.0.0.1:11434` |
 | `AI_TIMEOUT_SECONDS` | 아니요 | provider 호출 제한 시간 | `120` |
+| `LANGSMITH_TRACING` | 아니요 | LangGraph 실행 추적 활성화 | `false` |
+| `LANGSMITH_API_KEY` | 추적 사용 시 | LangSmith API 인증 key | 빈 값 |
+| `LANGSMITH_PROJECT` | 아니요 | 트레이스를 모을 LangSmith 프로젝트 | `skku-lost-and-found-local` |
+| `LANGSMITH_ENDPOINT` | 아니요 | LangSmith API 주소 | `https://api.smith.langchain.com` |
 
 모델과 provider는 Streamlit 또는 평가 명령의 인자로 선택합니다. 가격 계산은 [`evals/pricing.json`](./evals/pricing.json)에 등록된 모델만 지원하며, 평가 전에 공식 가격과 확인 날짜를 갱신해야 합니다.
 
@@ -115,6 +121,26 @@ Copy-Item .env.example .env
 ```
 
 OpenAI를 사용할 경우 `.env`의 `OPENAI_API_KEY`에 개인 key를 직접 설정합니다. key를 코드, README, 테스트 또는 오류 출력에 넣지 않습니다.
+
+### LangSmith 추적
+
+백엔드의 LangGraph 실행은 `skku-post-draft-chat` 그래프로 표시되며 각 요청은 `post-draft-chat-turn` 실행으로 기록됩니다. 시험 환경에서 트레이스를 확인하려면 `backend/.env`에 다음 값을 설정합니다.
+
+```dotenv
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=본인의_LangSmith_API_key
+LANGSMITH_PROJECT=skku-lost-and-found-local
+LANGSMITH_ENDPOINT=https://api.smith.langchain.com
+```
+
+저장소 루트에서 백엔드 컨테이너를 다시 생성하면 변경된 환경 변수가 적용됩니다.
+
+```powershell
+docker compose up -d --force-recreate backend
+docker compose logs -f backend
+```
+
+그 후 AI 채팅 요청을 한 번 보내고 LangSmith의 `skku-lost-and-found-local` 프로젝트에서 그래프 노드, 입력, 출력과 실행 시간을 확인합니다. 현재 시험 설정은 대화 원문과 모델 결과를 LangSmith로 전송하므로 실제 개인정보나 민감한 분실물 정보에는 사용하지 않습니다. 추적을 끄려면 `LANGSMITH_TRACING=false`로 변경한 뒤 백엔드 컨테이너를 다시 생성합니다.
 
 ### 3. Ollama 모델 준비
 
@@ -219,7 +245,7 @@ python -m pytest -q
 ## 개인정보와 보안
 
 - `.env`, API key와 인증 정보는 Git에 포함하지 않습니다.
-- 사용자 자연어, 위치, 이미지와 모델 원문 응답을 애플리케이션 로그에 기록하지 않습니다.
+- 사용자 자연어, 위치, 이미지와 모델 원문 응답을 애플리케이션 로그에 기록하지 않습니다. 단, `LANGSMITH_TRACING=true`인 시험 환경에서는 LangGraph 입력과 출력이 LangSmith 트레이스로 전송됩니다.
 - Streamlit에서 선택한 사진은 메모리에서 provider로 전송하며 파일 또는 DB에 저장하지 않습니다.
 - OpenAI vision 요청에는 `store: false`를 지정합니다.
 - prompt injection 문장은 시스템 지시가 아닌 사용자 데이터로 취급합니다.
@@ -227,46 +253,6 @@ python -m pytest -q
 
 OpenAI를 선택하면 입력과 선택한 이미지가 외부 OpenAI API로 전송됩니다. Ollama를 선택하면 설정된 `OLLAMA_BASE_URL`로 전송됩니다.
 
-## 문제 해결과 한계
-
-### `ollama` 명령을 찾을 수 없음
-
-Ollama 설치 후 PowerShell을 다시 열고 확인합니다.
-
-```powershell
-ollama --version
-```
-
-Windows에서 PATH 반영 전이라면 설치 경로의 실행 파일을 직접 사용할 수 있습니다.
-
-```powershell
-& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" list
-```
-
-### `model not found`
-
-선택한 모델을 먼저 내려받습니다.
-
-```powershell
-ollama pull llama3.2:3b
-ollama pull moondream
-```
-
-### 로컬 응답이 느림
-
-장비의 VRAM이 부족하면 일부 연산이 CPU로 이동합니다. 테스트 장비에서 `llama3.2:3b` 단일 초안은 약 22초가 걸렸으며, 이는 측정 환경에 종속된 값입니다. 더 작은 모델, GPU 서버 또는 상용 API와 동일 조건으로 비교해야 합니다.
-
-### 평가 실행 중 출력이 없음
-
-`run_text_eval.py`는 완료 전까지 진행률을 출력하지 않습니다. 결과 파일도 전체 실행이 끝난 후 생성되므로 터미널 prompt가 돌아오기 전에는 중단하지 않습니다. 중단 시 해당 실행의 중간 결과는 보존되지 않습니다.
-
-### 알려진 제약
-
-- text dataset은 실제 사용자 데이터가 아닌 템플릿 기반 seed입니다.
-- vision 분석은 단일 사진을 직접 확인하는 단계이며 정량 image dataset은 아직 없습니다.
-- 이미지 해상도와 OpenAI `detail` 설정에 따른 비용·품질 비교는 아직 수행하지 않았습니다.
-- 모델 간 충돌 해결, human-in-the-loop와 LangGraph 기반 다단계 흐름은 요구사항 확정 후 검토합니다.
-- 지도 선택 UI, 채팅 다회차 질문과 AI 초안을 기존 수정 화면에 채우는 흐름은 아직 구현하지 않았습니다.
 
 ## 다음 단계
 
@@ -274,7 +260,6 @@ ollama pull moondream
 2. 이미지 해상도와 전송 detail을 변경하여 품질, latency, token과 비용의 균형점을 찾습니다.
 3. 팀 회의를 통해 필수 추출 필드와 키워드를 확정하고 schema와 prompt를 조정합니다.
 4. 라벨링된 이미지 데이터셋과 vision 평가 harness를 구축합니다.
-5. 다단계 분기, 충돌 해결 또는 사람 검토가 필요할 경우 LangGraph 도입을 검토합니다.
 
 ## 관련 문서
 
