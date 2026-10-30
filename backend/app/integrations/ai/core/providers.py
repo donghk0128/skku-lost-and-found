@@ -114,10 +114,12 @@ class OpenAIProvider(HttpProvider):
         api_key: str,
         base_url: str = "https://api.openai.com/v1",
         timeout_seconds: float = 120,
+        reasoning_effort: str = "none",
     ):
         super().__init__(model, timeout_seconds)
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
+        self.reasoning_effort = reasoning_effort
 
     def _generate_once(self, request: DraftRequest) -> GenerationResult:
         if not self.api_key:
@@ -127,6 +129,7 @@ class OpenAIProvider(HttpProvider):
             headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
             json={
                 "model": self.model,
+                "reasoning": {"effort": self.reasoning_effort},
                 "input": build_messages(request),
                 "text": {
                     "format": {

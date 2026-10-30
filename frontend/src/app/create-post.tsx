@@ -30,9 +30,16 @@ import PinIcon from "@/assets/icons/location.svg";
 
 export default function CreatePostScreen() {
   const router = useRouter();
-  const { type, editId } = useLocalSearchParams<{
+  const { type, editId, creationMethod, title: initialTitle, description: initialDescription, categoryId, place: initialPlace, startAt, endAt } = useLocalSearchParams<{
     type?: string;
     editId?: string;
+    creationMethod?: string;
+    title?: string;
+    description?: string;
+    categoryId?: string;
+    place?: string;
+    startAt?: string;
+    endAt?: string;
   }>();
   const { user } = useAuth();
   const editing = !!editId;
@@ -46,12 +53,12 @@ export default function CreatePostScreen() {
   const [categoryError, setCategoryError] = useState("");
   const [category, setCategory] = useState<Category | null>(null);
   const [categoryOpen, setCategoryOpen] = useState(false);
-  const [start, setStart] = useState<Date | null>(null);
-  const [end, setEnd] = useState<Date | null>(null);
-  const [place, setPlace] = useState("");
+  const [start, setStart] = useState<Date | null>(() => startAt ? new Date(startAt) : null);
+  const [end, setEnd] = useState<Date | null>(() => endAt ? new Date(endAt) : null);
+  const [place, setPlace] = useState(initialPlace ?? "");
   const [features, setFeatures] = useState("");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [title, setTitle] = useState(initialTitle ?? "");
+  const [description, setDescription] = useState(initialDescription ?? "");
   const [photos, setPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -70,7 +77,12 @@ export default function CreatePostScreen() {
     postsApi
       .categories()
       .then((items) => {
-        if (active) setCategories(items);
+        if (active) {
+          setCategories(items);
+          if (!editId && categoryId) {
+            setCategory(items.find((item) => item.id === Number(categoryId)) ?? null);
+          }
+        }
       })
       .catch(() => {
         if (active)
@@ -81,8 +93,7 @@ export default function CreatePostScreen() {
     return () => {
       active = false;
     };
-  }, []);
-
+  }, [categoryId, editId]);
   useEffect(() => {
     if (!editId) return;
     let active = true;
@@ -226,7 +237,7 @@ export default function CreatePostScreen() {
         };
         const post = editId
           ? await postsApi.update(editId, body, session.access_token)
-          : await postsApi.create(
+          : await (creationMethod === "AI_ASSISTED" ? postsApi.createAiAssisted : postsApi.create)(
               {
                 post_type: postType,
                 ...body,

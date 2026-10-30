@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     ai_provider: Literal["ollama", "openai"] = "ollama"
     ai_model: str = "llama3.2:3b"
     ai_timeout_seconds: float = 120
+    ai_reasoning_effort: Literal["none", "low", "medium", "high", "xhigh", "max"] = "none"
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
     ollama_base_url: str = "http://127.0.0.1:11434"

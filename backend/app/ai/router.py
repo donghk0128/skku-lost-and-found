@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.ai.schemas import AIDraftCreateRequest, AIDraftResponse
+from app.ai.schemas import AIChatRequest, AIChatResponse, AIDraftCreateRequest, AIDraftResponse
 from app.ai.service import AIDraftService
 from app.auth.service import get_current_user
 from app.core.config import get_settings
@@ -27,6 +27,7 @@ def get_draft_provider() -> DraftProvider:
         settings.openai_api_key,
         settings.openai_base_url,
         settings.ai_timeout_seconds,
+        settings.ai_reasoning_effort,
     )
 
 
@@ -41,6 +42,22 @@ def create_post_draft(
 
     try:
         return AIDraftService.generate(db, request, provider)
+    except ProviderError as error:
+        status_code = 429 if error.kind == "rate_limited" else 503
+        raise ApiError(status_code, f"ai_{error.kind}", provider_error_message(error)) from error
+
+
+@router.post("/post-draft-chat", response_model=AIChatResponse)
+def continue_post_draft_chat(
+    request: AIChatRequest,
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    provider: DraftProvider = Depends(get_draft_provider),
+) -> AIChatResponse:
+    """Continue a stateless, text-only post drafting conversation."""
+
+    try:
+        return AIDraftService.continue_chat(db, request, provider)
     except ProviderError as error:
         status_code = 429 if error.kind == "rate_limited" else 503
         raise ApiError(status_code, f"ai_{error.kind}", provider_error_message(error)) from error

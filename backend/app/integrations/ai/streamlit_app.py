@@ -11,7 +11,7 @@ import streamlit as st
 from pydantic import ValidationError
 
 from core.providers import ProviderError, provider_error_message
-from core.schemas import CATEGORY_LABELS, DraftRequest, PostDraft, parse_optional_datetime
+from core.schemas import CATEGORY_LABELS, DraftRequest, PostDraft, parse_optional_date, parse_optional_time
 from core.service import create_provider, create_vision_provider, generate_draft
 
 
@@ -222,8 +222,17 @@ if "draft" in st.session_state:
         format_func=lambda code: f"{CATEGORY_LABELS[code]} ({code})",
     )
     location_text = st.text_input("Location / 장소", value=draft.get("location_text") or "")
-    start_at = st.text_input("Event Start Time / 발생 시작 시각", value=draft.get("event_start_at") or "")
-    end_at = st.text_input("Event End Time / 발생 종료 시각", value=draft.get("event_end_at") or "")
+    start_date = st.text_input("Event Start Date / 발생 시작 날짜", value=draft.get("event_start_date") or "")
+    end_date = st.text_input("Event End Date / 발생 종료 날짜", value=draft.get("event_end_date") or "")
+    start_time = st.text_input("Event Start Time / 발생 시작 시각 (선택)", value=draft.get("event_start_time") or "")
+    end_time = st.text_input("Event End Time / 발생 종료 시각 (선택)", value=draft.get("event_end_time") or "")
+    precision_options = [None, "DATE_ONLY", "EXACT", "APPROXIMATE", "RANGE"]
+    current_precision = draft.get("time_precision")
+    time_precision = st.selectbox(
+        "Time Precision / 시각 정밀도",
+        precision_options,
+        index=precision_options.index(current_precision),
+    )
     keywords_text = st.text_input("Keywords / 키워드", value=", ".join(draft.get("keywords", [])))
     missing_fields = st.multiselect(
         "Missing Fields / 누락 필드",
@@ -239,8 +248,11 @@ if "draft" in st.session_state:
             item_name=item_name.strip() or None,
             category_code=category_code,
             location_text=location_text.strip() or None,
-            event_start_at=parse_optional_datetime(start_at),
-            event_end_at=parse_optional_datetime(end_at),
+            event_start_date=parse_optional_date(start_date),
+            event_end_date=parse_optional_date(end_date),
+            event_start_time=parse_optional_time(start_time),
+            event_end_time=parse_optional_time(end_time),
+            time_precision=time_precision,
             keywords=[value.strip() for value in keywords_text.split(",") if value.strip()],
             missing_fields=missing_fields,
             warnings=[value.strip() for value in warnings_text.splitlines() if value.strip()],

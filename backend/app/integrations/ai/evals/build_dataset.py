@@ -38,8 +38,10 @@ def build_case(index: int) -> GoldCase:
     text = f"{time_phrase} {natural_location} {trait} {item}을 {verb}. 혹시 관련된 분은 확인 부탁드려요."
     title_action = "분실" if post_type == "LOST" else "습득"
     expected_location = None if ambiguous_location else location
-    start = None if missing_time else when - timedelta(minutes=15)
-    end = None if missing_time else when + timedelta(minutes=15)
+    start = None if missing_time else when.date()
+    end = None if missing_time else when.date()
+    start_time = None if missing_time else when.time()
+    end_time = None if missing_time else when.time()
     missing = []
     warnings = []
     if ambiguous_location:
@@ -57,8 +59,11 @@ def build_case(index: int) -> GoldCase:
             item_name=item,
             category_code=code,
             location_text=expected_location,
-            event_start_at=start,
-            event_end_at=end,
+            event_start_date=start,
+            event_end_date=end,
+            event_start_time=start_time,
+            event_end_time=end_time,
+            time_precision=None if missing_time else "EXACT",
             keywords=[trait, item],
             missing_fields=missing,
             warnings=warnings,

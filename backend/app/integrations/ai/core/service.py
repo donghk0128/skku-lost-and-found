@@ -24,6 +24,7 @@ def create_provider(provider: str, model: str) -> DraftProvider:
             os.getenv("OPENAI_API_KEY", ""),
             os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
             timeout,
+            os.getenv("AI_REASONING_EFFORT", "none"),
         )
     raise ValueError(f"Unsupported provider: {provider}")
 
