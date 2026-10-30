@@ -13,7 +13,13 @@ module.exports = ({ config }) => {
     },
     plugins: [
       ...(config.plugins ?? []),
-      ["react-native-maps", { iosGoogleMapsApiKey: googleMapsApiKey }],
+      [
+        "react-native-maps",
+        {
+          androidGoogleMapsApiKey: googleMapsApiKey,
+          iosGoogleMapsApiKey: googleMapsApiKey,
+        },
+      ],
     ],
   };
 };
