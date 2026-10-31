@@ -25,6 +25,8 @@ import {
   splitPostDescription,
 } from "@/lib/post-description";
 import { useAuth } from "@/providers/AuthProvider";
+import { onLocationPicked, type PickedLocation } from "@/lib/location-picker";
+import PinIcon from "@/assets/icons/location.svg";
 
 export default function CreatePostScreen() {
   const router = useRouter();
@@ -66,6 +68,10 @@ export default function CreatePostScreen() {
   const pending = useRef(false);
   const [saved, setSaved] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [picked, setPicked] = useState<PickedLocation | null>(null);
+
+  useEffect(() => onLocationPicked(setPicked), []);
+
   useEffect(() => {
     let active = true;
     postsApi
@@ -222,6 +228,12 @@ export default function CreatePostScreen() {
           location_text: place.trim() || null,
           event_start_at: start?.toISOString() ?? null,
           event_end_at: end?.toISOString() ?? null,
+          ...(picked
+            ? {
+                latitude: Number(picked.latitude.toFixed(6)),
+                longitude: Number(picked.longitude.toFixed(6)),
+              }
+            : {}),
         };
         const post = editId
           ? await postsApi.update(editId, body, session.access_token)
@@ -394,6 +406,29 @@ export default function CreatePostScreen() {
                 false,
                 255,
               )}
+              <Pressable
+                onPress={() => {
+                  router.push("/create-post-map");
+                }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 14,
+                  borderWidth: 1,
+                  borderColor: Colors.primary,
+                  borderRadius: 16,
+                  paddingVertical: 12,
+                }}
+              >
+                <PinIcon />
+                <Text style={{ color: Colors.primary }}>
+                  지도에서 위치 선택
+                </Text>
+              </Pressable>
+              {picked ? (
+                <Text style={styles.hint}>{picked.address}</Text>
+              ) : null}
               {input(
                 "특징",
                 features,

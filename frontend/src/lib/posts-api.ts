@@ -39,6 +39,8 @@ export type UpdatePost = {
   location_text: string | null;
   event_start_at: string | null;
   event_end_at: string | null;
+  latitude?: number;
+  longitude?: number;
 };
 export const postsApi = {
   update: (id: string, body: UpdatePost, token: string) =>
