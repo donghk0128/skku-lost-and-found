@@ -144,6 +144,9 @@ const en = {
   "map.tapToChoose": "Tap the map to choose a location.",
   "map.loadingAddress": "Finding address...",
   "map.selectLocation": "Use this location",
+  "map.webUnavailable":
+    "Map selection is not available on the web. Go back and enter the location manually.",
+  "map.openInGoogleMaps": "Open in Google Maps",
   "ai.initialPromptLost":
     "Tell me when and where you lost the item, and what it was.",
   "ai.initialPromptFound":

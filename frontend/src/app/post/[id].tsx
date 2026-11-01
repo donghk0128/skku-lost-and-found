@@ -19,7 +19,7 @@ import { readSession, writeSession } from "@/lib/session-storage";
 import { authApi } from "@/lib/auth-api";
 import { splitPostDescription } from "@/lib/post-description";
 import { useAuth } from "@/providers/AuthProvider";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import PostLocationMap from "@/components/PostLocationMap";
 import { useLocale } from "@/i18n/LocaleProvider";
 
 const formatDate = (value: string, locale: "en" | "ko") =>
@@ -375,24 +375,10 @@ function PostDetail({ id }: { id: string }) {
             </View>
           ) : null}
           {post.latitude !== null && post.longitude !== null ? (
-            <MapView
-              provider={PROVIDER_GOOGLE}
-              style={{ height: 200 }}
-              scrollEnabled={false}
-              initialRegion={{
-                latitude: post.latitude ?? 0,
-                longitude: post.longitude ?? 0,
-                latitudeDelta: 0.005,
-                longitudeDelta: 0.005,
-              }}
-            >
-              <Marker
-                coordinate={{
-                  latitude: post.latitude ?? 0,
-                  longitude: post.longitude ?? 0,
-                }}
-              />
-            </MapView>
+            <PostLocationMap
+              latitude={post.latitude}
+              longitude={post.longitude}
+            />
           ) : null}
         </View>
         {recommendations.length || recommendationError ? (
