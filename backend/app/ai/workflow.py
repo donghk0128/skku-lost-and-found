@@ -30,7 +30,7 @@ class ChatWorkflowState(TypedDict, total=False):
 QUESTIONS = {
     "item_name": "어떤 물건인지 조금 더 구체적으로 알려주세요.",
     "location": "어디에서 있었던 일인가요? 건물이나 장소를 알려주세요.",
-    "event_time": "언제 있었던 일인가요? 알고 있는 날짜만 알려주세요.",
+    "event_time": "언제 있었던 일인가요? 분실 예상 날짜를 알려주세요.",
 }
 MISSING_FIELD_PRIORITY = tuple(QUESTIONS)
 TRACE_TAGS = ["ai", "post-draft", "text-chat"]
