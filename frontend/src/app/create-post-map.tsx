@@ -7,8 +7,9 @@ import { Alert, View, Pressable, StyleSheet, Text } from "react-native";
 import { router } from "expo-router";
 import { Colors, Fonts } from "@/constants/theme";
 import { pickLocation } from "@/lib/location-picker";
+import { useLocale } from "@/i18n/LocaleProvider";
 const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
-// 대략 좌표이므로 실제 위치로 교체
+// Approximate coordinates; replace them with verified campus locations.
 const CAMPUSES = {
   humanities: { latitude: 37.5882, longitude: 126.9933 },
   science: { latitude: 37.2939, longitude: 126.9751 },
@@ -16,6 +17,7 @@ const CAMPUSES = {
 type LatLng = { latitude: number; longitude: number };
 
 export default function CreatePostMap() {
+  const { locale, t } = useLocale();
   const mapRef = useRef<MapView>(null);
   const [pin, setPin] = useState<LatLng>();
   const [placeName, setPlaceName] = useState<string>();
@@ -30,7 +32,7 @@ export default function CreatePostMap() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("위치 권한이 필요합니다.");
+        Alert.alert(t("map.permissionRequired"));
         return;
       }
       const { coords } = await Location.getCurrentPositionAsync({});
@@ -38,7 +40,7 @@ export default function CreatePostMap() {
       setPin(here);
       moveTo(here);
     } catch {
-      Alert.alert("현재 위치를 가져오지 못했습니다.");
+      Alert.alert(t("map.currentLocationFailed"));
     }
   };
 
@@ -47,21 +49,21 @@ export default function CreatePostMap() {
     let active = true;
     axios
       .get<{ results: { formatted_address: string }[]; status: string }>(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${pin.latitude},${pin.longitude}&language=ko&key=${googleMapsApiKey}`,
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${pin.latitude},${pin.longitude}&language=${locale}&key=${googleMapsApiKey}`,
       )
       .then((res) => {
         if (!active) return;
         setPlaceName(
-          res.data.results[0]?.formatted_address ?? "주소를 찾을 수 없는 위치",
+          res.data.results[0]?.formatted_address ?? t("map.unknownAddress"),
         );
       })
       .catch(() => {
-        if (active) setPlaceName("주소를 불러오지 못했습니다");
+        if (active) setPlaceName(t("map.addressLoadFailed"));
       });
     return () => {
       active = false;
     };
-  }, [pin]);
+  }, [pin, locale]);
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#FFF" }}>
       <View
@@ -73,7 +75,7 @@ export default function CreatePostMap() {
           height: 64,
         }}
       >
-        <Pressable onPress={() => router.back()} accessibilityLabel="뒤로가기">
+        <Pressable onPress={() => router.back()} accessibilityLabel={t("common.back")}>
           <Text style={{ fontSize: 36, color: "#111" }}>‹</Text>
         </Pressable>
         <Text
@@ -83,7 +85,7 @@ export default function CreatePostMap() {
             fontFamily: Fonts.pretendardSemiBold,
           }}
         >
-          지도에서 선택
+          {t("map.title")}
         </Text>
         <View style={{ width: 44, height: 44, justifyContent: "center" }} />
       </View>
@@ -116,13 +118,13 @@ export default function CreatePostMap() {
             gap: 8,
           }}
         >
-          <Chip label="현재 위치" primary onPress={goToMyLocation} />
+          <Chip label={t("map.currentLocation")} primary onPress={goToMyLocation} />
           <Chip
-            label="인문사회캠퍼스"
+            label={t("map.humanitiesCampus")}
             onPress={() => moveTo(CAMPUSES.humanities)}
           />
           <Chip
-            label="자연과학캠퍼스"
+            label={t("map.scienceCampus")}
             onPress={() => moveTo(CAMPUSES.science)}
           />
         </View>
@@ -152,8 +154,8 @@ export default function CreatePostMap() {
             }}
           >
             {!pin
-              ? "지도를 탭해서 위치를 선택해주세요"
-              : (placeName ?? "위치를 확인하는 중...")}
+              ? t("map.tapToChoose")
+              : (placeName ?? t("map.loadingAddress"))}
           </Text>
           <Pressable
             disabled={!pin || !placeName}
@@ -179,7 +181,7 @@ export default function CreatePostMap() {
                 fontFamily: Fonts.pretendardMedium,
               }}
             >
-              이 위치로 선택
+              {t("map.selectLocation")}
             </Text>
           </Pressable>
         </View>

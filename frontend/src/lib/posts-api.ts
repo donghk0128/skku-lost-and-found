@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import { File } from "expo-file-system";
 import type { ImagePickerAsset } from "expo-image-picker";
 import { baseUrl, request, ApiError } from "@/lib/auth-api";
+import { t } from "@/i18n";
 
 export type Post = {
   id: string;
@@ -75,7 +76,7 @@ export const postsApi = {
       const data = await response.json().catch(() => null);
       throw new ApiError(
         response.status,
-        data?.error?.message ?? "사진 업로드에 실패했습니다.",
+        data?.error?.message ?? t("api.photoUploadFailed"),
       );
     }
   },

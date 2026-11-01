@@ -6,13 +6,14 @@ import { useColorScheme } from "react-native";
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import { Fonts } from "@/constants/theme";
 import AuthProvider, { useAuth } from "@/providers/AuthProvider";
+import { LocaleProvider } from "@/i18n/LocaleProvider";
 
 SplashScreen.preventAutoHideAsync();
 
 function AuthContent() {
   const { user, loading } = useAuth();
 
-  if (loading) return null; // 또는 로딩 화면
+  if (loading) return null;
 
   return (
     <Stack screenOptions={{ headerShown: false, animation: "slide_from_right", gestureEnabled: true, contentStyle: { backgroundColor: "#FFFFFF" } }}>
@@ -46,11 +47,13 @@ export default function TabLayout() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <AuthProvider>
-      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <AnimatedSplashOverlay />
-        <AuthContent />
-      </ThemeProvider>
-    </AuthProvider>
+    <LocaleProvider>
+      <AuthProvider>
+        <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+          <AnimatedSplashOverlay />
+          <AuthContent />
+        </ThemeProvider>
+      </AuthProvider>
+    </LocaleProvider>
   );
 }

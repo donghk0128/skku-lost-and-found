@@ -20,9 +20,10 @@ import { authApi } from "@/lib/auth-api";
 import { splitPostDescription } from "@/lib/post-description";
 import { useAuth } from "@/providers/AuthProvider";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import { useLocale } from "@/i18n/LocaleProvider";
 
-const formatDate = (value: string) =>
-  new Date(value).toLocaleString("ko-KR", {
+const formatDate = (value: string, locale: "en" | "ko") =>
+  new Date(value).toLocaleString(locale === "en" ? "en-US" : "ko-KR", {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -32,6 +33,7 @@ const formatDate = (value: string) =>
   });
 
 function Recommendation({ post }: { post: Post }) {
+  const { locale, t } = useLocale();
   const router = useRouter();
   const [photo, setPhoto] = useState<string | null>(null);
   useEffect(() => {
@@ -62,14 +64,16 @@ function Recommendation({ post }: { post: Post }) {
         />
       ) : (
         <View style={[styles.recommendationImage, styles.placeholder]}>
-          <Text style={styles.placeholderText}>사진 없음</Text>
+          <Text style={styles.placeholderText}>{t("post.noPhoto")}</Text>
         </View>
       )}
       <Text style={styles.recommendationTitle} numberOfLines={2}>
         {post.title}
       </Text>
       <Text style={styles.small}>
-        {new Date(post.created_at).toLocaleDateString("ko-KR")}
+        {new Date(post.created_at).toLocaleDateString(
+          locale === "en" ? "en-US" : "ko-KR",
+        )}
       </Text>
     </Pressable>
   );
@@ -84,6 +88,7 @@ export default function PostDetailRoute() {
 }
 
 function PostDetail({ id }: { id: string }) {
+  const { locale, t, categoryLabel } = useLocale();
   const router = useRouter();
   const { user } = useAuth();
   const width = Math.min(useWindowDimensions().width, 640);
@@ -121,7 +126,7 @@ function PostDetail({ id }: { id: string }) {
     setActionError("");
     try {
       const session = await readSession();
-      if (!session) throw new Error("로그인이 필요합니다.");
+      if (!session) throw new Error(t("common.loginRequired"));
       const token = await authApi.refresh(session.refresh_token);
       session.access_token = token.access_token;
       await writeSession(session);
@@ -137,7 +142,7 @@ function PostDetail({ id }: { id: string }) {
       });
     } catch (error) {
       setActionError(
-        error instanceof Error ? error.message : "삭제하지 못했습니다.",
+        error instanceof Error ? error.message : t("post.deleteFailed"),
       );
     } finally {
       pendingDelete.current = false;
@@ -164,7 +169,7 @@ function PostDetail({ id }: { id: string }) {
         if (categories.status === "fulfilled")
           setCategory(
             categories.value.find((item) => item.id === result.category_id)
-              ?.name ?? "",
+              ?.code ?? "",
           );
         if (related.status === "fulfilled")
           setRecommendations(related.value.items.map((item) => item.post));
@@ -174,7 +179,7 @@ function PostDetail({ id }: { id: string }) {
           setError(
             error instanceof Error
               ? error.message
-              : "게시글을 불러오지 못했습니다.",
+              : t("common.postLoadFailed"),
           );
           setLoading(false);
         }
@@ -198,7 +203,7 @@ function PostDetail({ id }: { id: string }) {
         <Pressable
           onPress={back}
           style={styles.back}
-          accessibilityLabel="뒤로가기"
+          accessibilityLabel={t("common.back")}
         >
           <Text style={styles.backText}>‹</Text>
         </Pressable>
@@ -209,7 +214,7 @@ function PostDetail({ id }: { id: string }) {
             <>
               <Text style={styles.error}>{error}</Text>
               <Pressable onPress={retry}>
-                <Text style={styles.link}>다시 시도</Text>
+                <Text style={styles.link}>{t("common.retry")}</Text>
               </Pressable>
             </>
           )}
@@ -219,19 +224,22 @@ function PostDetail({ id }: { id: string }) {
   const lost = post.post_type === "LOST";
   const content = splitPostDescription(post.description);
   const details = [
-    category ? ["카테고리", category] : null,
-    content.features ? ["특징", content.features] : null,
-    post.item_name ? ["물품명", post.item_name] : null,
+    category ? [t("post.category"), categoryLabel(category)] : null,
+    content.features ? [t("post.features"), content.features] : null,
+    post.item_name ? [t("post.itemName"), post.item_name] : null,
     post.event_start_at && post.event_end_at
       ? [
-          lost ? "분실 추정 시간" : "습득 시간",
+          lost ? t("post.estimatedLostTime") : t("post.foundTime"),
           post.event_start_at === post.event_end_at
-            ? formatDate(post.event_start_at)
-            : `${formatDate(post.event_start_at)}\n~ ${formatDate(post.event_end_at)}`,
+            ? formatDate(post.event_start_at, locale)
+            : `${formatDate(post.event_start_at, locale)}\n~ ${formatDate(post.event_end_at, locale)}`,
         ]
       : null,
     post.location_text
-      ? [lost ? "분실 장소" : "습득 장소", post.location_text]
+      ? [
+          lost ? t("post.lostPlace") : t("post.foundPlace"),
+          post.location_text,
+        ]
       : null,
   ].filter((item): item is string[] => item !== null);
   return (
@@ -244,19 +252,19 @@ function PostDetail({ id }: { id: string }) {
         <Pressable
           onPress={back}
           accessibilityRole="button"
-          accessibilityLabel="뒤로가기"
+          accessibilityLabel={t("common.back")}
           style={styles.back}
         >
           <Text style={styles.backText}>‹</Text>
         </Pressable>
         <Text style={styles.headerTitle}>
-          {lost ? "분실물" : "습득물"} 상세
+          {lost ? t("post.lostDetail") : t("post.foundDetail")}
         </Text>
         {post.author_id === user?.id ? (
           <Pressable
             accessibilityRole="button"
             ref={moreButton}
-            accessibilityLabel="게시글 더보기"
+            accessibilityLabel={t("post.moreOptions")}
             onPress={showMenu}
             style={styles.back}
           >
@@ -287,7 +295,9 @@ function PostDetail({ id }: { id: string }) {
                     source={{ uri }}
                     style={styles.heroImage}
                     resizeMode="cover"
-                    accessibilityLabel={`물품 사진 ${index + 1}`}
+                    accessibilityLabel={t("post.photoAccessibility", {
+                      index: index + 1,
+                    })}
                     onError={() => setPhotoError(true)}
                   />
                 </View>
@@ -303,7 +313,7 @@ function PostDetail({ id }: { id: string }) {
         {photoError ? (
           <Pressable onPress={retry} style={styles.photoFeedback}>
             <Text style={styles.small}>
-              사진을 불러오지 못했습니다 · 다시 시도
+              {t("common.imageLoadFailed")}
             </Text>
           </Pressable>
         ) : null}
@@ -316,16 +326,16 @@ function PostDetail({ id }: { id: string }) {
               ]}
             >
               <Text style={[styles.badgeText, !lost && styles.foundText]}>
-                {lost ? "분실했어요" : "습득했어요"}
+                {lost ? t("post.lostBadge") : t("post.foundBadge")}
               </Text>
             </View>
             <View style={styles.statusBadge}>
               <Text style={styles.statusText}>
                 {post.status === "OPEN"
                   ? lost
-                    ? "찾는 중"
-                    : "주인 찾는 중"
-                  : "완료"}
+                    ? t("post.searching")
+                    : t("post.findingOwner")
+                  : t("post.completed")}
               </Text>
             </View>
           </View>
@@ -338,9 +348,13 @@ function PostDetail({ id }: { id: string }) {
             </View>
             <View style={styles.authorCopy}>
               <Text style={styles.author}>
-                {post.author_id === user?.id ? user.nickname : "작성자"}
+                {post.author_id === user?.id
+                  ? user.nickname
+                  : t("common.postAuthor")}
               </Text>
-              <Text style={styles.small}>{formatDate(post.created_at)}</Text>
+              <Text style={styles.small}>
+                {formatDate(post.created_at, locale)}
+              </Text>
             </View>
           </View>
           <View style={styles.divider} />
@@ -349,7 +363,7 @@ function PostDetail({ id }: { id: string }) {
           </Text>
           {details.length ? (
             <View style={styles.infoCard}>
-              <Text style={styles.sectionTitle}>물품 정보</Text>
+              <Text style={styles.sectionTitle}>{t("post.itemInfo")}</Text>
               {details.map(([label, value]) => (
                 <View key={label} style={styles.infoRow}>
                   <Text style={styles.infoLabel}>{label}</Text>
@@ -385,14 +399,14 @@ function PostDetail({ id }: { id: string }) {
           <View style={styles.related}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>
-                비슷한 {lost ? "습득물" : "분실물"}
+                {lost ? t("post.similarFound") : t("post.similarLost")}
               </Text>
-              <Text style={styles.small}>혹시 이 물건인가요?</Text>
+              <Text style={styles.small}>{t("post.isThisItem")}</Text>
             </View>
             {recommendationError ? (
               <Pressable onPress={retry}>
                 <Text style={styles.link}>
-                  추천을 불러오지 못했습니다 · 다시 시도
+                  {t("post.recommendationsFailed")}
                 </Text>
               </Pressable>
             ) : (
@@ -414,7 +428,7 @@ function PostDetail({ id }: { id: string }) {
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => setMenu(null)}
-            accessibilityLabel="메뉴 닫기"
+            accessibilityLabel={t("post.closeMenu")}
           />
           <View
             style={[
@@ -446,7 +460,7 @@ function PostDetail({ id }: { id: string }) {
               >
                 <Path d="m16 3 5 5M3 21l5-1L21 7a2.1 2.1 0 0 0-5-5L3 15z" />
               </Svg>
-              <Text style={styles.popoverText}>수정하기</Text>
+              <Text style={styles.popoverText}>{t("post.edit")}</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -468,7 +482,7 @@ function PostDetail({ id }: { id: string }) {
               >
                 <Path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" />
               </Svg>
-              <Text style={styles.popoverText}>삭제하기</Text>
+              <Text style={styles.popoverText}>{t("post.delete")}</Text>
             </Pressable>
           </View>
         </View>
@@ -486,12 +500,12 @@ function PostDetail({ id }: { id: string }) {
             style={StyleSheet.absoluteFill}
             disabled={deleting}
             onPress={() => setMenu(null)}
-            accessibilityLabel="닫기"
+            accessibilityLabel={t("post.close")}
           />
           <View style={styles.menuCard}>
-            <Text style={styles.confirmTitle}>게시글을 삭제할까요?</Text>
+            <Text style={styles.confirmTitle}>{t("post.confirmDeleteTitle")}</Text>
             <Text style={styles.confirmHint}>
-              삭제한 게시글은 목록에서 더 이상 표시되지 않습니다.
+              {t("post.confirmDeleteMessage")}
             </Text>
             {actionError ? (
               <Text style={styles.confirmError}>{actionError}</Text>
@@ -503,7 +517,7 @@ function PostDetail({ id }: { id: string }) {
                 onPress={() => void remove()}
               >
                 <Text style={styles.deleteText}>
-                  {deleting ? "삭제 중…" : "삭제하기"}
+                  {deleting ? t("post.deleting") : t("post.delete")}
                 </Text>
               </Pressable>
               <Pressable
@@ -511,7 +525,7 @@ function PostDetail({ id }: { id: string }) {
                 style={styles.menuItem}
                 onPress={() => setMenu(null)}
               >
-                <Text style={styles.confirmHint}>취소</Text>
+                <Text style={styles.confirmHint}>{t("post.cancelDelete")}</Text>
               </Pressable>
             </View>
           </View>

@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import { t } from "@/i18n";
 
 export type User = {
   id: string;
@@ -51,17 +52,17 @@ export async function request<T>(
     if (!response.ok) {
       throw new ApiError(
         response.status,
-        data.error?.message ?? "요청을 처리하지 못했습니다.",
+        data.error?.message ?? t("common.requestFailed"),
       );
     }
     return data as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
     if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("요청 처리 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.");
+      throw new Error(t("api.timeout"));
     }
     throw new Error(
-      "서버에 연결하지 못했습니다. 서버 실행 상태와 API 주소를 확인해주세요.",
+      t("api.connectionFailed"),
     );
   } finally {
     clearTimeout(timeout);

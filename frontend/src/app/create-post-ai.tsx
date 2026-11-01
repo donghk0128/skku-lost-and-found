@@ -8,16 +8,25 @@ import { aiApi, type AIDraft } from "@/lib/ai-api";
 import { authApi } from "@/lib/auth-api";
 import { postsApi } from "@/lib/posts-api";
 import { readSession, writeSession } from "@/lib/session-storage";
+import { useLocale } from "@/i18n/LocaleProvider";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 export default function CreatePostAiScreen() {
+  const { locale, t, categoryLabel } = useLocale();
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
   const { type } = useLocalSearchParams<{ type?: string }>();
   const postType = type === "FOUND" ? "FOUND" : "LOST";
   const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([{ role: "assistant", content: `언제, 어디서, 무엇을 ${postType === "LOST" ? "잃어버렸는지" : "주웠는지"} 설명해주세요.` }]);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      role: "assistant",
+      content: t(
+        postType === "LOST" ? "ai.initialPromptLost" : "ai.initialPromptFound",
+      ),
+    },
+  ]);
   const [draft, setDraft] = useState<AIDraft | null>(null);
   const [pendingField, setPendingField] = useState<"item_name" | "location" | "event_time" | null>(null);
   const [collectedFields, setCollectedFields] = useState<Partial<Record<"item_name" | "location" | "event_time", string>>>({});
@@ -28,7 +37,7 @@ export default function CreatePostAiScreen() {
 
   const authenticatedToken = async () => {
     const session = await readSession();
-    if (!session) throw new Error("로그인이 필요합니다.");
+    if (!session) throw new Error(t("common.loginRequired"));
     const refreshed = await authApi.refresh(session.refresh_token);
     session.access_token = refreshed.access_token;
     await writeSession(session);
@@ -59,7 +68,7 @@ export default function CreatePostAiScreen() {
       setReady(result.status === "READY");
       setMessages((current) => [...current, { role: "assistant", content: result.assistant_message }]);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "AI 응답을 받지 못했습니다.");
+      setError(cause instanceof Error ? cause.message : t("ai.responseFailed"));
     } finally {
       setBusy(false);
     }
@@ -83,7 +92,7 @@ export default function CreatePostAiScreen() {
       router.dismissAll();
       router.replace({ pathname: "/post/[id]", params: { id: post.id } });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "게시글을 등록하지 못했습니다.");
+      setError(cause instanceof Error ? cause.message : t("ai.publishFailed"));
       setPublishing(false);
     }
   };
@@ -106,8 +115,8 @@ export default function CreatePostAiScreen() {
     <SafeAreaView style={styles.root}>
       <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <View style={styles.header}>
-          <Pressable accessibilityLabel="뒤로가기" onPress={() => router.back()} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable>
-          <View><Text style={styles.headerTitle}>게시글 작성 도우미</Text><Text style={styles.headerSubtitle}>텍스트 AI 채팅</Text></View>
+          <Pressable accessibilityLabel={t("common.back")} onPress={() => router.back()} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable>
+          <View><Text style={styles.headerTitle}>{t("ai.title")}</Text><Text style={styles.headerSubtitle}>{t("ai.subtitle")}</Text></View>
           <View style={styles.back} />
         </View>
         <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}>
@@ -116,27 +125,27 @@ export default function CreatePostAiScreen() {
               <Text style={item.role === "user" ? styles.userText : styles.assistantText}>{item.content}</Text>
             </View>
           ))}
-          {busy ? <View style={styles.assistantBubble}><Text style={styles.assistantText}>답변을 정리하고 있어요…</Text></View> : null}
+          {busy ? <View style={styles.assistantBubble}><Text style={styles.assistantText}>{t("ai.organizingAnswer")}</Text></View> : null}
           {ready && draft ? (
             <View style={styles.draftCard}>
-              <Text style={styles.previewLabel}>초안 미리보기</Text>
+              <Text style={styles.previewLabel}>{t("ai.preview")}</Text>
               <Text style={styles.draftTitle}>{draft.title}</Text>
               <Text style={styles.draftText}>{draft.description}</Text>
-              <Text style={styles.draftMeta}>카테고리 · {draft.category_code}</Text>
-              <Text style={styles.draftMeta}>장소 · {draft.location_text}</Text>
-              <Text style={styles.draftMeta}>시간 · {draft.event_start_at ? new Date(draft.event_start_at).toLocaleString("ko-KR") : "-"}</Text>
-              {draft.warnings.map((warning) => <Text key={warning} style={styles.warning}>확인 · {warning}</Text>)}
+              <Text style={styles.draftMeta}>{t("ai.category", { category: categoryLabel(draft.category_code) })}</Text>
+              <Text style={styles.draftMeta}>{t("ai.location", { location: draft.location_text ?? "-" })}</Text>
+              <Text style={styles.draftMeta}>{t("ai.time", { time: draft.event_start_at ? new Date(draft.event_start_at).toLocaleString(locale === "en" ? "en-US" : "ko-KR") : "-" })}</Text>
+              {draft.warnings.map((warning) => <Text key={warning} style={styles.warning}>{t("ai.reviewWarning", { warning })}</Text>)}
               <View style={styles.actions}>
-                <Pressable accessibilityRole="button" onPress={edit} disabled={publishing} style={styles.secondaryButton}><Text style={styles.secondaryText}>수정</Text></Pressable>
-                <Pressable accessibilityRole="button" onPress={() => void publish()} disabled={publishing} style={styles.primaryButton}><Text style={styles.primaryText}>{publishing ? "게시 중…" : "바로 게시"}</Text></Pressable>
+                <Pressable accessibilityRole="button" onPress={edit} disabled={publishing} style={styles.secondaryButton}><Text style={styles.secondaryText}>{t("ai.edit")}</Text></Pressable>
+                <Pressable accessibilityRole="button" onPress={() => void publish()} disabled={publishing} style={styles.primaryButton}><Text style={styles.primaryText}>{publishing ? t("ai.publishing") : t("ai.publishNow")}</Text></Pressable>
               </View>
             </View>
           ) : null}
           {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
         </ScrollView>
         <View style={styles.composer}>
-          <TextInput value={message} onChangeText={setMessage} editable={!busy && !publishing} multiline placeholder={ready ? "추가로 바꾸고 싶은 내용을 말해주세요" : "답변을 입력해주세요"} placeholderTextColor="#AAA" style={styles.input} accessibilityLabel="AI 게시글 답변" />
-          <Pressable accessibilityRole="button" accessibilityLabel="답변 보내기" disabled={busy || publishing || !message.trim()} onPress={() => void send()} style={[styles.send, (busy || publishing || !message.trim()) && styles.sendDisabled]}><Text style={styles.sendText}>↑</Text></Pressable>
+          <TextInput value={message} onChangeText={setMessage} editable={!busy && !publishing} multiline placeholder={ready ? t("ai.editRequestPlaceholder") : t("ai.answerPlaceholder")} placeholderTextColor="#AAA" style={styles.input} accessibilityLabel={t("ai.answerAccessibility")} />
+          <Pressable accessibilityRole="button" accessibilityLabel={t("ai.sendAnswer")} disabled={busy || publishing || !message.trim()} onPress={() => void send()} style={[styles.send, (busy || publishing || !message.trim()) && styles.sendDisabled]}><Text style={styles.sendText}>↑</Text></Pressable>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

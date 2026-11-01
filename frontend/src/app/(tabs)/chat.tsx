@@ -7,12 +7,14 @@ import {
 
 import { ExternalLink } from "@/components/external-link";
 import { ThemedText } from "@/components/themed-text";
+import { useLocale } from "@/i18n/LocaleProvider";
 import { ThemedView } from "@/components/themed-view";
 import { Collapsible } from "@/components/ui/collapsible";
 import { BottomTabInset, MaxContentWidth, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 
 export default function TabTwoScreen() {
+  const { t } = useLocale();
   const safeAreaInsets = useSafeAreaInsets();
   const insets = {
     ...safeAreaInsets,
@@ -42,7 +44,7 @@ export default function TabTwoScreen() {
       }}
     >
       <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">채팅</ThemedText>
+        <ThemedText type="title">{t("tabs.chat")}</ThemedText>
         <Pressable>
           <SettingIcon />
         </Pressable>

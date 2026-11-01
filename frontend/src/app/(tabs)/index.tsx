@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
-  Alert,
   Keyboard,
   Pressable,
   StyleSheet,
@@ -20,10 +19,13 @@ import {
 import PostBoard from "@/components/post-board";
 import CreatePostButton from "@/components/create-post-button";
 import SettingIcon from "@/assets/icons/setting.svg";
+import { useLocale } from "@/i18n/LocaleProvider";
+import LanguageSelector from "@/components/language-selector";
 
 type BoardTab = "lost" | "found";
 
 export default function HomeScreen() {
+  const { t } = useLocale();
   const router = useRouter();
   const params = useLocalSearchParams<{ board?: string; refresh?: string }>();
   const [selectedTab, setActiveTab] = useState<{
@@ -47,27 +49,30 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
         <View style={styles.content}>
-          {/* 헤더 */}
+          {/* Header */}
           <View style={styles.header}>
             <ThemedText type="title" style={styles.logo}>
               SKKU Lost & Found
             </ThemedText>
 
-            <Pressable
-              onPress={() => router.push("/settings")}
-              accessibilityRole="button"
-              accessibilityLabel="설정"
-              hitSlop={8}
-              style={({ pressed }) => [
-                styles.settingsButton,
-                pressed && styles.pressed,
-              ]}
-            >
-              <SettingIcon />
-            </Pressable>
+            <View style={styles.headerActions}>
+              <LanguageSelector />
+              <Pressable
+                onPress={() => router.push("/settings")}
+                accessibilityRole="button"
+                accessibilityLabel={t("home.settings")}
+                hitSlop={8}
+                style={({ pressed }) => [
+                  styles.settingsButton,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <SettingIcon />
+              </Pressable>
+            </View>
           </View>
 
-          {/* 게시판 탭 */}
+          {/* Board tabs */}
           <View style={styles.tabs}>
             <Pressable
               onPress={() => changeTab("lost")}
@@ -83,7 +88,7 @@ export default function HomeScreen() {
                   activeTab === "lost" && styles.activeTabText,
                 ]}
               >
-                분실했어요
+                {t("home.lostTab")}
               </ThemedText>
             </Pressable>
 
@@ -101,17 +106,17 @@ export default function HomeScreen() {
                   activeTab === "found" && styles.activeTabText,
                 ]}
               >
-                습득했어요
+                {t("home.foundTab")}
               </ThemedText>
             </Pressable>
           </View>
 
-          {/* 정렬 · 필터 · 검색 */}
+          {/* Sort, filter, and search */}
           <View style={styles.toolbar}>
             <Pressable
               disabled
               accessibilityRole="button"
-              accessibilityLabel="최신순 정렬"
+              accessibilityLabel={t("home.sortNewest")}
               style={({ pressed }) => [
                 styles.toolButton,
                 pressed && styles.pressed,
@@ -120,7 +125,7 @@ export default function HomeScreen() {
               <ThemedText style={styles.sortIcon}>↕</ThemedText>
 
               <ThemedText type="small" style={styles.toolText}>
-                최신순
+                {t("home.newest")}
               </ThemedText>
             </Pressable>
 
@@ -142,7 +147,7 @@ export default function HomeScreen() {
               </View>
 
               <ThemedText type="small" style={styles.toolText}>
-                필터
+                {t("home.filter")}
               </ThemedText>
             </Pressable>
 
@@ -154,7 +159,7 @@ export default function HomeScreen() {
 
               <TextInput
                 style={styles.searchInput}
-                placeholder="검색해보세요"
+                placeholder={t("home.searchPlaceholder")}
                 placeholderTextColor="#9A9DA3"
                 value={search}
                 onChangeText={setSearch}
@@ -162,16 +167,18 @@ export default function HomeScreen() {
                 autoCorrect={false}
                 returnKeyType="search"
                 onSubmitEditing={() => Keyboard.dismiss()}
-                accessibilityLabel="게시글 검색"
+                accessibilityLabel={t("home.searchAccessibility")}
               />
             </View>
           </View>
 
-          {/* 게시글 리스트 영역 */}
+          {/* Post list */}
           <View
             style={styles.boardArea}
             accessibilityLabel={
-              activeTab === "lost" ? "분실물 게시판" : "습득물 게시판"
+              activeTab === "lost"
+                ? t("home.lostBoard")
+                : t("home.foundBoard")
             }
           >
             <PostBoard
@@ -222,6 +229,11 @@ const styles = StyleSheet.create({
     height: 44,
     alignItems: "center",
     justifyContent: "center",
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
   },
   settingsIcon: {
     color: "#30353A",

@@ -3,25 +3,30 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Fonts } from "@/constants/theme";
+import { useLocale } from "@/i18n/LocaleProvider";
 
 export default function CreatePostMethodScreen() {
+  const { t } = useLocale();
   const router = useRouter();
   const { type } = useLocalSearchParams<{ type?: string }>();
   const postType = type === "FOUND" ? "FOUND" : "LOST";
-  const action = postType === "LOST" ? "잃어버리셨나요?" : "주우셨나요?";
+  const action =
+    postType === "LOST"
+      ? t("createMethod.lostQuestion")
+      : t("createMethod.foundQuestion");
 
   return (
     <SafeAreaView style={styles.root}>
       <View style={styles.header}>
-        <Pressable accessibilityLabel="뒤로가기" onPress={() => router.back()} style={styles.back}>
+        <Pressable accessibilityLabel={t("common.back")} onPress={() => router.back()} style={styles.back}>
           <Text style={styles.backText}>‹</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>게시글 작성</Text>
+        <Text style={styles.headerTitle}>{t("createMethod.title")}</Text>
         <View style={styles.back} />
       </View>
       <View style={styles.content}>
-        <Text style={styles.title}>무엇을 {action}</Text>
-        <Text style={styles.subtitle}>게시글을 작성할 방식을 찾아보세요</Text>
+        <Text style={styles.title}>{action}</Text>
+        <Text style={styles.subtitle}>{t("createMethod.prompt")}</Text>
         <View style={styles.options}>
           <Pressable
             accessibilityRole="button"
@@ -33,16 +38,16 @@ export default function CreatePostMethodScreen() {
             }
             style={styles.aiOption}
           >
-            <Text style={styles.aiTitle}>AI와 함께 작성하기</Text>
-            <Text style={styles.aiHint}>AI의 질문에 답하며 글을 간편하게 써보세요</Text>
+            <Text style={styles.aiTitle}>{t("createMethod.aiTitle")}</Text>
+            <Text style={styles.aiHint}>{t("createMethod.aiHint")}</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push({ pathname: "/create-post", params: { type: postType } })}
             style={styles.manualOption}
           >
-            <Text style={styles.manualTitle}>혼자 작성하기</Text>
-            <Text style={styles.manualHint}>직접 게시물을 작성하세요</Text>
+            <Text style={styles.manualTitle}>{t("createMethod.manualTitle")}</Text>
+            <Text style={styles.manualHint}>{t("createMethod.manualHint")}</Text>
           </Pressable>
         </View>
       </View>

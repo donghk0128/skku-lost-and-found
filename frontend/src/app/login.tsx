@@ -15,8 +15,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors, Fonts } from "@/constants/theme";
 import { useAuth } from "@/providers/AuthProvider";
+import { useLocale } from "@/i18n/LocaleProvider";
+import LanguageSelector from "@/components/language-selector";
 
 export default function Login() {
+  const { t } = useLocale();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { signIn, initializationError } = useAuth();
@@ -41,7 +44,7 @@ export default function Login() {
     try {
       await action();
     } catch (error) {
-      setError(error instanceof Error ? error.message : "요청을 처리하지 못했습니다.");
+      setError(error instanceof Error ? error.message : t("common.requestFailed"));
     } finally {
       pending.current = false;
       setBusy(false);
@@ -51,7 +54,7 @@ export default function Login() {
   const handleSignIn = () => {
     if (pending.current) return;
     if (!email.trim() || !password) {
-      setError("이메일과 비밀번호를 입력해주세요.");
+      setError(t("login.missingCredentials"));
       return;
     }
 
@@ -86,26 +89,26 @@ export default function Login() {
               <View style={styles.accent} />
 
               <Text style={styles.title}>
-                안녕하세요,{"\n"}
-                성균관대 분실물 찾기{"\n"}
-                서비스입니다.
+                {t("login.greeting")}
+                {"\n"}
+                {t("login.serviceName")}
               </Text>
 
               <Text style={styles.description}>
-                원활한 서비스 이용을 위해 로그인해주세요.
+                {t("login.serviceDescription")}
               </Text>
             </View>
 
             <View style={styles.form}>
               <View style={styles.field}>
-                <Text style={styles.label}>이메일</Text>
+                <Text style={styles.label}>{t("login.email")}</Text>
 
                 <TextInput
                   style={[
                     styles.input,
                     focusedField === "email" && styles.inputFocused,
                   ]}
-                  placeholder="이메일을 입력해주세요"
+                  placeholder={t("login.emailPlaceholder")}
                   placeholderTextColor="#B8BBC0"
                   value={email}
                   editable={!busy}
@@ -122,12 +125,12 @@ export default function Login() {
                   textContentType="username"
                   returnKeyType="next"
                   onSubmitEditing={() => passwordRef.current?.focus()}
-                  accessibilityLabel="이메일"
+                  accessibilityLabel={t("login.email")}
                 />
               </View>
 
               <View style={styles.field}>
-                <Text style={styles.label}>비밀번호</Text>
+                <Text style={styles.label}>{t("login.password")}</Text>
 
                 <TextInput
                   ref={passwordRef}
@@ -135,7 +138,7 @@ export default function Login() {
                     styles.input,
                     focusedField === "password" && styles.inputFocused,
                   ]}
-                  placeholder="비밀번호를 입력해주세요"
+                  placeholder={t("login.passwordPlaceholder")}
                   placeholderTextColor="#B8BBC0"
                   value={password}
                   editable={!busy}
@@ -152,7 +155,7 @@ export default function Login() {
                   textContentType="password"
                   returnKeyType="go"
                   onSubmitEditing={handleSignIn}
-                  accessibilityLabel="비밀번호"
+                  accessibilityLabel={t("login.password")}
                 />
               </View>
 
@@ -172,27 +175,30 @@ export default function Login() {
                 pressed && styles.buttonPressed,
               ]}
             >
-              <Text style={styles.buttonText}>{busy ? "처리 중…" : "로그인"}</Text>
+              <Text style={styles.buttonText}>
+                {busy ? t("common.processing") : t("login.signIn")}
+              </Text>
             </Pressable>
 
             <View style={styles.links}>
-              {/* 각 기능 구현 전까지 비활성화 */}
+              {/* Disabled until these features are implemented. */}
               <Pressable disabled style={styles.link}>
-                <Text style={styles.linkText}>아이디 찾기</Text>
+                <Text style={styles.linkText}>{t("login.findId")}</Text>
               </Pressable>
 
               <View style={styles.divider} />
 
               <Pressable disabled style={styles.link}>
-                <Text style={styles.linkText}>비밀번호 찾기</Text>
+                <Text style={styles.linkText}>{t("login.findPassword")}</Text>
               </Pressable>
 
               <View style={styles.divider} />
 
               <Pressable disabled={busy} style={styles.link} accessibilityRole="button" onPress={() => router.push("/signup")}>
-                <Text style={styles.linkText}>회원가입</Text>
+                <Text style={styles.linkText}>{t("login.signUp")}</Text>
               </Pressable>
             </View>
+            <LanguageSelector variant="row" />
           </View>
         </View>
       </ScrollView>

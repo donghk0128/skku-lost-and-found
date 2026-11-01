@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors, Fonts } from "@/constants/theme";
 import { authApi } from "@/lib/auth-api";
 import { useAuth } from "@/providers/AuthProvider";
+import { useLocale } from "@/i18n/LocaleProvider";
 
 type Stage = "email" | "code" | "information";
 
@@ -37,6 +38,7 @@ function FieldError({ message }: { message: string }) {
 }
 
 export default function SignupScreen({ stage }: { stage: Stage }) {
+  const { t } = useLocale();
   const router = useRouter();
   const { signUp } = useAuth();
   const insets = useSafeAreaInsets();
@@ -96,7 +98,7 @@ export default function SignupScreen({ stage }: { stage: Stage }) {
   const nickname = id.normalize("NFKC").trim();
   const idError =
     Array.from(nickname).length < 2 || Array.from(nickname).length > 10
-      ? "아이디는 2~10자로 입력해주세요."
+      ? t("signup.invalidId")
       : "";
   const passwordLength = Array.from(password).length;
   const passwordError =
@@ -104,12 +106,12 @@ export default function SignupScreen({ stage }: { stage: Stage }) {
     passwordLength > 20 ||
     !/[A-Za-z]/.test(password) ||
     !/[0-9]/.test(password)
-      ? "비밀번호는 영문과 숫자를 포함한 8~20자로 입력해주세요."
+      ? t("signup.invalidPassword")
       : "";
   const confirmationError = !confirmation
-    ? "비밀번호를 다시 입력해주세요."
+    ? t("signup.confirmPassword")
     : password !== confirmation
-      ? "비밀번호가 일치하지 않습니다."
+      ? t("signup.passwordMismatch")
       : "";
   const pending = useRef(false);
   const mounted = useRef(true);
@@ -144,11 +146,11 @@ export default function SignupScreen({ stage }: { stage: Stage }) {
     }
     const address = stage === "email" ? email.trim() : verificationEmail;
     if (!address) {
-      setError("학교 이메일을 입력해주세요.");
+      setError(t("signup.emailRequired"));
       return;
     }
     if (stage === "code" && !/^\d{6}$/.test(code)) {
-      setError("6자리 숫자 인증 코드를 입력해주세요.");
+      setError(t("signup.codeRequired"));
       return;
     }
     if (stage === "information") {
@@ -187,7 +189,7 @@ export default function SignupScreen({ stage }: { stage: Stage }) {
         setError(
           error instanceof Error
             ? error.message
-            : "요청을 처리하지 못했습니다.",
+            : t("common.requestFailed"),
         );
     } finally {
       pending.current = false;
@@ -212,7 +214,7 @@ export default function SignupScreen({ stage }: { stage: Stage }) {
           <Pressable
             onPress={back}
             accessibilityRole="button"
-            accessibilityLabel="이전 단계"
+            accessibilityLabel={t("signup.previousStep")}
             hitSlop={8}
             style={styles.back}
           >
@@ -221,7 +223,9 @@ export default function SignupScreen({ stage }: { stage: Stage }) {
           <View style={styles.main}>
             <View
               style={styles.steps}
-              accessibilityLabel={`회원가입 ${information ? 2 : 1}단계, 총 2단계`}
+              accessibilityLabel={t("signup.progress", {
+                step: information ? 2 : 1,
+              })}
             >
               <View
                 style={[styles.circle, !information && styles.activeCircle]}
@@ -256,7 +260,7 @@ export default function SignupScreen({ stage }: { stage: Stage }) {
                       focused === "id" && styles.focused,
                       touched.id && idError ? styles.inputError : null,
                     ]}
-                    placeholder="아이디 2~10자"
+                    placeholder={t("signup.idPlaceholder")}
                     placeholderTextColor="#D0D0D0"
                     value={id}
                     editable={!sending}
@@ -283,7 +287,7 @@ export default function SignupScreen({ stage }: { stage: Stage }) {
                         ? styles.inputError
                         : null,
                     ]}
-                    placeholder="영문·숫자 포함 8~20자"
+                    placeholder={t("signup.passwordPlaceholder")}
                     placeholderTextColor="#D0D0D0"
                     value={password}
                     editable={!sending}
@@ -352,7 +356,7 @@ export default function SignupScreen({ stage }: { stage: Stage }) {
                 </Text>
                 {stage === "email" ? (
                   <TextInput
-                    accessibilityLabel="학교 이메일"
+                    accessibilityLabel={t("signup.universityEmail")}
                     style={[
                       styles.input,
                       styles.verificationInput,
@@ -382,7 +386,7 @@ export default function SignupScreen({ stage }: { stage: Stage }) {
                     ]}
                   >
                     <TextInput
-                      accessibilityLabel="6자리 인증 코드"
+                      accessibilityLabel={t("signup.verificationCode")}
                       style={styles.codeInput}
                       placeholder="000000"
                       placeholderTextColor="#D0D0D0"
@@ -399,7 +403,9 @@ export default function SignupScreen({ stage }: { stage: Stage }) {
                     />
                     <Text
                       style={styles.timer}
-                      accessibilityLabel={`인증 남은 시간 ${remaining}초`}
+                      accessibilityLabel={t("signup.timeRemaining", {
+                        seconds: remaining,
+                      })}
                     >{`${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}`}</Text>
                   </View>
                 )}
