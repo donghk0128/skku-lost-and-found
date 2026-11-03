@@ -44,6 +44,7 @@ export const aiApi = {
   ) => request<AIDraft>("/ai/post-drafts", body, token, undefined, 130000),
   continueChat: (
     body: {
+      locale: "ko" | "en";
       post_type: "LOST" | "FOUND";
       messages: { role: "user"; content: string }[];
       draft?: AIDraft;

@@ -7,6 +7,7 @@ import { Colors, Fonts } from "@/constants/theme";
 import { aiApi, type AIDraft } from "@/lib/ai-api";
 import { authApi } from "@/lib/auth-api";
 import { postsApi } from "@/lib/posts-api";
+import { joinPostDescription } from "@/lib/post-description";
 import { readSession, writeSession } from "@/lib/session-storage";
 import { useLocale } from "@/i18n/LocaleProvider";
 
@@ -34,6 +35,7 @@ export default function CreatePostAiScreen() {
   const [busy, setBusy] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState("");
+  const features = draft?.keywords.join(", ") ?? "";
 
   const authenticatedToken = async () => {
     const session = await readSession();
@@ -56,6 +58,8 @@ export default function CreatePostAiScreen() {
     setError("");
     try {
       const result = await aiApi.continueChat({
+        // 현재 화면 언어를 전달해 챗봇의 질문과 초안 언어를 일치시킨다.
+        locale,
         post_type: postType,
         messages: userMessages,
         draft: draft ?? undefined,
@@ -82,7 +86,8 @@ export default function CreatePostAiScreen() {
       const post = await postsApi.createAiAssisted({
         post_type: draft.post_type,
         title: draft.title,
-        description: draft.description,
+        // 일반 작성과 같은 형식으로 AI 특징을 본문에 합쳐 저장한다.
+        description: joinPostDescription(draft.description, features),
         item_name: draft.item_name ?? undefined,
         category_id: draft.category_id,
         location_text: draft.location_text ?? undefined,
@@ -104,6 +109,7 @@ export default function CreatePostAiScreen() {
       creationMethod: "AI_ASSISTED",
       title: draft.title,
       description: draft.description,
+      features,
       categoryId: String(draft.category_id),
       place: draft.location_text ?? "",
       startAt: draft.event_start_at ?? "",
@@ -131,6 +137,7 @@ export default function CreatePostAiScreen() {
               <Text style={styles.previewLabel}>{t("ai.preview")}</Text>
               <Text style={styles.draftTitle}>{draft.title}</Text>
               <Text style={styles.draftText}>{draft.description}</Text>
+              <Text style={styles.draftMeta}>{t("createPost.features")}: {features || "-"}</Text>
               <Text style={styles.draftMeta}>{t("ai.category", { category: categoryLabel(draft.category_code) })}</Text>
               <Text style={styles.draftMeta}>{t("ai.location", { location: draft.location_text ?? "-" })}</Text>
               <Text style={styles.draftMeta}>{t("ai.time", { time: draft.event_start_at ? new Date(draft.event_start_at).toLocaleString(locale === "en" ? "en-US" : "ko-KR") : "-" })}</Text>

@@ -32,12 +32,13 @@ import { useLocale } from "@/i18n/LocaleProvider";
 export default function CreatePostScreen() {
   const { t, categoryLabel } = useLocale();
   const router = useRouter();
-  const { type, editId, creationMethod, title: initialTitle, description: initialDescription, categoryId, place: initialPlace, startAt, endAt } = useLocalSearchParams<{
+  const { type, editId, creationMethod, title: initialTitle, description: initialDescription, features: initialFeatures, categoryId, place: initialPlace, startAt, endAt } = useLocalSearchParams<{
     type?: string;
     editId?: string;
     creationMethod?: string;
     title?: string;
     description?: string;
+    features?: string;
     categoryId?: string;
     place?: string;
     startAt?: string;
@@ -58,7 +59,8 @@ export default function CreatePostScreen() {
   const [start, setStart] = useState<Date | null>(() => startAt ? new Date(startAt) : null);
   const [end, setEnd] = useState<Date | null>(() => endAt ? new Date(endAt) : null);
   const [place, setPlace] = useState(initialPlace ?? "");
-  const [features, setFeatures] = useState("");
+  // AI 초안에서 전달된 특징도 일반 작성과 같은 입력란에서 수정할 수 있다.
+  const [features, setFeatures] = useState(initialFeatures ?? "");
   const [title, setTitle] = useState(initialTitle ?? "");
   const [description, setDescription] = useState(initialDescription ?? "");
   const [photos, setPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);

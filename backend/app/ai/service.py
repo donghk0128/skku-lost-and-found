@@ -8,9 +8,9 @@ from sqlalchemy.orm import Session
 from app.ai.schemas import AIChatRequest, AIChatResponse, AIDraftCreateRequest, AIDraftResponse
 from app.ai.workflow import run_chat_workflow
 from app.core.errors import ApiError
-from app.integrations.ai.core.providers import DraftProvider
-from app.integrations.ai.core.schemas import DraftRequest, PostDraft
-from app.integrations.ai.knowledge.location_retriever import LocationMatch, find_locations
+from app.ai.core.providers import DraftProvider
+from app.ai.core.schemas import DraftRequest, PostDraft
+from app.ai.knowledge.location_retriever import LocationMatch, find_locations
 from app.posts.repository import PostRepository
 
 
@@ -31,6 +31,7 @@ class AIDraftService:
                 post_type=request.post_type,
                 natural_language=request.natural_language,
                 reference_time=datetime.now(ZoneInfo("Asia/Seoul")),
+                locale=request.locale,
             )
         )
         category = PostRepository.get_category_by_code(db, result.draft.category_code)
@@ -45,7 +46,11 @@ class AIDraftService:
             else "RANGE"
         )
         event_start_at, event_end_at = AIDraftService._event_range(result.draft)
-        matches = location_matches if location_matches is not None else find_locations(request.natural_language)
+        matches = location_matches if location_matches is not None else (
+            find_locations(request.natural_language, locale=request.locale)
+            if request.locale == "en"
+            else find_locations(request.natural_language)
+        )
         location_candidates = [match.resolved_name for match in matches]
         if location_confirmed:
             location_text = request.confirmed_location.text
@@ -65,9 +70,17 @@ class AIDraftService:
             missing_fields.remove("location")
         warnings = list(result.draft.warnings)
         if len(matches) > 1:
-            warnings.append("여러 학교 장소가 발견되어 사용자 확인이 필요합니다.")
+            warnings.append(
+                "Multiple campus locations were found. Please confirm the location."
+                if request.locale == "en"
+                else "여러 학교 장소가 발견되어 사용자 확인이 필요합니다."
+            )
         elif not matches and result.draft.location_text is not None:
-            warnings.append("학교 장소 사전에 없는 위치는 자동으로 확정하지 않았습니다.")
+            warnings.append(
+                "The location is not in the campus directory and could not be confirmed automatically."
+                if request.locale == "en"
+                else "학교 장소 사전에 없는 위치는 자동으로 확정하지 않았습니다."
+            )
         return AIDraftResponse(
             post_type=request.post_type,
             title=result.draft.title,
@@ -113,11 +126,13 @@ class AIDraftService:
 
         state = run_chat_workflow(
             post_type=request.post_type,
+            locale=request.locale,
             user_messages=[message.content for message in request.messages],
             draft_generator=lambda conversation, location_matches: AIDraftService.generate(
                 db,
                 AIDraftCreateRequest(
                     post_type=request.post_type,
+                    locale=request.locale,
                     natural_language=conversation,
                 ),
                 provider,

@@ -4,13 +4,14 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal, Self
 
-from app.integrations.ai.core.schemas import TimePrecision
+from app.ai.core.schemas import TimePrecision
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 from pydantic_core import PydanticCustomError
 
 
 PostType = Literal["LOST", "FOUND"]
+Locale = Literal["ko", "en"]
 RequiredDraftField = Literal["item_name", "location", "event_time"]
 
 
@@ -30,6 +31,7 @@ class AIDraftCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     post_type: PostType
+    locale: Locale = "ko"
     natural_language: str = Field(min_length=1, max_length=4000)
     confirmed_location: ConfirmedLocation | None = None
     confirmed_event_start_at: AwareDatetime | None = None
@@ -90,6 +92,7 @@ class AIChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     post_type: PostType
+    locale: Locale = "ko"
     messages: list[AIChatMessage] = Field(min_length=1, max_length=12)
     draft: AIDraftResponse | None = None
     pending_field: RequiredDraftField | None = None

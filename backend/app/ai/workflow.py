@@ -5,8 +5,8 @@ from typing import Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from app.ai.schemas import AIDraftResponse, PostType, RequiredDraftField
-from app.integrations.ai.knowledge.location_retriever import LocationMatch, find_locations
+from app.ai.schemas import AIDraftResponse, Locale, PostType, RequiredDraftField
+from app.ai.knowledge.location_retriever import LocationMatch, find_locations
 
 
 ChatStatus = Literal["NEEDS_INPUT", "READY"]
@@ -17,6 +17,7 @@ class ChatWorkflowState(TypedDict, total=False):
     """Serializable drafting state that can later accept RAG and image evidence."""
 
     post_type: PostType
+    locale: Locale
     user_messages: list[str]
     draft: AIDraftResponse
     previous_draft: AIDraftResponse
@@ -28,15 +29,31 @@ class ChatWorkflowState(TypedDict, total=False):
 
 
 QUESTIONS = {
-    "item_name": "어떤 물건인지 조금 더 구체적으로 알려주세요.",
-    "location": "어디에서 있었던 일인가요? 건물이나 장소를 알려주세요.",
-    "event_time": "언제 있었던 일인가요? 분실 예상 날짜를 알려주세요.",
+    "ko": {
+        "item_name": "어떤 물건인지 조금 더 구체적으로 알려주세요.",
+        "location": "어디에서 있었던 일인가요? 건물이나 장소를 알려주세요.",
+        "event_time": "언제 있었던 일인가요? 분실 예상 날짜를 알려주세요.",
+    },
+    "en": {
+        "item_name": "Could you describe the item more specifically?",
+        "location": "Where did this happen? Please provide a building or location.",
+        "event_time": "When did this happen? Please provide the lost or found date.",
+    },
 }
-MISSING_FIELD_PRIORITY = tuple(QUESTIONS)
+MISSING_FIELD_PRIORITY: tuple[RequiredDraftField, ...] = (
+    "item_name",
+    "location",
+    "event_time",
+)
 TRACE_TAGS = ["ai", "post-draft", "text-chat"]
 
 
-def _conversation_text(messages: list[str]) -> str:
+def _conversation_text(messages: list[str], locale: Locale) -> str:
+    if locale == "en":
+        return "\n".join(
+            f"User input {index + 1}: {message}"
+            for index, message in enumerate(messages)
+        )
     return "\n".join(
         f"사용자 {index + 1}번째 입력: {message}"
         for index, message in enumerate(messages)
@@ -47,17 +64,29 @@ def build_chat_workflow(draft_generator: DraftGenerator):
     """Compile the text drafting graph with an injected, testable model operation."""
 
     def retrieve_location(state: ChatWorkflowState) -> ChatWorkflowState:
-        latest_matches = find_locations(state["user_messages"][-1])
+        locale = state["locale"]
+        latest_matches = (
+            find_locations(state["user_messages"][-1], locale=locale)
+            if locale == "en"
+            else find_locations(state["user_messages"][-1])
+        )
         matches = (
             latest_matches
             if len(latest_matches) == 1
-            else find_locations(_conversation_text(state["user_messages"]))
+            else (
+                find_locations(
+                    _conversation_text(state["user_messages"], locale),
+                    locale=locale,
+                )
+                if locale == "en"
+                else find_locations(_conversation_text(state["user_messages"], locale))
+            )
         )
         return {"location_matches": matches}
 
     def extract_draft(state: ChatWorkflowState) -> ChatWorkflowState:
         draft = draft_generator(
-            _conversation_text(state["user_messages"]),
+            _conversation_text(state["user_messages"], state["locale"]),
             state.get("location_matches", ()),
         )
         pending_field = next(
@@ -108,18 +137,27 @@ def build_chat_workflow(draft_generator: DraftGenerator):
                 f"{index}. {candidate}"
                 for index, candidate in enumerate(state["draft"].location_candidates, start=1)
             )
-            assistant_message = f"여러 장소가 확인됐어요. 어느 장소인가요?\n{candidates}"
+            introduction = (
+                "Multiple locations were found. Which one is correct?"
+                if state["locale"] == "en"
+                else "여러 장소가 확인됐어요. 어느 장소인가요?"
+            )
+            assistant_message = f"{introduction}\n{candidates}"
         else:
-            assistant_message = QUESTIONS[pending_field]
+            assistant_message = QUESTIONS[state["locale"]][pending_field]
         return {
             "status": "NEEDS_INPUT",
             "assistant_message": assistant_message,
         }
 
-    def prepare_review(_: ChatWorkflowState) -> ChatWorkflowState:
+    def prepare_review(state: ChatWorkflowState) -> ChatWorkflowState:
         return {
             "status": "READY",
-            "assistant_message": "필요한 정보를 모두 확인했어요. 아래 초안을 확인해주세요.",
+            "assistant_message": (
+                "I have all the required information. Please review the draft below."
+                if state["locale"] == "en"
+                else "필요한 정보를 모두 확인했어요. 아래 초안을 확인해주세요."
+            ),
         }
 
     graph = StateGraph(ChatWorkflowState)
@@ -156,6 +194,7 @@ def run_chat_workflow(
     post_type: PostType,
     user_messages: list[str],
     draft_generator: DraftGenerator,
+    locale: Locale = "ko",
     previous_draft: AIDraftResponse | None = None,
     pending_field: RequiredDraftField | None = None,
     collected_fields: dict[RequiredDraftField, str] | None = None,
@@ -166,6 +205,7 @@ def run_chat_workflow(
     return graph.invoke(
         {
             "post_type": post_type,
+            "locale": locale,
             "user_messages": user_messages,
             "previous_draft": previous_draft,
             "pending_field": pending_field,
@@ -176,6 +216,7 @@ def run_chat_workflow(
             "tags": TRACE_TAGS,
             "metadata": {
                 "post_type": post_type,
+                "locale": locale,
                 "message_count": len(user_messages),
             },
         },

@@ -9,6 +9,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validato
 
 # frontend 코드에 맞게 카테고리 설정
 PostType = Literal["LOST", "FOUND"]
+Locale = Literal["ko", "en"]
 CategoryCode = Literal[
     "ELECTRONICS",
     "WALLET",
@@ -44,6 +45,7 @@ class DraftRequest(BaseModel):
     post_type: PostType
     natural_language: str = Field(min_length=1, max_length=4000)
     reference_time: AwareDatetime
+    locale: Locale = "ko"
 
 
 class PostDraft(BaseModel):

@@ -9,7 +9,7 @@ from app.auth.service import get_current_user
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.errors import ApiError
-from app.integrations.ai.core.providers import DraftProvider, OllamaProvider, OpenAIProvider, ProviderError, provider_error_message
+from app.ai.core.providers import DraftProvider, OllamaProvider, OpenAIProvider, ProviderError, provider_error_message
 from app.users.model import User
 
 
