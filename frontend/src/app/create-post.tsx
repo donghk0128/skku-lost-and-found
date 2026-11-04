@@ -32,7 +32,7 @@ import { useLocale } from "@/i18n/LocaleProvider";
 export default function CreatePostScreen() {
   const { t, categoryLabel } = useLocale();
   const router = useRouter();
-  const { type, editId, creationMethod, title: initialTitle, description: initialDescription, features: initialFeatures, categoryId, place: initialPlace, startAt, endAt } = useLocalSearchParams<{
+  const { type, editId, creationMethod, title: initialTitle, description: initialDescription, features: initialFeatures, categoryId, place: initialPlace, latitude, longitude, startAt, endAt } = useLocalSearchParams<{
     type?: string;
     editId?: string;
     creationMethod?: string;
@@ -41,6 +41,8 @@ export default function CreatePostScreen() {
     features?: string;
     categoryId?: string;
     place?: string;
+    latitude?: string;
+    longitude?: string;
     startAt?: string;
     endAt?: string;
   }>();
@@ -72,9 +74,28 @@ export default function CreatePostScreen() {
   const pending = useRef(false);
   const [saved, setSaved] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
-  const [picked, setPicked] = useState<PickedLocation | null>(null);
+  const [picked, setPicked] = useState<PickedLocation | null>(() => {
+    if (!initialPlace || !latitude || !longitude) return null;
+    const parsedLatitude = Number(latitude);
+    const parsedLongitude = Number(longitude);
+    if (!Number.isFinite(parsedLatitude) || !Number.isFinite(parsedLongitude)) {
+      return null;
+    }
+    return {
+      address: initialPlace,
+      latitude: parsedLatitude,
+      longitude: parsedLongitude,
+    };
+  });
 
-  useEffect(() => onLocationPicked(setPicked), []);
+  useEffect(
+    () =>
+      onLocationPicked((location) => {
+        setPicked(location);
+        setPlace((current) => current.trim() ? current : location.address);
+      }),
+    [],
+  );
 
   useEffect(() => {
     let active = true;
@@ -116,6 +137,15 @@ export default function CreatePostScreen() {
         setTitle(post.title);
         setDescription(content.body);
         setPlace(post.location_text ?? "");
+        setPicked(
+          post.latitude !== null && post.longitude !== null
+            ? {
+                address: post.location_text ?? "",
+                latitude: post.latitude,
+                longitude: post.longitude,
+              }
+            : null,
+        );
         setStart(post.event_start_at ? new Date(post.event_start_at) : null);
         setEnd(post.event_end_at ? new Date(post.event_end_at) : null);
         setExistingPhotos(images.map((image) => imageUrl(image.content_url)));
@@ -227,30 +257,41 @@ export default function CreatePostScreen() {
         setProgress(
           editing ? t("createPost.editing") : t("createPost.submitting"),
         );
-        const body = {
+        const commonBody = {
           title: title.trim(),
           description: joinPostDescription(description, features),
           category_id: category?.id ?? null,
           location_text: place.trim() || null,
           event_start_at: start?.toISOString() ?? null,
           event_end_at: end?.toISOString() ?? null,
-          ...(picked
-            ? {
-                latitude: Number(picked.latitude.toFixed(6)),
-                longitude: Number(picked.longitude.toFixed(6)),
-              }
-            : {}),
         };
+        const coordinates = picked
+          ? {
+              latitude: Number(picked.latitude.toFixed(6)),
+              longitude: Number(picked.longitude.toFixed(6)),
+            }
+          : {};
         const post = editId
-          ? await postsApi.update(editId, body, session.access_token)
-          : await (creationMethod === "AI_ASSISTED" ? postsApi.createAiAssisted : postsApi.create)(
+          ? await postsApi.update(
+              editId,
+              {
+                ...commonBody,
+                ...coordinates,
+                ...(!picked ? { latitude: null, longitude: null } : {}),
+              },
+              session.access_token,
+            )
+          : await (creationMethod === "AI_ASSISTED"
+              ? postsApi.createAiAssisted
+              : postsApi.create)(
               {
                 post_type: postType,
-                ...body,
-                category_id: body.category_id ?? undefined,
-                location_text: body.location_text ?? undefined,
-                event_start_at: body.event_start_at ?? undefined,
-                event_end_at: body.event_end_at ?? undefined,
+                ...commonBody,
+                category_id: commonBody.category_id ?? undefined,
+                location_text: commonBody.location_text ?? undefined,
+                event_start_at: commonBody.event_start_at ?? undefined,
+                event_end_at: commonBody.event_end_at ?? undefined,
+                ...coordinates,
               },
               session.access_token,
             );
@@ -433,7 +474,17 @@ export default function CreatePostScreen() {
               )}
               <Pressable
                 onPress={() => {
-                  router.push("/create-post-map");
+                  router.push({
+                    pathname: "/create-post-map",
+                    params: {
+                      ...(picked
+                        ? {
+                            latitude: String(picked.latitude),
+                            longitude: String(picked.longitude),
+                          }
+                        : {}),
+                    },
+                  });
                 }}
                 style={{
                   flexDirection: "row",
@@ -448,7 +499,11 @@ export default function CreatePostScreen() {
               >
                 <PinIcon />
                 <Text style={{ color: Colors.primary }}>
-                  {t("createPost.pickOnMap")}
+                  {t(
+                    picked
+                      ? "createPost.changeMapLocation"
+                      : "createPost.pickOnMap",
+                  )}
                 </Text>
               </Pressable>
               {picked ? (
