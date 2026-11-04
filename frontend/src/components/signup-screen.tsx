@@ -15,7 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors, Fonts } from "@/constants/theme";
-import { authApi } from "@/lib/auth-api";
+import { ApiError, authApi } from "@/lib/auth-api";
 import { useAuth } from "@/providers/AuthProvider";
 import { useLocale } from "@/i18n/LocaleProvider";
 
@@ -185,12 +185,21 @@ export default function SignupScreen({ stage }: { stage: Stage }) {
         }
       }
     } catch (error) {
-      if (mounted.current && active.current && !expired.current)
+      if (mounted.current && active.current && !expired.current) {
+        if (
+          stage === "information" &&
+          error instanceof ApiError &&
+          error.code === "email_already_registered"
+        ) {
+          setError(t("signup.emailAlreadyRegistered"));
+          return;
+        }
         setError(
           error instanceof Error
             ? error.message
             : t("common.requestFailed"),
         );
+      }
     } finally {
       pending.current = false;
       if (mounted.current) setSending(false);

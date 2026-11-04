@@ -669,7 +669,7 @@ export default function CreatePostScreen() {
                     }}
                     style={styles.category}
                   >
-                    <Text>{item.name}</Text>
+                    <Text>{categoryLabel(item.code, item.name)}</Text>
                   </Pressable>
                 ))}
               </ScrollView>

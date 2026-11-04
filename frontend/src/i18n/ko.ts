@@ -47,6 +47,7 @@ const ko = {
   "signup.confirmPassword": "비밀번호를 다시 입력해주세요.",
   "signup.passwordMismatch": "비밀번호가 일치하지 않습니다.",
   "signup.emailRequired": "학교 이메일을 입력해주세요.",
+  "signup.emailAlreadyRegistered": "이미 가입된 이메일입니다.",
   "signup.codeRequired": "6자리 숫자 인증 코드를 입력해주세요.",
   "signup.previousStep": "이전 단계",
   "signup.progress": "회원가입 {{step}}단계, 총 2단계",
@@ -60,9 +61,12 @@ const ko = {
   "createMethod.title": "게시글 작성",
   "createMethod.prompt": "게시글을 작성할 방식을 찾아보세요",
   "createMethod.aiTitle": "AI와 함께 작성하기",
-  "createMethod.aiHint": "AI의 질문에 답하며 글을 간편하게 써보세요",
-  "createMethod.manualTitle": "혼자 작성하기",
-  "createMethod.manualHint": "직접 게시물을 작성하세요",
+  "createMethod.aiHint":
+    "AI가 게시글을 대신 작성해요.\n몇 가지 질문에 답하고 간편하게 완성해보세요.",
+  "createMethod.manualTitle": "직접 작성하기",
+  "createMethod.manualHint":
+    "필요한 정보를 직접 입력해주세요.\n사진도 함께 첨부하면 좋아요.",
+  "createMethod.goTo": "바로가기",
   "createButton.closeMenu": "작성 메뉴 닫기",
   "createButton.createPost": "게시글 작성",
   "createButton.lostTitle": "분실글 작성",

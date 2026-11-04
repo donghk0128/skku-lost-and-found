@@ -23,6 +23,7 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public code?: string,
   ) {
     super(message);
   }
@@ -67,6 +68,7 @@ export async function request<T>(
         validationDetails
           ? `${data.error?.message ?? t("common.requestFailed")} (${validationDetails})`
           : data.error?.message ?? t("common.requestFailed"),
+        typeof data.error?.code === "string" ? data.error.code : undefined,
       );
     }
     return data as T;

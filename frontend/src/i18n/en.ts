@@ -47,6 +47,7 @@ const en = {
   "signup.confirmPassword": "Re-enter your password.",
   "signup.passwordMismatch": "Passwords do not match.",
   "signup.emailRequired": "Enter your university email address.",
+  "signup.emailAlreadyRegistered": "This email address is already registered.",
   "signup.codeRequired": "Enter the 6-digit verification code.",
   "signup.previousStep": "Previous step",
   "signup.progress": "Sign-up, step {{step}} of 2",
@@ -60,9 +61,12 @@ const en = {
   "createMethod.title": "Create a post",
   "createMethod.prompt": "How would you like to create your post?",
   "createMethod.aiTitle": "Create with AI",
-  "createMethod.aiHint": "Answer a few questions to create your post.",
-  "createMethod.manualTitle": "Create manually",
-  "createMethod.manualHint": "Write your post yourself.",
+  "createMethod.aiHint":
+    "Let AI write your post for you.\nJust answer a few questions, and you’re all set!",
+  "createMethod.manualTitle": "Write it yourself",
+  "createMethod.manualHint":
+    "Enter the details you want to share.\nYou can also attach a photo.",
+  "createMethod.goTo": "Get started",
   "createButton.closeMenu": "Close post menu",
   "createButton.createPost": "Create a post",
   "createButton.lostTitle": "Report a lost item",
