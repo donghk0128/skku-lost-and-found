@@ -221,6 +221,7 @@ function PostDetail({ id }: { id: string }) {
         </View>
       </SafeAreaView>
     );
+  const isOwnPost = post.author_id === user?.id;
   const lost = post.post_type === "LOST";
   const content = splitPostDescription(post.description);
   const details = [
@@ -274,7 +275,7 @@ function PostDetail({ id }: { id: string }) {
           <View style={styles.back} />
         )}
       </View>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         {photos.length ? (
           <View style={styles.hero}>
             <ScrollView
@@ -409,6 +410,31 @@ function PostDetail({ id }: { id: string }) {
           </View>
         ) : null}
       </ScrollView>
+      <SafeAreaView edges={["bottom"]} style={styles.chatBar}>
+        <View style={styles.chatBarContent}>
+          {/* Demo only: no navigation or chat request is attached. */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("post.chat")}
+            accessibilityHint={isOwnPost ? t("post.ownPost") : undefined}
+            accessibilityState={{ disabled: isOwnPost }}
+            disabled={isOwnPost}
+            style={[styles.chatButton, isOwnPost && styles.chatButtonDisabled]}
+          >
+            <Text
+              style={[
+                styles.chatButtonText,
+                isOwnPost && styles.chatButtonTextDisabled,
+              ]}
+            >
+              {t("post.chat")}
+            </Text>
+          </Pressable>
+          {isOwnPost ? (
+            <Text style={styles.chatHint}>{t("post.ownPost")}</Text>
+          ) : null}
+        </View>
+      </SafeAreaView>
       {menu === "actions" ? (
         <View style={styles.popoverLayer}>
           <Pressable
@@ -603,6 +629,46 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   root: { flex: 1, backgroundColor: "#FFF" },
+  scroll: { flex: 1 },
+  chatBar: {
+    flexShrink: 0,
+    backgroundColor: "#FFF",
+    borderTopWidth: 1,
+    borderTopColor: "#EDF0EE",
+  },
+  chatBarContent: {
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    paddingBottom: 12,
+    gap: 8,
+  },
+  chatButton: {
+    minHeight: 52,
+    borderRadius: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primary,
+  },
+  chatButtonDisabled: { backgroundColor: "#E7ECE9" },
+  chatButtonText: {
+    fontFamily: Fonts.pretendardSemiBold,
+    fontSize: 16,
+    lineHeight: 24,
+    color: "#FFF",
+  },
+  chatButtonTextDisabled: { color: "#7D8982" },
+  chatHint: {
+    fontFamily: Fonts.pretendardRegular,
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#8C9690",
+    textAlign: "center",
+  },
   header: {
     width: "100%",
     alignSelf: "center",
