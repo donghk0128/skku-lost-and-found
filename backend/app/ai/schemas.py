@@ -87,7 +87,7 @@ class AIChatMessage(BaseModel):
 
 
 class AIChatRequest(BaseModel):
-    """Complete user-side conversation sent on each drafting turn."""
+    """Conversation and optional confirmed map location sent on each drafting turn."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -97,6 +97,7 @@ class AIChatRequest(BaseModel):
     draft: AIDraftResponse | None = None
     pending_field: RequiredDraftField | None = None
     collected_fields: dict[RequiredDraftField, str] = Field(default_factory=dict)
+    confirmed_location: ConfirmedLocation | None = None
 
     @model_validator(mode="after")
     def validate_total_content_length(self) -> Self:
