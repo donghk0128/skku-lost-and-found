@@ -168,6 +168,8 @@ const ko = {
   "post.lostDetail": "분실물 상세",
   "post.foundDetail": "습득물 상세",
   "post.moreOptions": "게시글 더보기",
+  "post.chat": "채팅하기",
+  "post.ownPost": "본인이 작성한 글입니다.",
   "post.photoAccessibility": "물품 사진 {{index}}",
   "post.lostBadge": "분실했어요",
   "post.foundBadge": "습득했어요",

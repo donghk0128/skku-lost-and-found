@@ -173,6 +173,8 @@ const en = {
   "post.lostDetail": "Lost item details",
   "post.foundDetail": "Found item details",
   "post.moreOptions": "More post options",
+  "post.chat": "Chat",
+  "post.ownPost": "This is your post.",
   "post.photoAccessibility": "Item photo {{index}}",
   "post.lostBadge": "Lost",
   "post.foundBadge": "Found",
