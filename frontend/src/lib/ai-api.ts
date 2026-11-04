@@ -50,6 +50,11 @@ export const aiApi = {
       draft?: AIDraft;
       pending_field?: "item_name" | "location" | "event_time" | null;
       collected_fields?: Partial<Record<"item_name" | "location" | "event_time", string>>;
+      confirmed_location?: {
+        text: string;
+        latitude: number;
+        longitude: number;
+      };
     },
     token: string,
   ) => request<AIChatResult>("/ai/post-draft-chat", body, token, undefined, 130000),

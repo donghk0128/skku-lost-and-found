@@ -50,9 +50,23 @@ export async function request<T>(
     if (response.status === 204) return undefined as T;
     const data = await response.json();
     if (!response.ok) {
+      const validationDetails = Array.isArray(data.error?.details)
+        ? data.error.details
+            .filter(
+              (detail: { loc?: unknown; msg?: unknown }) =>
+                Array.isArray(detail.loc) && typeof detail.msg === "string",
+            )
+            .map(
+              (detail: { loc: unknown[]; msg: string }) =>
+                `${detail.loc.slice(1).join(".")}: ${detail.msg}`,
+            )
+            .join("; ")
+        : "";
       throw new ApiError(
         response.status,
-        data.error?.message ?? t("common.requestFailed"),
+        validationDetails
+          ? `${data.error?.message ?? t("common.requestFailed")} (${validationDetails})`
+          : data.error?.message ?? t("common.requestFailed"),
       );
     }
     return data as T;

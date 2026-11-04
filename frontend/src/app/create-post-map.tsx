@@ -4,7 +4,7 @@ import axios from "axios";
 import * as Location from "expo-location";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Alert, View, Pressable, StyleSheet, Text } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Colors, Fonts } from "@/constants/theme";
 import { pickLocation } from "@/lib/location-picker";
 import { useLocale } from "@/i18n/LocaleProvider";
@@ -18,8 +18,27 @@ type LatLng = { latitude: number; longitude: number };
 
 export default function CreatePostMap() {
   const { locale, t } = useLocale();
+  const { latitude, longitude } = useLocalSearchParams<{
+    latitude?: string;
+    longitude?: string;
+  }>();
   const mapRef = useRef<MapView>(null);
-  const [pin, setPin] = useState<LatLng>();
+  const [pin, setPin] = useState<LatLng | undefined>(() => {
+    if (!latitude || !longitude) return undefined;
+    const parsedLatitude = Number(latitude);
+    const parsedLongitude = Number(longitude);
+    if (
+      !Number.isFinite(parsedLatitude) ||
+      !Number.isFinite(parsedLongitude) ||
+      parsedLatitude < -90 ||
+      parsedLatitude > 90 ||
+      parsedLongitude < -180 ||
+      parsedLongitude > 180
+    ) {
+      return undefined;
+    }
+    return { latitude: parsedLatitude, longitude: parsedLongitude };
+  });
   const [placeName, setPlaceName] = useState<string>();
 
   const moveTo = (target: LatLng) =>
@@ -95,7 +114,7 @@ export default function CreatePostMap() {
           provider={PROVIDER_GOOGLE}
           style={StyleSheet.absoluteFill}
           initialRegion={{
-            ...CAMPUSES.science,
+            ...(pin ?? CAMPUSES.science),
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
           }}
