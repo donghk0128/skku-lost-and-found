@@ -13,19 +13,29 @@ import { imageUrl, postsApi, type Category, type Post } from "@/lib/posts-api";
 import { useFocusEffect, useRouter } from "expo-router";
 import { splitPostDescription } from "@/lib/post-description";
 import { useAuth } from "@/providers/AuthProvider";
+import { useLocale } from "@/i18n/LocaleProvider";
+import type { TranslateFn } from "@/i18n";
 
-function relativeTime(date: string) {
+function relativeTime(date: string, t: TranslateFn) {
   const minutes = Math.max(
     0,
     Math.floor((Date.now() - new Date(date).getTime()) / 60000),
   );
-  if (minutes < 1) return "방금 전";
-  if (minutes < 60) return `${minutes}분 전`;
-  if (minutes < 1440) return `${Math.floor(minutes / 60)}시간 전`;
-  return `${Math.floor(minutes / 1440)}일 전`;
+  if (minutes < 1) return t("board.justNow");
+  if (minutes < 60) return t("board.minutesAgo", { count: minutes });
+  if (minutes < 1440)
+    return t("board.hoursAgo", { count: Math.floor(minutes / 60) });
+  return t("board.daysAgo", { count: Math.floor(minutes / 1440) });
 }
 
-function PostRow({ post, category }: { post: Post; category?: string }) {
+function PostRow({
+  post,
+  category,
+}: {
+  post: Post;
+  category?: Category;
+}) {
+  const { t, categoryLabel } = useLocale();
   const { user } = useAuth();
   const router = useRouter();
   const [thumbnail, setThumbnail] = useState<string | null>(null);
@@ -63,17 +73,19 @@ function PostRow({ post, category }: { post: Post; category?: string }) {
         <View style={styles.meta}>
           {category ? (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{category}</Text>
+              <Text style={styles.badgeText}>
+                {categoryLabel(category.code, category.name)}
+              </Text>
             </View>
           ) : null}
           <View style={styles.avatar} />
           <Text numberOfLines={1} style={styles.author}>
-            {post.author_id === user?.id ? user.nickname : "작성자"}
+            {post.author_id === user?.id ? user.nickname : t("common.postAuthor")}
           </Text>
-          <Text style={styles.time}>{relativeTime(post.created_at)}</Text>
+          <Text style={styles.time}>{relativeTime(post.created_at, t)}</Text>
         </View>
         {post.status === "COMPLETED" ? (
-          <Text style={styles.completed}>완료</Text>
+          <Text style={styles.completed}>{t("board.completed")}</Text>
         ) : null}
       </View>
       {thumbnail ? (
@@ -81,7 +93,7 @@ function PostRow({ post, category }: { post: Post; category?: string }) {
           source={{ uri: thumbnail }}
           style={styles.image}
           onError={() => setThumbnail(null)}
-          accessibilityLabel="게시글 사진"
+          accessibilityLabel={t("board.photoAccessibility")}
         />
       ) : null}
     </Pressable>
@@ -95,6 +107,7 @@ export default function PostBoard({
   type: "LOST" | "FOUND";
   search: string;
 }) {
+  const { locale, t } = useLocale();
   const [query, setQuery] = useState(search);
   const [posts, setPosts] = useState<Post[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -140,7 +153,7 @@ export default function PostBoard({
           setError(
             error instanceof Error
               ? error.message
-              : "게시글을 불러오지 못했습니다.",
+              : t("common.postLoadFailed"),
           );
       } finally {
         if (version === requests.current.generation) {
@@ -169,14 +182,14 @@ export default function PostBoard({
   return (
     <FlatList
       data={posts}
+      extraData={locale}
       keyExtractor={(post) => post.id}
       renderItem={({ item }) => (
         <PostRow
           post={item}
-          category={
-            categories.find((category) => category.id === item.category_id)
-              ?.name
-          }
+          category={categories.find(
+            (category) => category.id === item.category_id,
+          )}
         />
       )}
       contentContainerStyle={styles.list}
@@ -192,10 +205,10 @@ export default function PostBoard({
         !loading && !error ? (
           <Text style={styles.empty}>
             {query.trim()
-              ? "검색 결과가 없습니다."
+              ? t("board.searchEmpty")
               : type === "LOST"
-                ? "등록된 분실물이 없습니다."
-                : "등록된 습득물이 없습니다."}
+                ? t("board.lostEmpty")
+                : t("board.foundEmpty")}
           </Text>
         ) : null
       }
@@ -212,7 +225,7 @@ export default function PostBoard({
                 accessibilityRole="button"
                 onPress={() => void load(posts.length)}
               >
-                <Text style={styles.retry}>다시 시도</Text>
+                <Text style={styles.retry}>{t("board.retry")}</Text>
               </Pressable>
             </>
           ) : null}

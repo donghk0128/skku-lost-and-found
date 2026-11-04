@@ -8,21 +8,32 @@ import {
   View,
 } from "react-native";
 import { Colors, Fonts } from "@/constants/theme";
+import { useLocale } from "@/i18n/LocaleProvider";
 
 type Props = {
   value: Date | null;
   onChange: (value: Date) => void;
   label?: string;
 };
-const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
 const pad = (value: number) => String(value).padStart(2, "0");
 
 /** A local date/time field. Changes are committed only when the user confirms. */
 export default function DateTimeField({
   value,
   onChange,
-  label = "발생 시각",
+  label,
 }: Props) {
+  const { locale, t } = useLocale();
+  const fieldLabel = label ?? t("datetime.eventTime");
+  const weekdays = [
+    t("datetime.weekdaySun"),
+    t("datetime.weekdayMon"),
+    t("datetime.weekdayTue"),
+    t("datetime.weekdayWed"),
+    t("datetime.weekdayThu"),
+    t("datetime.weekdayFri"),
+    t("datetime.weekdaySat"),
+  ];
   const [mode, setMode] = useState<"date" | "time" | null>(null);
   const [draft, setDraft] = useState(() => new Date());
   const [month, setMonth] = useState(() => new Date());
@@ -71,27 +82,27 @@ export default function DateTimeField({
     <View style={styles.field}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${label} 날짜 선택`}
+        accessibilityLabel={t("datetime.selectDateAccessibility", { label: fieldLabel })}
         onPress={() => open("date")}
         style={styles.trigger}
       >
         <Text style={[styles.triggerText, !value && styles.placeholder]}>
           {value
             ? `${value.getFullYear()}.${pad(value.getMonth() + 1)}.${pad(value.getDate())}`
-            : "날짜 선택"}
+            : t("datetime.selectDate")}
         </Text>
         <Text style={styles.arrow}>⌄</Text>
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${label} 시간 선택`}
+        accessibilityLabel={t("datetime.selectTimeAccessibility", { label: fieldLabel })}
         onPress={() => open("time")}
         style={styles.trigger}
       >
         <Text style={[styles.triggerText, !value && styles.placeholder]}>
           {value
             ? `${pad(value.getHours())}:${pad(value.getMinutes())}`
-            : "시간 선택"}
+            : t("datetime.selectTime")}
         </Text>
         <Text style={styles.arrow}>⌄</Text>
       </Pressable>
@@ -105,7 +116,7 @@ export default function DateTimeField({
         <View style={styles.overlay}>
           <Pressable
             style={StyleSheet.absoluteFill}
-            accessibilityLabel="선택 취소"
+            accessibilityLabel={t("datetime.cancelSelection")}
             onPress={() => setMode(null)}
           />
           <View style={styles.dialog} accessibilityViewIsModal>
@@ -115,14 +126,16 @@ export default function DateTimeField({
             >
               <View style={styles.header}>
                 <View>
-                  <Text style={styles.eyebrow}>{label}</Text>
+                  <Text style={styles.eyebrow}>{fieldLabel}</Text>
                   <Text style={styles.title}>
-                    {mode === "date" ? "날짜 선택" : "시간 선택"}
+                    {mode === "date"
+                      ? t("datetime.selectDate")
+                      : t("datetime.selectTime")}
                   </Text>
                 </View>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="닫기"
+                  accessibilityLabel={t("datetime.close")}
                   onPress={() => setMode(null)}
                   style={styles.close}
                 >
@@ -134,18 +147,24 @@ export default function DateTimeField({
                   <View style={styles.monthHeader}>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel="이전 달"
+                      accessibilityLabel={t("datetime.previousMonth")}
                       onPress={() => changeMonth(-1)}
                       style={styles.close}
                     >
                       <Text style={styles.nav}>‹</Text>
                     </Pressable>
                     <Text style={styles.month}>
-                      {month.getFullYear()}년 {month.getMonth() + 1}월
+                      {new Intl.DateTimeFormat(
+                        locale === "en" ? "en-US" : "ko-KR",
+                        {
+                        year: "numeric",
+                        month: "long",
+                        },
+                      ).format(month)}
                     </Text>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel="다음 달"
+                      accessibilityLabel={t("datetime.nextMonth")}
                       onPress={() => changeMonth(1)}
                       style={styles.close}
                     >
@@ -175,7 +194,20 @@ export default function DateTimeField({
                           <Pressable
                             key={index}
                             accessibilityRole="button"
-                            accessibilityLabel={`${month.getFullYear()}년 ${month.getMonth() + 1}월 ${day}일`}
+                            accessibilityLabel={t("datetime.dateAccessibility", {
+                              date: new Intl.DateTimeFormat(
+                                locale === "en" ? "en-US" : "ko-KR",
+                                {
+                                dateStyle: "full",
+                                },
+                              ).format(
+                                new Date(
+                                  month.getFullYear(),
+                                  month.getMonth(),
+                                  day,
+                                ),
+                              ),
+                            })}
                             accessibilityState={{ selected }}
                             onPress={() => chooseDay(day)}
                             style={styles.cell}
@@ -207,13 +239,15 @@ export default function DateTimeField({
                       <Text style={styles.colon}> : </Text>
                       {pad(draft.getMinutes())}
                     </Text>
-                    <Text style={styles.caption}>24시간 기준</Text>
+                    <Text style={styles.caption}>{t("datetime.24Hour")}</Text>
                   </View>
                   <View style={styles.timeColumns}>
                     {(["hour", "minute"] as const).map((unit) => (
                       <View key={unit} style={styles.timeColumn}>
                         <Text style={styles.caption}>
-                          {unit === "hour" ? "시" : "분"}
+                          {unit === "hour"
+                            ? t("datetime.hours")
+                            : t("datetime.minutes")}
                         </Text>
                         <ScrollView
                           style={styles.timeList}
@@ -232,7 +266,7 @@ export default function DateTimeField({
                                 <Pressable
                                   key={number}
                                   accessibilityRole="button"
-                                  accessibilityLabel={`${number}${unit === "hour" ? "시" : "분"}`}
+                                  accessibilityLabel={`${number} ${unit === "hour" ? t("datetime.hours") : t("datetime.minutes")}`}
                                   accessibilityState={{ selected }}
                                   onPress={() => chooseTime(unit, number)}
                                   style={[
@@ -264,7 +298,7 @@ export default function DateTimeField({
                   onPress={() => setMode(null)}
                   style={styles.cancel}
                 >
-                  <Text style={styles.cancelText}>취소</Text>
+                  <Text style={styles.cancelText}>{t("common.cancel")}</Text>
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
@@ -274,7 +308,7 @@ export default function DateTimeField({
                   }}
                   style={styles.confirm}
                 >
-                  <Text style={styles.confirmText}>선택 완료</Text>
+                  <Text style={styles.confirmText}>{t("datetime.confirm")}</Text>
                 </Pressable>
               </View>
             </ScrollView>

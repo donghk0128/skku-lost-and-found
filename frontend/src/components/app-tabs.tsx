@@ -2,8 +2,10 @@ import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { useColorScheme } from "react-native";
 
 import { Colors } from "@/constants/theme";
+import { useLocale } from "@/i18n/LocaleProvider";
 
 export default function AppTabs() {
+  const { t } = useLocale();
   const scheme = useColorScheme();
   const colors = Colors[scheme === "unspecified" ? "light" : scheme];
 
@@ -15,7 +17,7 @@ export default function AppTabs() {
       tintColor={Colors.primary}
     >
       <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Label>홈</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{t("tabs.home")}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={require("@/assets/images/tabIcons/home-line.png")}
           renderingMode="template"
@@ -23,7 +25,7 @@ export default function AppTabs() {
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="chat">
-        <NativeTabs.Trigger.Label>채팅</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{t("tabs.chat")}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={require("@/assets/images/tabIcons/chat.png")}
           renderingMode="template"

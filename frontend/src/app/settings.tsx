@@ -4,8 +4,10 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Fonts } from "@/constants/theme";
 import { useAuth } from "@/providers/AuthProvider";
+import { useLocale } from "@/i18n/LocaleProvider";
 
 export default function SettingsScreen() {
+  const { t } = useLocale();
   const router = useRouter();
   const { signOut } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -21,7 +23,7 @@ export default function SettingsScreen() {
       // Protected routes remove authenticated screens when user becomes null.
     } catch (error) {
       setError(
-        error instanceof Error ? error.message : "로그아웃하지 못했습니다.",
+        error instanceof Error ? error.message : t("settings.logoutFailed"),
       );
     } finally {
       pending.current = false;
@@ -35,7 +37,7 @@ export default function SettingsScreen() {
           <Pressable
             disabled={busy}
             accessibilityRole="button"
-            accessibilityLabel="뒤로가기"
+            accessibilityLabel={t("common.back")}
             onPress={() =>
               router.canGoBack() ? router.back() : router.replace("/")
             }
@@ -43,7 +45,7 @@ export default function SettingsScreen() {
           >
             <Text style={styles.backText}>‹</Text>
           </Pressable>
-          <Text style={styles.title}>설정</Text>
+          <Text style={styles.title}>{t("settings.title")}</Text>
           <View style={styles.back} />
         </View>
         <Pressable
@@ -53,7 +55,9 @@ export default function SettingsScreen() {
           onPress={() => void logout()}
           style={styles.logout}
         >
-          <Text style={styles.label}>{busy ? "로그아웃 중…" : "로그아웃"}</Text>
+          <Text style={styles.label}>
+            {busy ? t("settings.loggingOut") : t("settings.logout")}
+          </Text>
           <Text style={styles.chevron}>›</Text>
         </Pressable>
         {error ? (

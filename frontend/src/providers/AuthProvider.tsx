@@ -6,6 +6,7 @@ import {
   type User,
 } from "@/lib/auth-api";
 import { readSession, writeSession } from "@/lib/session-storage";
+import { t } from "@/i18n";
 
 type AuthContextValue = {
   user: User | null;
@@ -52,7 +53,7 @@ export default function AuthProvider({
           setInitializationError(
             error instanceof Error
               ? error.message
-              : "로그인 정보를 확인하지 못했습니다.",
+              : t("auth.restoreFailed"),
           );
         }
       } finally {
@@ -109,6 +110,6 @@ export default function AuthProvider({
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context)
-    throw new Error("useAuth는 AuthProvider 안에서 사용해야 합니다.");
+    throw new Error(t("auth.providerRequired"));
   return context;
 }

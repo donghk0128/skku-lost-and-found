@@ -10,8 +10,10 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { BottomTabInset, Colors, Fonts } from "@/constants/theme";
+import { useLocale } from "@/i18n/LocaleProvider";
 
 export default function CreatePostButton() {
+  const { t } = useLocale();
   const router = useRouter();
   const { height, width } = useWindowDimensions();
   const trigger = useRef<View>(null);
@@ -31,7 +33,11 @@ export default function CreatePostButton() {
   const close = (type?: "LOST" | "FOUND") =>
     animate(0, () => {
       setOpen(false);
-      if (type) router.push({ pathname: "/create-post", params: { type } });
+      if (type)
+        router.push({
+          pathname: "/create-post-method",
+          params: { type },
+        } as never);
     });
   const show = () => {
     trigger.current?.measureInWindow((left, top) => {
@@ -49,7 +55,9 @@ export default function CreatePostButton() {
         !expanded && open ? "no-hide-descendants" : "auto"
       }
       accessibilityRole="button"
-      accessibilityLabel={expanded ? "작성 메뉴 닫기" : "게시글 작성"}
+      accessibilityLabel={
+        expanded ? t("createButton.closeMenu") : t("createButton.createPost")
+      }
       onPress={() => (expanded ? close() : show())}
       style={[
         styles.button,
@@ -95,7 +103,7 @@ export default function CreatePostButton() {
             style={[StyleSheet.absoluteFill, { opacity: progress }]}
           >
             <Pressable
-              accessibilityLabel="작성 메뉴 닫기"
+              accessibilityLabel={t("createButton.closeMenu")}
               onPress={() => close()}
               style={styles.dim}
             />
@@ -125,8 +133,8 @@ export default function CreatePostButton() {
               onPress={() => close("LOST")}
               style={styles.choice}
             >
-              <Text style={styles.title}>분실글 작성</Text>
-              <Text style={styles.hint}>잃어버린 물건을 찾아보세요</Text>
+              <Text style={styles.title}>{t("createButton.lostTitle")}</Text>
+              <Text style={styles.hint}>{t("createButton.lostHint")}</Text>
             </Pressable>
             <View style={styles.divider} />
             <Pressable
@@ -134,8 +142,8 @@ export default function CreatePostButton() {
               onPress={() => close("FOUND")}
               style={styles.choice}
             >
-              <Text style={styles.title}>습득글 작성</Text>
-              <Text style={styles.hint}>주운 물건의 주인을 찾아주세요</Text>
+              <Text style={styles.title}>{t("createButton.foundTitle")}</Text>
+              <Text style={styles.hint}>{t("createButton.foundHint")}</Text>
             </Pressable>
           </Animated.View>
           {button(true)}

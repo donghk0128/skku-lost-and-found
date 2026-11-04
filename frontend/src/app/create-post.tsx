@@ -25,12 +25,24 @@ import {
   splitPostDescription,
 } from "@/lib/post-description";
 import { useAuth } from "@/providers/AuthProvider";
+import { onLocationPicked, type PickedLocation } from "@/lib/location-picker";
+import PinIcon from "@/assets/icons/location.svg";
+import { useLocale } from "@/i18n/LocaleProvider";
 
 export default function CreatePostScreen() {
+  const { t, categoryLabel } = useLocale();
   const router = useRouter();
-  const { type, editId } = useLocalSearchParams<{
+  const { type, editId, creationMethod, title: initialTitle, description: initialDescription, features: initialFeatures, categoryId, place: initialPlace, startAt, endAt } = useLocalSearchParams<{
     type?: string;
     editId?: string;
+    creationMethod?: string;
+    title?: string;
+    description?: string;
+    features?: string;
+    categoryId?: string;
+    place?: string;
+    startAt?: string;
+    endAt?: string;
   }>();
   const { user } = useAuth();
   const editing = !!editId;
@@ -44,12 +56,13 @@ export default function CreatePostScreen() {
   const [categoryError, setCategoryError] = useState("");
   const [category, setCategory] = useState<Category | null>(null);
   const [categoryOpen, setCategoryOpen] = useState(false);
-  const [start, setStart] = useState<Date | null>(null);
-  const [end, setEnd] = useState<Date | null>(null);
-  const [place, setPlace] = useState("");
-  const [features, setFeatures] = useState("");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [start, setStart] = useState<Date | null>(() => startAt ? new Date(startAt) : null);
+  const [end, setEnd] = useState<Date | null>(() => endAt ? new Date(endAt) : null);
+  const [place, setPlace] = useState(initialPlace ?? "");
+  // AI 초안에서 전달된 특징도 일반 작성과 같은 입력란에서 수정할 수 있다.
+  const [features, setFeatures] = useState(initialFeatures ?? "");
+  const [title, setTitle] = useState(initialTitle ?? "");
+  const [description, setDescription] = useState(initialDescription ?? "");
   const [photos, setPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -59,23 +72,32 @@ export default function CreatePostScreen() {
   const pending = useRef(false);
   const [saved, setSaved] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [picked, setPicked] = useState<PickedLocation | null>(null);
+
+  useEffect(() => onLocationPicked(setPicked), []);
+
   useEffect(() => {
     let active = true;
     postsApi
       .categories()
       .then((items) => {
-        if (active) setCategories(items);
+        if (active) {
+          setCategories(items);
+          if (!editId && categoryId) {
+            setCategory(items.find((item) => item.id === Number(categoryId)) ?? null);
+          }
+        }
       })
       .catch(() => {
         if (active)
           setCategoryError(
-            "카테고리를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
+            t("createPost.categoryLoadFailed"),
           );
       });
     return () => {
       active = false;
     };
-  }, []);
+  }, [categoryId, editId]);
   useEffect(() => {
     if (!editId) return;
     let active = true;
@@ -87,7 +109,7 @@ export default function CreatePostScreen() {
       .then(([post, items, images]) => {
         if (!active) return;
         if (post.author_id !== user?.id)
-          throw new Error("본인이 작성한 게시글만 수정할 수 있습니다.");
+          throw new Error(t("createPost.editOnlyOwn"));
         setCategory(items.find((item) => item.id === post.category_id) ?? null);
         const content = splitPostDescription(post.description);
         setFeatures(content.features);
@@ -105,7 +127,7 @@ export default function CreatePostScreen() {
           setInitialError(
             error instanceof Error
               ? error.message
-              : "게시글을 불러오지 못했습니다.",
+              : t("common.postLoadFailed"),
           );
           setInitializing(false);
         }
@@ -118,11 +140,11 @@ export default function CreatePostScreen() {
     if (busy) return;
     if (saved) {
       Alert.alert(
-        "게시글은 저장되었습니다",
-        "사진 업로드를 마치지 않고 나갈까요?",
+        t("createPost.savedTitle"),
+        t("createPost.leaveUpload"),
         [
-          { text: "계속 작성", style: "cancel" },
-          { text: "나가기", onPress: () => router.replace("/") },
+          { text: t("common.continueWriting"), style: "cancel" },
+          { text: t("common.leave"), onPress: () => router.replace("/") },
         ],
       );
     } else if (step === 2) setStep(1);
@@ -144,7 +166,7 @@ export default function CreatePostScreen() {
           (asset) => asset.fileSize && asset.fileSize > 5 * 1024 * 1024,
         )
       ) {
-        setError("사진은 한 장당 5MiB 이하로 선택해주세요.");
+        setError(t("createPost.photoTooLarge"));
         return;
       }
       if (
@@ -154,7 +176,7 @@ export default function CreatePostScreen() {
             !["image/jpeg", "image/png", "image/webp"].includes(asset.mimeType),
         )
       ) {
-        setError("JPEG, PNG, WebP 사진만 업로드할 수 있습니다.");
+        setError(t("createPost.unsupportedPhoto"));
         return;
       }
       setPhotos((current) =>
@@ -162,7 +184,7 @@ export default function CreatePostScreen() {
       );
       setError("");
     } catch {
-      setError("사진을 선택하지 못했습니다. 사진 접근 권한을 확인해주세요.");
+      setError(t("createPost.photoPermission"));
     }
   };
   const submit = async () => {
@@ -170,39 +192,41 @@ export default function CreatePostScreen() {
     setError("");
     if (step === 1) {
       if (!category) {
-        setError("카테고리를 선택해주세요.");
+        setError(t("createPost.selectCategory"));
         return;
       }
       if ((start === null) !== (end === null)) {
-        setError("시작과 끝 날짜·시간을 함께 선택해주세요.");
+        setError(t("createPost.selectBothTimes"));
         return;
       }
       if (start && end && start > end) {
-        setError("시작 시각은 끝 시각보다 늦을 수 없습니다.");
+        setError(t("createPost.invalidTimeRange"));
         return;
       }
       setStep(2);
       return;
     }
     if (!acknowledged) {
-      setError("게시물 안내를 확인하고 체크해주세요.");
+      setError(t("createPost.acknowledgeNotice"));
       return;
     }
     if (!title.trim() || !description.trim()) {
-      setError("제목과 내용을 입력해주세요.");
+      setError(t("createPost.titleAndBodyRequired"));
       return;
     }
     pending.current = true;
     setBusy(true);
     try {
       const session = await readSession();
-      if (!session) throw new Error("로그인이 필요합니다.");
+      if (!session) throw new Error(t("common.loginRequired"));
       // Refresh before writing so an expired access token does not interrupt uploads.
       const refreshed = await authApi.refresh(session.refresh_token);
       session.access_token = refreshed.access_token;
       await writeSession(session);
       if (!savedId.current) {
-        setProgress(editing ? "게시글 수정 중…" : "게시글 등록 중…");
+        setProgress(
+          editing ? t("createPost.editing") : t("createPost.submitting"),
+        );
         const body = {
           title: title.trim(),
           description: joinPostDescription(description, features),
@@ -210,10 +234,16 @@ export default function CreatePostScreen() {
           location_text: place.trim() || null,
           event_start_at: start?.toISOString() ?? null,
           event_end_at: end?.toISOString() ?? null,
+          ...(picked
+            ? {
+                latitude: Number(picked.latitude.toFixed(6)),
+                longitude: Number(picked.longitude.toFixed(6)),
+              }
+            : {}),
         };
         const post = editId
           ? await postsApi.update(editId, body, session.access_token)
-          : await postsApi.create(
+          : await (creationMethod === "AI_ASSISTED" ? postsApi.createAiAssisted : postsApi.create)(
               {
                 post_type: postType,
                 ...body,
@@ -232,7 +262,12 @@ export default function CreatePostScreen() {
         uploaded.current = Math.max(0, images.length - existingPhotos.length);
       }
       for (let index = uploaded.current; index < photos.length; index++) {
-        setProgress(`사진 업로드 중 ${index + 1}/${photos.length}…`);
+        setProgress(
+          t("createPost.uploadingPhoto", {
+            current: index + 1,
+            total: photos.length,
+          }),
+        );
         await postsApi.upload(
           savedId.current,
           photos[index],
@@ -255,9 +290,9 @@ export default function CreatePostScreen() {
     } catch (error) {
       setError(
         (savedId.current
-          ? "게시글은 저장되었지만 사진 업로드가 끝나지 않았습니다. 다시 등록을 눌러 재시도해주세요.\n"
+          ? t("createPost.uploadIncomplete")
           : "") +
-          (error instanceof Error ? error.message : "등록하지 못했습니다."),
+          (error instanceof Error ? error.message : t("createPost.submitFailed")),
       );
     } finally {
       pending.current = false;
@@ -294,7 +329,7 @@ export default function CreatePostScreen() {
           <Text style={styles.backText}>‹</Text>
         </Pressable>
         <Text style={{ padding: 28 }}>
-          {initialError || "게시글을 불러오는 중…"}
+          {initialError || t("createPost.initialLoading")}
         </Text>
       </SafeAreaView>
     );
@@ -308,13 +343,13 @@ export default function CreatePostScreen() {
           <Pressable
             disabled={busy}
             onPress={back}
-            accessibilityLabel="뒤로가기"
+            accessibilityLabel={t("common.back")}
             style={styles.back}
           >
             <Text style={styles.backText}>‹</Text>
           </Pressable>
           <Text style={styles.headerTitle}>
-            {editing ? "게시글 수정" : "게시글 작성"}
+            {editing ? t("createPost.editTitle") : t("createPost.creatingTitle")}
           </Text>
           <View style={styles.back} />
         </View>
@@ -324,7 +359,7 @@ export default function CreatePostScreen() {
         >
           <View
             style={styles.steps}
-            accessibilityLabel={`게시글 작성 ${step}단계, 총 2단계`}
+            accessibilityLabel={t("createPost.stepProgress", { step })}
           >
             <View style={[styles.circle, step === 1 && styles.active]}>
               <Text
@@ -343,18 +378,25 @@ export default function CreatePostScreen() {
             </View>
           </View>
           <Text style={styles.title}>
-            {step === 1 ? "물품 정보" : lost ? "분실글 작성" : "습득글 작성"}
+            {step === 1
+              ? t("createPost.stepOne")
+              : lost
+                ? t("createPost.stepTwoLost")
+                : t("createPost.stepTwoFound")}
           </Text>
           {step === 1 ? (
             <>
               <View style={styles.field}>
-                <Text style={styles.label}>카테고리</Text>
+                <Text style={styles.label}>{t("createPost.category")}</Text>
                 <Pressable
                   onPress={() => setCategoryOpen(true)}
                   style={styles.select}
                 >
                   <Text style={styles.selectText}>
-                    {category?.name ?? "선택"} ⌄
+                    {category
+                      ? categoryLabel(category.code, category.name)
+                      : t("createPost.select")}{" "}
+                    ⌄
                   </Text>
                 </Pressable>
                 {categoryError ? (
@@ -363,56 +405,87 @@ export default function CreatePostScreen() {
               </View>
               <View style={styles.field}>
                 <Text style={styles.label}>
-                  {lost ? "분실" : "습득"} 날짜 & 시간{" "}
-                  <Text style={styles.hint}>(선택)</Text>
+                  {lost ? t("createPost.lost") : t("createPost.found")}{" "}
+                  {t("createPost.dateTime")}{" "}
+                  <Text style={styles.hint}>{t("createPost.optional")}</Text>
                 </Text>
                 <DateTimeField
-                  label="시작 시각"
+                  label={t("createPost.startTime")}
                   value={start}
                   onChange={setStart}
                 />
                 <Text style={styles.hint}>~</Text>
-                <DateTimeField label="끝 시각" value={end} onChange={setEnd} />
+                <DateTimeField
+                  label={t("createPost.endTime")}
+                  value={end}
+                  onChange={setEnd}
+                />
               </View>
               {input(
-                lost ? "분실 장소" : "습득 장소",
+                lost
+                  ? t("createPost.lostLocation")
+                  : t("createPost.foundLocation"),
                 place,
                 setPlace,
-                "예) 제2공, 26119B",
+                t("createPost.locationExample"),
                 false,
                 255,
               )}
+              <Pressable
+                onPress={() => {
+                  router.push("/create-post-map");
+                }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 14,
+                  borderWidth: 1,
+                  borderColor: Colors.primary,
+                  borderRadius: 16,
+                  paddingVertical: 12,
+                }}
+              >
+                <PinIcon />
+                <Text style={{ color: Colors.primary }}>
+                  {t("createPost.pickOnMap")}
+                </Text>
+              </Pressable>
+              {picked ? (
+                <Text style={styles.hint}>{picked.address}</Text>
+              ) : null}
               {input(
-                "특징",
+                t("createPost.features"),
                 features,
                 setFeatures,
-                "예) 흰색, 기스 있음",
+                t("createPost.featuresExample"),
                 true,
               )}
             </>
           ) : (
             <>
               {input(
-                "제목",
+                t("createPost.titleLabel"),
                 title,
                 setTitle,
-                "제목을 입력해주세요",
+                t("createPost.titlePlaceholder"),
                 false,
                 100,
               )}
               {input(
-                "내용",
+                t("createPost.description"),
                 description,
                 setDescription,
-                "물건과 상황을 자세히 알려주세요",
+                t("createPost.descriptionPlaceholder"),
                 true,
               )}
               <View style={styles.field}>
                 <Text style={styles.label}>
-                  사진{" "}
+                  {t("createPost.photos")}{" "}
                   <Text style={styles.hint}>
-                    {existingPhotos.length + photos.length}/5 · 한 장당 최대
-                    5MiB
+                    {t("createPost.photoLimit", {
+                      count: existingPhotos.length + photos.length,
+                    })}
                   </Text>
                 </Text>
                 <ScrollView horizontal contentContainerStyle={styles.photos}>
@@ -421,10 +494,10 @@ export default function CreatePostScreen() {
                       disabled={busy}
                       onPress={() => void pick()}
                       style={styles.addPhoto}
-                      accessibilityLabel="사진 추가"
+                      accessibilityLabel={t("createPost.addPhoto")}
                     >
                       <Text style={styles.addText}>＋</Text>
-                      <Text style={styles.hint}>사진 추가</Text>
+                      <Text style={styles.hint}>{t("createPost.addPhoto")}</Text>
                     </Pressable>
                   ) : null}
                   {existingPhotos.map((uri) => (
@@ -442,7 +515,9 @@ export default function CreatePostScreen() {
                             )
                           }
                           style={styles.remove}
-                          accessibilityLabel={`사진 ${index + 1} 삭제`}
+                          accessibilityLabel={t("createPost.removePhoto", {
+                            index: index + 1,
+                          })}
                         >
                           <Text style={{ color: "white" }}>×</Text>
                         </Pressable>
@@ -452,7 +527,7 @@ export default function CreatePostScreen() {
                 </ScrollView>
                 {editing ? (
                   <Text style={styles.hint}>
-                    기존 사진은 유지되며, 새 사진을 추가할 수 있습니다.
+                    {t("createPost.keepExistingPhotos")}
                   </Text>
                 ) : null}
               </View>
@@ -466,11 +541,11 @@ export default function CreatePostScreen() {
           {step === 2 ? (
             <View style={styles.notice}>
               <Text style={styles.noticeText}>
-                *부적절한 게시물은 제재 및 법적 처벌의 대상이 될 수 있습니다.
+                {t("createPost.contentNotice")}
               </Text>
               <Pressable
                 accessibilityRole="checkbox"
-                accessibilityLabel="확인했습니다"
+                accessibilityLabel={t("createPost.acknowledged")}
                 accessibilityState={{
                   checked: acknowledged,
                   disabled: busy || saved,
@@ -487,7 +562,9 @@ export default function CreatePostScreen() {
                     <Text style={styles.checkmark}>✓</Text>
                   ) : null}
                 </View>
-                <Text style={styles.checkLabel}>확인했습니다</Text>
+                <Text style={styles.checkLabel}>
+                  {t("createPost.acknowledged")}
+                </Text>
               </Pressable>
             </View>
           ) : null}
@@ -506,14 +583,14 @@ export default function CreatePostScreen() {
           >
             <Text style={styles.buttonText}>
               {busy
-                ? progress || "처리 중…"
+                ? progress || t("common.processing")
                 : step === 1
-                  ? "다음"
+                  ? t("createPost.next")
                   : saved
-                    ? "사진 업로드 재시도"
+                    ? t("createPost.retryUpload")
                     : editing
-                      ? "수정 완료"
-                      : "등록하기"}
+                      ? t("createPost.finishEdit")
+                      : t("createPost.submit")}
             </Text>
           </Pressable>
         </ScrollView>
@@ -525,7 +602,7 @@ export default function CreatePostScreen() {
         >
           <Pressable style={styles.dim} onPress={() => setCategoryOpen(false)}>
             <View style={styles.categoryMenu}>
-              <Text style={styles.label}>카테고리 선택</Text>
+              <Text style={styles.label}>{t("createPost.chooseCategory")}</Text>
               <ScrollView>
                 {categories.map((item) => (
                   <Pressable

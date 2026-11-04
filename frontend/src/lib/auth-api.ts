@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import { t } from "@/i18n";
 
 export type User = {
   id: string;
@@ -32,9 +33,10 @@ export async function request<T>(
   body?: object,
   token?: string,
   method?: "PATCH" | "DELETE",
+  timeoutMs = 15000,
 ): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${baseUrl}${path}`, {
       method: method ?? (body ? "POST" : "GET"),
@@ -50,14 +52,17 @@ export async function request<T>(
     if (!response.ok) {
       throw new ApiError(
         response.status,
-        data.error?.message ?? "요청을 처리하지 못했습니다.",
+        data.error?.message ?? t("common.requestFailed"),
       );
     }
     return data as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(t("api.timeout"));
+    }
     throw new Error(
-      "서버에 연결하지 못했습니다. 서버 실행 상태와 API 주소를 확인해주세요.",
+      t("api.connectionFailed"),
     );
   } finally {
     clearTimeout(timeout);

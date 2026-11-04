@@ -1,0 +1,37 @@
+{
+  "locations": [
+    {
+      "id": "samsung_library",
+      "names": {
+        "ko": "삼성학술정보관",
+        "en": "Samsung Library"
+      },
+      "aliases": {
+        "ko": ["디도", "디지털도서관", "삼성도서관", "율전 도서관"],
+        "en": ["Samsung Library", "Samsung Academic Information Center", "Digital Library"]
+      }
+    },
+    {
+      "id": "student_center",
+      "names": {
+        "ko": "학생회관",
+        "en": "Student Center"
+      },
+      "aliases": {
+        "ko": ["학관", "학생회관"],
+        "en": ["Student Center", "Student Union"]
+      }
+    },
+    {
+      "id": "central_library",
+      "names": {
+        "ko": "중앙학술정보관",
+        "en": "Central Library"
+      },
+      "aliases": {
+        "ko": ["명륜 도서관", "중도"],
+        "en": ["Central Library", "Central Academic Information Center"]
+      }
+    }
+  ]
+}

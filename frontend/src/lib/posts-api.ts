@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import { File } from "expo-file-system";
 import type { ImagePickerAsset } from "expo-image-picker";
 import { baseUrl, request, ApiError } from "@/lib/auth-api";
+import { t } from "@/i18n";
 
 export type Post = {
   id: string;
@@ -14,6 +15,8 @@ export type Post = {
   created_at: string;
   item_name: string | null;
   location_text: string | null;
+  latitude: number | null;
+  longitude: number | null;
   event_start_at: string | null;
   event_end_at: string | null;
 };
@@ -27,6 +30,8 @@ export type CreatePost = {
   item_name?: string;
   event_start_at?: string;
   event_end_at?: string;
+  latitude?: number;
+  longitude?: number;
 };
 export type UpdatePost = {
   title: string;
@@ -35,6 +40,8 @@ export type UpdatePost = {
   location_text: string | null;
   event_start_at: string | null;
   event_end_at: string | null;
+  latitude?: number;
+  longitude?: number;
 };
 export const postsApi = {
   update: (id: string, body: UpdatePost, token: string) =>
@@ -48,6 +55,8 @@ export const postsApi = {
     ),
   create: (body: CreatePost, token: string) =>
     request<Post>("/posts", body, token),
+  createAiAssisted: (body: CreatePost, token: string) =>
+    request<Post>("/posts/ai-assisted", body, token),
   upload: async (id: string, asset: ImagePickerAsset, token: string) => {
     const form = new FormData();
     if (Platform.OS === "web") {
@@ -67,7 +76,7 @@ export const postsApi = {
       const data = await response.json().catch(() => null);
       throw new ApiError(
         response.status,
-        data?.error?.message ?? "사진 업로드에 실패했습니다.",
+        data?.error?.message ?? t("api.photoUploadFailed"),
       );
     }
   },
