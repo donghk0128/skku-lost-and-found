@@ -63,6 +63,8 @@ docker compose run --rm backend alembic upgrade head
 
 백엔드 환경 변수는 `backend/.env.example`을 참고합니다. 실제 secret이 포함된 `.env`는 커밋하지 않습니다.
 
+이메일 인증은 기본적으로 SMTP로 실제 메일을 발송합니다. `backend/.env`에 발신 계정과 앱 비밀번호를 설정하는 방법은 [인증 이메일 설정](./docs/email-setup.md)을 참고합니다.
+
 ### Frontend
 
 ```sh
@@ -96,6 +98,7 @@ npx tsc --noEmit
 
 ## 문서
 
+- [인증 이메일 설정 (Docker / Gmail)](./docs/email-setup.md)
 - [AI 게시글 작성 모듈](./backend/app/ai/README.md)
 - [게시글 API](./backend/app/posts/README.md)
 - [채팅 모듈](./backend/app/chat/README.md)

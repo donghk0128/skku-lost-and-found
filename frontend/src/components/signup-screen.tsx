@@ -84,21 +84,21 @@ export default function SignupScreen({ stage }: { stage: Stage }) {
   );
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
-  const [id, setId] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [focused, setFocused] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [touched, setTouched] = useState({
-    id: false,
+    username: false,
     password: false,
     confirmation: false,
   });
-  const nickname = id.normalize("NFKC").trim();
-  const idError =
+  const nickname = username.normalize("NFKC").trim();
+  const usernameError =
     Array.from(nickname).length < 2 || Array.from(nickname).length > 10
-      ? t("signup.invalidId")
+      ? t("signup.invalidUsername")
       : "";
   const passwordLength = Array.from(password).length;
   const passwordError =
@@ -154,9 +154,9 @@ export default function SignupScreen({ stage }: { stage: Stage }) {
       return;
     }
     if (stage === "information") {
-      setTouched({ id: true, password: true, confirmation: true });
+      setTouched({ username: true, password: true, confirmation: true });
       setError("");
-      if (idError || passwordError || confirmationError) return;
+      if (usernameError || passwordError || confirmationError) return;
     }
     pending.current = true;
     setSending(true);
@@ -252,29 +252,29 @@ export default function SignupScreen({ stage }: { stage: Stage }) {
             {information ? (
               <View style={styles.informationForm}>
                 <View style={styles.field}>
-                  <Text style={styles.label}>ID</Text>
+                  <Text style={styles.label}>{t("signup.username")}</Text>
                   <TextInput
-                    accessibilityLabel="ID"
+                    accessibilityLabel={t("signup.username")}
                     style={[
                       styles.input,
-                      focused === "id" && styles.focused,
-                      touched.id && idError ? styles.inputError : null,
+                      focused === "username" && styles.focused,
+                      touched.username && usernameError ? styles.inputError : null,
                     ]}
-                    placeholder={t("signup.idPlaceholder")}
+                    placeholder={t("signup.usernamePlaceholder")}
                     placeholderTextColor="#D0D0D0"
-                    value={id}
+                    value={username}
                     editable={!sending}
                     onChangeText={(value) => {
-                      setId(value);
-                      setTouched((previous) => ({ ...previous, id: true }));
+                      setUsername(value);
+                      setTouched((previous) => ({ ...previous, username: true }));
                       setError("");
                     }}
                     autoCapitalize="none"
                     autoCorrect={false}
-                    onFocus={() => setFocused("id")}
+                    onFocus={() => setFocused("username")}
                     onBlur={() => setFocused(null)}
                   />
-                  <FieldError message={touched.id ? idError : ""} />
+                  <FieldError message={touched.username ? usernameError : ""} />
                 </View>
                 <View style={styles.field}>
                   <Text style={styles.label}>Password</Text>
@@ -349,11 +349,9 @@ export default function SignupScreen({ stage }: { stage: Stage }) {
                     ? "Enter your SKK University email address."
                     : "Verification code has sent to your email."}
                 </Text>
-                <Text style={styles.hint}>
-                  {stage === "email"
-                    ? "ex) @g.skku.edu, @skku.edu"
-                    : "Please check your email box."}
-                </Text>
+                {stage === "code" && (
+                  <Text style={styles.hint}>Please check your email box.</Text>
+                )}
                 {stage === "email" ? (
                   <TextInput
                     accessibilityLabel={t("signup.universityEmail")}
@@ -362,7 +360,7 @@ export default function SignupScreen({ stage }: { stage: Stage }) {
                       styles.verificationInput,
                       focused === "email" && styles.focused,
                     ]}
-                    placeholder="example@g.skku.edu"
+                    placeholder="example@skku.edu"
                     placeholderTextColor="#D0D0D0"
                     value={email}
                     editable={!sending}

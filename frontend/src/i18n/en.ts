@@ -41,7 +41,7 @@ const en = {
   "login.findId": "Find ID",
   "login.findPassword": "Forgot password?",
   "login.signUp": "Sign up",
-  "signup.invalidId": "Enter an ID that is 2–10 characters long.",
+  "signup.invalidUsername": "Enter a username that is 2–10 characters long.",
   "signup.invalidPassword":
     "Use 8–20 characters, including letters and numbers.",
   "signup.confirmPassword": "Re-enter your password.",
@@ -50,7 +50,8 @@ const en = {
   "signup.codeRequired": "Enter the 6-digit verification code.",
   "signup.previousStep": "Previous step",
   "signup.progress": "Sign-up, step {{step}} of 2",
-  "signup.idPlaceholder": "ID (2–10 characters)",
+  "signup.username": "Username",
+  "signup.usernamePlaceholder": "Username (2–10 characters)",
   "signup.passwordPlaceholder": "8–20 characters, letters and numbers",
   "signup.universityEmail": "University email",
   "signup.verificationCode": "6-digit verification code",

@@ -11,15 +11,26 @@ class SmtpEmailClient:
 
     def send_verification_code(self, recipient_email: str, code: str) -> None:
         settings = get_settings()
-        if not settings.smtp_host or not settings.smtp_from_email:
+        if (
+            not settings.smtp_host
+            or not settings.smtp_from_email
+            or bool(settings.smtp_username) != bool(settings.smtp_password)
+        ):
             raise ApiError(503, "email_not_configured", "SMTP 이메일 발송 서비스가 아직 설정되지 않았습니다.")
 
         message = EmailMessage()
-        message["Subject"] = "[찾자] 성균관대학교 이메일 인증 코드"
+        message["Subject"] = "[SKKU FINDER] 이메일 인증 코드 / Email verification code"
         message["From"] = f"{settings.smtp_from_name} <{settings.smtp_from_email}>"
         message["To"] = recipient_email
+        expiry_minutes = settings.email_verification_expire_minutes
         message.set_content(
-            f"성균관대학교 분실물 찾기 서비스 찾자의 인증 코드입니다.\n\n{code}\n\n인증 코드는 5분 동안 유효합니다."
+            "SKKU FINDER 이메일 인증 코드입니다.\n"
+            "Your SKKU FINDER email verification code is:\n\n"
+            f"{code}\n\n"
+            f"인증 코드는 {expiry_minutes}분 동안 유효합니다.\n"
+            f"This code is valid for {expiry_minutes} minutes.\n\n"
+            "요청하지 않은 메일이라면 무시해주세요.\n"
+            "If you did not request this email, please ignore it."
         )
 
         try:

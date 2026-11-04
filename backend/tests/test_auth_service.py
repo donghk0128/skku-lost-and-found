@@ -55,6 +55,26 @@ def test_only_exact_skku_domain_can_receive_code(db: Session, email: str) -> Non
     assert "@skku.edu" in error.value.message
 
 
+def test_failed_delivery_does_not_persist_code_or_block_retry(db: Session) -> None:
+    class FailedEmailClient:
+        def send_verification_code(self, recipient_email: str, code: str) -> None:
+            raise ApiError(503, "email_delivery_failed", "Delivery failed")
+
+    email = "retry@skku.edu"
+    with pytest.raises(ApiError) as error:
+        AuthService(FailedEmailClient()).send_verification_code(db, email)
+    assert error.value.code == "email_delivery_failed"
+    assert AuthRepository.get_latest_unverified_verification(db, email) is None
+
+    sender = FakeEmailClient()
+    service = AuthService(sender)
+    service.send_verification_code(db, email)
+    assert sender.last_code is not None
+    with pytest.raises(ApiError) as error:
+        service.send_verification_code(db, email)
+    assert error.value.code == "verification_resend_cooldown"
+
+
 def test_signup_login_refresh_and_logout_flow(db: Session) -> None:
     email_client = FakeEmailClient()
     service = AuthService(email_client)

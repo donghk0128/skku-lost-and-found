@@ -41,7 +41,7 @@ const ko = {
   "login.findId": "아이디 찾기",
   "login.findPassword": "비밀번호 찾기",
   "login.signUp": "회원가입",
-  "signup.invalidId": "아이디는 2~10자로 입력해주세요.",
+  "signup.invalidUsername": "사용자 이름은 2~10자로 입력해주세요.",
   "signup.invalidPassword":
     "비밀번호는 영문과 숫자를 포함한 8~20자로 입력해주세요.",
   "signup.confirmPassword": "비밀번호를 다시 입력해주세요.",
@@ -50,7 +50,8 @@ const ko = {
   "signup.codeRequired": "6자리 숫자 인증 코드를 입력해주세요.",
   "signup.previousStep": "이전 단계",
   "signup.progress": "회원가입 {{step}}단계, 총 2단계",
-  "signup.idPlaceholder": "아이디 2~10자",
+  "signup.username": "사용자 이름",
+  "signup.usernamePlaceholder": "사용자 이름 2~10자",
   "signup.passwordPlaceholder": "영문·숫자 포함 8~20자",
   "signup.universityEmail": "학교 이메일",
   "signup.verificationCode": "6자리 인증 코드",
