@@ -1,12 +1,6 @@
 import { useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import {
-  Keyboard,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-} from "react-native";
+import { Keyboard, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
@@ -52,7 +46,7 @@ export default function HomeScreen() {
           {/* Header */}
           <View style={styles.header}>
             <ThemedText type="title" style={styles.logo}>
-              SKKU Lost & Found
+              SKKU Finder
             </ThemedText>
 
             <View style={styles.headerActions}>
@@ -176,9 +170,7 @@ export default function HomeScreen() {
           <View
             style={styles.boardArea}
             accessibilityLabel={
-              activeTab === "lost"
-                ? t("home.lostBoard")
-                : t("home.foundBoard")
+              activeTab === "lost" ? t("home.lostBoard") : t("home.foundBoard")
             }
           >
             <PostBoard

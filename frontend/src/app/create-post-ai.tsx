@@ -5,18 +5,25 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Colors, Fonts } from "@/constants/theme";
 import { aiApi, type AIDraft } from "@/lib/ai-api";
+import ChatLocationPicker from "@/components/ChatLocationPicker";
 import { authApi } from "@/lib/auth-api";
 import { postsApi } from "@/lib/posts-api";
+import type { PickedLocation } from "@/lib/location-picker";
 import { joinPostDescription } from "@/lib/post-description";
 import { readSession, writeSession } from "@/lib/session-storage";
 import { useLocale } from "@/i18n/LocaleProvider";
 
-type ChatMessage = { role: "user" | "assistant"; content: string };
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  showLocationPicker?: boolean;
+};
 
 export default function CreatePostAiScreen() {
   const { locale, t, categoryLabel } = useLocale();
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
+  const locationPickerShown = useRef(false);
   const { type } = useLocalSearchParams<{ type?: string }>();
   const postType = type === "FOUND" ? "FOUND" : "LOST";
   const [message, setMessage] = useState("");
@@ -31,6 +38,7 @@ export default function CreatePostAiScreen() {
   const [draft, setDraft] = useState<AIDraft | null>(null);
   const [pendingField, setPendingField] = useState<"item_name" | "location" | "event_time" | null>(null);
   const [collectedFields, setCollectedFields] = useState<Partial<Record<"item_name" | "location" | "event_time", string>>>({});
+  const [confirmedLocation, setConfirmedLocation] = useState<PickedLocation | null>(null);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -46,15 +54,12 @@ export default function CreatePostAiScreen() {
     return session.access_token;
   };
 
-  const send = async () => {
-    const content = message.trim();
-    if (!content || busy || publishing) return;
-    const nextMessages = [...messages, { role: "user" as const, content }];
-    const userMessages = nextMessages.filter((item): item is { role: "user"; content: string } => item.role === "user").slice(-12);
-    setMessages(nextMessages);
-    setMessage("");
+  const continueChat = async (
+    userMessages: { role: "user"; content: string }[],
+    location = confirmedLocation,
+    wasLocationAnswer = false,
+  ) => {
     setBusy(true);
-    setReady(false);
     setError("");
     try {
       const result = await aiApi.continueChat({
@@ -65,17 +70,73 @@ export default function CreatePostAiScreen() {
         draft: draft ?? undefined,
         pending_field: pendingField,
         collected_fields: collectedFields,
+        confirmed_location: location
+          ? {
+              text: location.address,
+              latitude: location.latitude,
+              longitude: location.longitude,
+            }
+          : undefined,
       }, await authenticatedToken());
       setDraft(result.draft);
       setPendingField(result.pending_field);
       setCollectedFields(result.collected_fields);
       setReady(result.status === "READY");
-      setMessages((current) => [...current, { role: "assistant", content: result.assistant_message }]);
+      const shouldShowLocationPicker =
+        !locationPickerShown.current &&
+        (wasLocationAnswer ||
+          Boolean(result.draft.location_text) ||
+          result.draft.location_candidates.length > 0);
+      if (shouldShowLocationPicker) locationPickerShown.current = true;
+      setMessages((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content: result.assistant_message,
+          showLocationPicker: shouldShowLocationPicker,
+        },
+      ]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("ai.responseFailed"));
     } finally {
       setBusy(false);
     }
+  };
+
+  const send = async () => {
+    const content = message.trim();
+    if (!content || busy || publishing) return;
+    const location =
+      pendingField === "location" && confirmedLocation?.address !== content
+        ? null
+        : confirmedLocation;
+    if (location !== confirmedLocation) {
+      setConfirmedLocation(null);
+    }
+    const nextMessages = [
+      ...messages,
+      {
+        role: "user" as const,
+        content,
+      },
+    ];
+    const userMessages = nextMessages
+      .filter((item): item is { role: "user"; content: string } => item.role === "user")
+      .slice(-12);
+    setMessages(nextMessages);
+    setMessage("");
+    setReady(false);
+    await continueChat(userMessages, location, pendingField === "location");
+  };
+
+  const confirmLocation = async (location: PickedLocation) => {
+    if (busy || publishing) return;
+    setConfirmedLocation(location);
+    locationPickerShown.current = true;
+    const userMessages = messages
+      .filter((item): item is { role: "user"; content: string } => item.role === "user")
+      .slice(-12);
+    await continueChat(userMessages, location);
   };
 
   const publish = async () => {
@@ -91,6 +152,14 @@ export default function CreatePostAiScreen() {
         item_name: draft.item_name ?? undefined,
         category_id: draft.category_id,
         location_text: draft.location_text ?? undefined,
+        ...(confirmedLocation
+          ? {
+              latitude: confirmedLocation.latitude,
+              longitude: confirmedLocation.longitude,
+            }
+          : draft.latitude !== null && draft.longitude !== null
+            ? { latitude: draft.latitude, longitude: draft.longitude }
+          : {}),
         event_start_at: draft.event_start_at ?? undefined,
         event_end_at: draft.event_end_at ?? undefined,
       }, await authenticatedToken());
@@ -112,6 +181,8 @@ export default function CreatePostAiScreen() {
       features,
       categoryId: String(draft.category_id),
       place: draft.location_text ?? "",
+      latitude: String(confirmedLocation?.latitude ?? draft.latitude ?? ""),
+      longitude: String(confirmedLocation?.longitude ?? draft.longitude ?? ""),
       startAt: draft.event_start_at ?? "",
       endAt: draft.event_end_at ?? "",
     } });
@@ -127,8 +198,22 @@ export default function CreatePostAiScreen() {
         </View>
         <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}>
           {messages.map((item, index) => (
-            <View key={`${item.role}-${index}`} style={item.role === "user" ? styles.userBubble : styles.assistantBubble}>
-              <Text style={item.role === "user" ? styles.userText : styles.assistantText}>{item.content}</Text>
+            <View key={`${item.role}-${index}`} style={styles.messageGroup}>
+              {item.showLocationPicker ? (
+                <ChatLocationPicker
+                  disabled={busy || publishing}
+                  locationText={
+                    draft?.location_text ??
+                    draft?.location_candidates[0] ??
+                    ""
+                  }
+                  onConfirm={(location) => void confirmLocation(location)}
+                />
+              ) : (
+                <View style={item.role === "user" ? styles.userBubble : styles.assistantBubble}>
+                  <Text style={item.role === "user" ? styles.userText : styles.assistantText}>{item.content}</Text>
+                </View>
+              )}
             </View>
           ))}
           {busy ? <View style={styles.assistantBubble}><Text style={styles.assistantText}>{t("ai.organizingAnswer")}</Text></View> : null}
@@ -167,6 +252,7 @@ const styles = StyleSheet.create({
   headerTitle: { color: "#111", fontFamily: Fonts.pretendardSemiBold, fontSize: 15, textAlign: "center" },
   headerSubtitle: { color: "#999", fontFamily: Fonts.pretendardRegular, fontSize: 11, marginTop: 2, textAlign: "center" },
   content: { gap: 14, padding: 22, paddingBottom: 32 },
+  messageGroup: { gap: 10 },
   assistantBubble: { alignSelf: "flex-start", backgroundColor: "#F1F3F2", borderRadius: 16, maxWidth: "86%", padding: 14 },
   assistantText: { color: "#333", fontFamily: Fonts.pretendardRegular, fontSize: 14, lineHeight: 21 },
   userBubble: { alignSelf: "flex-end", backgroundColor: Colors.primary, borderRadius: 16, maxWidth: "86%", padding: 14 },

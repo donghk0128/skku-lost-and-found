@@ -47,6 +47,7 @@ const en = {
   "signup.confirmPassword": "Re-enter your password.",
   "signup.passwordMismatch": "Passwords do not match.",
   "signup.emailRequired": "Enter your university email address.",
+  "signup.emailAlreadyRegistered": "This email address is already registered.",
   "signup.codeRequired": "Enter the 6-digit verification code.",
   "signup.previousStep": "Previous step",
   "signup.progress": "Sign-up, step {{step}} of 2",
@@ -61,9 +62,12 @@ const en = {
   "createMethod.title": "Create a post",
   "createMethod.prompt": "How would you like to create your post?",
   "createMethod.aiTitle": "Create with AI",
-  "createMethod.aiHint": "Answer a few questions to create your post.",
-  "createMethod.manualTitle": "Create manually",
-  "createMethod.manualHint": "Write your post yourself.",
+  "createMethod.aiHint":
+    "Let AI write your post for you.\nJust answer a few questions, and you’re all set!",
+  "createMethod.manualTitle": "Write it yourself",
+  "createMethod.manualHint":
+    "Enter the details you want to share.\nYou can also attach a photo.",
+  "createMethod.goTo": "Get started",
   "createButton.closeMenu": "Close post menu",
   "createButton.createPost": "Create a post",
   "createButton.lostTitle": "Report a lost item",
@@ -110,6 +114,7 @@ const en = {
   "createPost.foundLocation": "Where it was found",
   "createPost.locationExample": "e.g. Building 2, Room 26119B",
   "createPost.pickOnMap": "Choose a location on the map",
+  "createPost.changeMapLocation": "Choose a different location on the map",
   "createPost.features": "Identifying features",
   "createPost.featuresExample": "e.g. White, scratched",
   "createPost.titleLabel": "Title",
@@ -147,6 +152,9 @@ const en = {
   "map.selectLocation": "Use this location",
   "map.webUnavailable":
     "Map selection is not available on the web. Go back and enter the location manually.",
+  "map.webApiKeyMissing": "Configure the web Maps API key to show this map.",
+  "map.webMapLoadFailed":
+    "Could not load the map. Check the API key and website restrictions.",
   "map.openInGoogleMaps": "Open in Google Maps",
   "ai.initialPromptLost":
     "Tell me when and where you lost the item, and what it was.",
@@ -169,6 +177,9 @@ const en = {
   "ai.answerPlaceholder": "Enter your answer",
   "ai.answerAccessibility": "AI post assistant response",
   "ai.sendAnswer": "Send response",
+  "ai.pinLocationPrompt": "Tap the map to pin the exact location.",
+  "ai.confirmPinnedLocation": "Confirm this location",
+  "ai.locationPinned": "Location selected",
   "post.noPhoto": "No photo",
   "post.lostDetail": "Lost item details",
   "post.foundDetail": "Found item details",

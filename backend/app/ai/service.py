@@ -69,13 +69,13 @@ class AIDraftService:
         if (location_confirmed or len(matches) == 1) and "location" in missing_fields:
             missing_fields.remove("location")
         warnings = list(result.draft.warnings)
-        if len(matches) > 1:
+        if not location_confirmed and len(matches) > 1:
             warnings.append(
                 "Multiple campus locations were found. Please confirm the location."
                 if request.locale == "en"
                 else "여러 학교 장소가 발견되어 사용자 확인이 필요합니다."
             )
-        elif not matches and result.draft.location_text is not None:
+        elif not location_confirmed and not matches and result.draft.location_text is not None:
             warnings.append(
                 "The location is not in the campus directory and could not be confirmed automatically."
                 if request.locale == "en"
@@ -134,12 +134,13 @@ class AIDraftService:
                     post_type=request.post_type,
                     locale=request.locale,
                     natural_language=conversation,
+                    confirmed_location=request.confirmed_location,
                 ),
                 provider,
                 location_matches,
             ),
-            previous_draft=request.draft,
-            pending_field=request.pending_field,
+            previous_draft=None if request.confirmed_location else request.draft,
+            pending_field=None if request.confirmed_location else request.pending_field,
             collected_fields=request.collected_fields,
         )
         return AIChatResponse(
