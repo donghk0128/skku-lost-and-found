@@ -149,6 +149,8 @@ const ko = {
   "map.loadingAddress": "위치를 확인하는 중...",
   "map.selectLocation": "이 위치로 선택",
   "map.webUnavailable": "웹에서는 지도 선택을 지원하지 않습니다",
+  "map.webApiKeyMissing": "웹 지도 API 키를 설정해주세요.",
+  "map.webMapLoadFailed": "지도를 불러오지 못했습니다. API 키와 도메인 제한을 확인해주세요.",
   "map.openInGoogleMaps": "Google 지도에서 보기",
   "ai.initialPromptLost": "언제, 어디서, 무엇을 잃어버렸는지 설명해주세요.",
   "ai.initialPromptFound": "언제, 어디서, 무엇을 주웠는지 설명해주세요.",

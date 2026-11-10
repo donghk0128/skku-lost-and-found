@@ -152,6 +152,9 @@ const en = {
   "map.selectLocation": "Use this location",
   "map.webUnavailable":
     "Map selection is not available on the web. Go back and enter the location manually.",
+  "map.webApiKeyMissing": "Configure the web Maps API key to show this map.",
+  "map.webMapLoadFailed":
+    "Could not load the map. Check the API key and website restrictions.",
   "map.openInGoogleMaps": "Open in Google Maps",
   "ai.initialPromptLost":
     "Tell me when and where you lost the item, and what it was.",
