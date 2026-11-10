@@ -79,6 +79,11 @@ const ko = {
   "createPost.editOnlyOwn": "본인이 작성한 게시글만 수정할 수 있습니다.",
   "createPost.savedTitle": "게시글은 저장되었습니다",
   "createPost.leaveUpload": "사진 업로드를 마치지 않고 나갈까요?",
+  "ai.takePhoto": "카메라로 촬영",
+  "ai.attachImage": "이미지 첨부",
+  "ai.closePhotoMenu": "사진 메뉴 닫기",
+  "ai.cameraPermission": "촬영하려면 카메라 접근 권한을 허용해주세요.",
+  "ai.cameraFailed": "촬영하지 못했습니다. 카메라 사용 가능 여부와 권한을 확인해주세요.",
   "createPost.photoTooLarge": "사진은 한 장당 5MiB 이하로 선택해주세요.",
   "createPost.unsupportedPhoto": "JPEG, PNG, WebP 사진만 업로드할 수 있습니다.",
   "createPost.photoPermission":

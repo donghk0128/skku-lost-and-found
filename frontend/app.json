@@ -47,7 +47,7 @@
         "expo-image-picker",
         {
           "photosPermission": "게시글에 첨부할 사진을 선택합니다.",
-          "cameraPermission": false,
+          "cameraPermission": "게시글에 첨부할 사진을 촬영합니다.",
           "microphonePermission": false
         }
       ]
