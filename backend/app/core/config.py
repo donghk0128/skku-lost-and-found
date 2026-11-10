@@ -15,13 +15,13 @@ class Settings(BaseSettings):
     post_image_dir: str = "post_images"
     cors_allowed_origins: list[str] = ["http://localhost:8081", "http://127.0.0.1:8081"]
 
-    email_delivery_mode: str = "console"
+    email_delivery_mode: str = "smtp"
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_username: str = ""
     smtp_password: str = ""
     smtp_from_email: str = ""
-    smtp_from_name: str = "SKKU 찾자"
+    smtp_from_name: str = "SKKU FINDER"
     smtp_use_tls: bool = True
 
     email_verification_expire_minutes: int = 5

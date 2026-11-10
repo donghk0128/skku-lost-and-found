@@ -41,7 +41,7 @@ const en = {
   "login.findId": "Find ID",
   "login.findPassword": "Forgot password?",
   "login.signUp": "Sign up",
-  "signup.invalidId": "Enter an ID that is 2–10 characters long.",
+  "signup.invalidUsername": "Enter a username that is 2–10 characters long.",
   "signup.invalidPassword":
     "Use 8–20 characters, including letters and numbers.",
   "signup.confirmPassword": "Re-enter your password.",
@@ -51,7 +51,8 @@ const en = {
   "signup.codeRequired": "Enter the 6-digit verification code.",
   "signup.previousStep": "Previous step",
   "signup.progress": "Sign-up, step {{step}} of 2",
-  "signup.idPlaceholder": "ID (2–10 characters)",
+  "signup.username": "Username",
+  "signup.usernamePlaceholder": "Username (2–10 characters)",
   "signup.passwordPlaceholder": "8–20 characters, letters and numbers",
   "signup.universityEmail": "University email",
   "signup.verificationCode": "6-digit verification code",
@@ -151,6 +152,9 @@ const en = {
   "map.selectLocation": "Use this location",
   "map.webUnavailable":
     "Map selection is not available on the web. Go back and enter the location manually.",
+  "map.webApiKeyMissing": "Configure the web Maps API key to show this map.",
+  "map.webMapLoadFailed":
+    "Could not load the map. Check the API key and website restrictions.",
   "map.openInGoogleMaps": "Open in Google Maps",
   "ai.initialPromptLost":
     "Tell me when and where you lost the item, and what it was.",
@@ -180,6 +184,8 @@ const en = {
   "post.lostDetail": "Lost item details",
   "post.foundDetail": "Found item details",
   "post.moreOptions": "More post options",
+  "post.chat": "Chat",
+  "post.ownPost": "This is your post.",
   "post.photoAccessibility": "Item photo {{index}}",
   "post.lostBadge": "Lost",
   "post.foundBadge": "Found",

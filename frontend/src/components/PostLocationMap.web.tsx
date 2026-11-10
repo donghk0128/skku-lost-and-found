@@ -1,5 +1,6 @@
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 
+import GoogleMap from "@/components/GoogleMap.web";
 import { Colors, Fonts } from "@/constants/theme";
 import { useLocale } from "@/i18n/LocaleProvider";
 
@@ -11,10 +12,11 @@ type Props = {
 export default function PostLocationMap({ latitude, longitude }: Props) {
   const { t } = useLocale();
   const mapUrl = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+  const location = { latitude, longitude };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.message}>{t("map.webUnavailable")}</Text>
+      <GoogleMap center={location} marker={location} style={styles.map} />
       <Pressable
         accessibilityRole="link"
         onPress={() => void Linking.openURL(mapUrl)}
@@ -28,21 +30,17 @@ export default function PostLocationMap({ latitude, longitude }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    minHeight: 120,
     alignItems: "center",
-    justifyContent: "center",
-    padding: 16,
+    gap: 12,
     borderRadius: 12,
-    backgroundColor: "#F5F7FA",
+    overflow: "hidden",
+    width: "100%",
   },
-  message: {
-    color: "#555",
-    fontFamily: Fonts.pretendardRegular,
-    fontSize: 14,
-    textAlign: "center",
+  map: {
+    height: 220,
   },
   button: {
-    marginTop: 12,
+    alignSelf: "flex-start",
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 10,

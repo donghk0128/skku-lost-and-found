@@ -13,7 +13,8 @@ def settings(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     config = SimpleNamespace(
         smtp_host="smtp.example.test", smtp_port=587,
         smtp_username="sender@example.test", smtp_password="test-only-password",
-        smtp_from_email="sender@example.test", smtp_from_name="찾자", smtp_use_tls=True,
+        smtp_from_email="sender@example.test", smtp_from_name="SKKU FINDER", smtp_use_tls=True,
+        email_verification_expire_minutes=7,
     )
     monkeypatch.setattr(smtp_client, "get_settings", lambda: config)
     return config
@@ -48,10 +49,17 @@ def test_smtp_starttls_login_and_verification_message(settings: SimpleNamespace,
     assert message["To"] == "recipient@skku.edu"
     assert settings.smtp_from_email in message["From"]
     assert "123456" in message.get_content()
+    assert "이메일 인증 코드" in message["Subject"]
+    assert "Email verification code" in message["Subject"]
+    assert "7분" in message.get_content()
+    assert "7 minutes" in message.get_content()
 
 
-def test_missing_smtp_configuration_is_reported(settings: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
-    settings.smtp_from_email = ""
+@pytest.mark.parametrize("missing_field", ["smtp_host", "smtp_from_email", "smtp_username", "smtp_password"])
+def test_missing_smtp_configuration_is_reported(
+    settings: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, missing_field: str,
+) -> None:
+    setattr(settings, missing_field, "")
 
     def unexpected_connection(*args, **kwargs):
         pytest.fail("Unconfigured SMTP must not open a network connection")
