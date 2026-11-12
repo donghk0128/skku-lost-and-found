@@ -1,4 +1,4 @@
-"""Deterministic ranking signals; text scoring can later use embeddings."""
+"""Deterministic rule signals used alongside optional embedding similarity."""
 
 from math import asin, cos, exp, radians, sin, sqrt
 import unicodedata

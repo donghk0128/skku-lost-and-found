@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
     ollama_base_url: str = "http://127.0.0.1:11434"
+    gemini_api_key: str = ""
+    gemini_embedding_timeout_seconds: float = 10
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

@@ -6,6 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.errors import ApiError
+from app.matching.embedding import sync_post_embedding
 from app.posts.model import Category, Post, PostImage, now_utc
 from app.posts.repository import PostRepository
 from app.posts.schemas import CreationMethod, PostCreateRequest, PostStatus, PostType, PostUpdateRequest
@@ -90,6 +91,8 @@ class PostService:
             creation_method=creation_method,
         )
         PostRepository.create(db, post)
+        db.flush()
+        sync_post_embedding(db, post)
         PostService._commit(db)
         db.refresh(post)
         return post
@@ -127,6 +130,7 @@ class PostService:
         if "category_id" in request.model_fields_set:
             PostService._require_category(db, request.category_id)
         PostRepository.update_details(post, request.model_dump(exclude_unset=True))
+        sync_post_embedding(db, post)
         PostService._commit(db)
         db.refresh(post)
         return post
