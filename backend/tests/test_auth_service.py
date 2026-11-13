@@ -12,9 +12,11 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-that-is-long-enough")
 from app.auth.schemas import LoginRequest, SignUpRequest
 from app.auth.repository import AuthRepository
 from app.auth.service import AuthService
+from app.core import security
 from app.core.database import Base, SessionLocal, engine
 from app.core.errors import ApiError
-from app.core.security import utc_now
+from app.core.security import hash_secret, utc_now
+from app.users.model import User
 from app.users.repository import UserRepository
 
 
@@ -109,6 +111,35 @@ def test_signup_login_refresh_and_logout_flow(db: Session) -> None:
     with pytest.raises(ApiError) as error:
         service.refresh(db, login_refresh_token)
     assert error.value.code == "invalid_refresh_token"
+
+
+def test_login_refresh_token_remains_valid_across_second_boundary(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    user = User(
+        email="boundary@skku.edu",
+        nickname="테스터",
+        password_hash=hash_secret("safe-password-123"),
+        email_verified_at=utc_now(),
+    )
+    db.add(user)
+    db.commit()
+
+    start = utc_now()
+    calls = 0
+
+    def token_clock():
+        nonlocal calls
+        calls += 1
+        return start if calls <= 2 else start + timedelta(seconds=1)
+
+    monkeypatch.setattr(security, "utc_now", token_clock)
+    service = AuthService(FakeEmailClient())
+    _, _, refresh_token = service.login(
+        db, LoginRequest(email=user.email, password="safe-password-123")
+    )
+
+    assert service.refresh(db, refresh_token)
 
 
 def test_expired_code_and_attempt_limit_are_enforced(db: Session) -> None:

@@ -114,14 +114,14 @@ class AuthService:
         try:
             AuthRepository.create_user(db, user)
             db.flush()  # Generate the UUID before it becomes part of the refresh-token claims.
-            session = self._create_session(user.id)
+            session, refresh_token = self._create_session(user.id)
             AuthRepository.create_session(db, session)
             db.commit()
         except IntegrityError as error:
             db.rollback()
             raise ApiError(409, "email_already_registered", "이미 가입된 이메일입니다.") from error
         db.refresh(user)
-        return user, create_access_token(user.id), create_refresh_token(user.id, session.id)
+        return user, create_access_token(user.id), refresh_token
 
     def login(self, db: Session, request: LoginRequest) -> tuple[User, str, str]:
         email = normalize_email(request.email)
@@ -129,10 +129,10 @@ class AuthService:
         if user is None or not verify_secret(request.password, user.password_hash):
             raise ApiError(401, "invalid_credentials", "이메일 또는 비밀번호가 올바르지 않습니다.")
 
-        session = self._create_session(user.id)
+        session, refresh_token = self._create_session(user.id)
         AuthRepository.create_session(db, session)
         db.commit()
-        return user, create_access_token(user.id), create_refresh_token(user.id, session.id)
+        return user, create_access_token(user.id), refresh_token
 
     def refresh(self, db: Session, refresh_token: str) -> str:
         payload = self._decode_refresh_token(refresh_token)
@@ -151,16 +151,17 @@ class AuthService:
             db.commit()
 
     @staticmethod
-    def _create_session(user_id: UUID) -> UserSession:
+    def _create_session(user_id: UUID) -> tuple[UserSession, str]:
         session_id = uuid4()
         # The same signed token is returned only after its Argon2 hash is persisted.
         token = create_refresh_token(user_id, session_id)
-        return UserSession(
+        session = UserSession(
             id=session_id,
             user_id=user_id,
             refresh_token_hash=hash_secret(token),
             expires_at=utc_now() + timedelta(days=get_settings().refresh_token_expire_days),
         )
+        return session, token
 
     @staticmethod
     def _decode_refresh_token(refresh_token: str) -> dict:
