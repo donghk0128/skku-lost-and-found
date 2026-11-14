@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:17.11-bookworm
+    image: pgvector/pgvector:0.8.7-pg17-bookworm
     environment:
       POSTGRES_DB: skku_lost_and_found
       POSTGRES_USER: skku

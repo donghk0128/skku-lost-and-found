@@ -144,3 +144,54 @@ def test_scoring_uses_time_and_distance_without_requiring_them() -> None:
 
     assert score_posts(source, near) > score_posts(source, far)
     assert score_posts(source, missing) > 0
+
+
+def test_semantic_similarity_can_rerank_rule_candidates(
+    api_client: tuple[TestClient, Engine], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, engine = api_client
+    ids = _seed_posts(engine)
+    monkeypatch.setattr("app.matching.service.score_posts", lambda source, candidate: 0.4)
+    monkeypatch.setattr(
+        "app.matching.service.MatchingRepository.cosine_similarities",
+        lambda db, source, candidate_ids: {ids["best"]: 0.1, ids["other"]: 0.9},
+    )
+
+    response = client.get(f"/api/v1/posts/{ids['source']}/recommendations")
+    assert response.status_code == 200
+    assert [item["post"]["id"] for item in response.json()["items"]] == [
+        str(ids["other"]), str(ids["best"])
+    ]
+    assert response.json()["items"][0]["score"] == 0.55
+
+
+def test_embedding_comparison_is_limited_to_top_rule_candidates(
+    api_client: tuple[TestClient, Engine], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, engine = api_client
+    ids = _seed_posts(engine)
+    with Session(engine) as db:
+        source = db.get(Post, ids["source"])
+        assert source is not None
+        db.add_all(
+            Post(
+                author_id=source.author_id,
+                post_type="FOUND",
+                title=f"후보 {index}",
+                description="테스트",
+            )
+            for index in range(55)
+        )
+        db.commit()
+
+    compared: list[UUID] = []
+
+    def fake_similarities(db: Session, source: Post, candidate_ids: list[UUID]) -> dict[UUID, float]:
+        compared.extend(candidate_ids)
+        return {}
+
+    monkeypatch.setattr("app.matching.service.MatchingRepository.cosine_similarities", fake_similarities)
+    response = client.get(f"/api/v1/posts/{ids['source']}/recommendations")
+    assert response.status_code == 200
+    assert len(compared) == 50
+    assert len(response.json()["items"]) == 5
