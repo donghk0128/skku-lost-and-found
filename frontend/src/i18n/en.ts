@@ -79,6 +79,11 @@ const en = {
   "createPost.editOnlyOwn": "You can only edit posts you created.",
   "createPost.savedTitle": "Your post has been saved.",
   "createPost.leaveUpload": "Leave before the photo upload is complete?",
+  "ai.takePhoto": "Take a photo",
+  "ai.attachImage": "Attach an image",
+  "ai.closePhotoMenu": "Close photo menu",
+  "ai.cameraPermission": "Allow camera access to take a photo.",
+  "ai.cameraFailed": "Could not take a photo. Check camera availability and permissions.",
   "createPost.photoTooLarge": "Each photo must be 5 MiB or smaller.",
   "createPost.unsupportedPhoto":
     "Only JPEG, PNG, and WebP photos are supported.",

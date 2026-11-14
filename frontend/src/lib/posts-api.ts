@@ -21,6 +21,10 @@ export type Post = {
   event_end_at: string | null;
 };
 export type Category = { id: number; name: string; code: string };
+export type PostImageAsset = Pick<ImagePickerAsset, "uri"> &
+  Partial<
+    Pick<ImagePickerAsset, "file" | "fileName" | "fileSize" | "mimeType">
+  >;
 export type CreatePost = {
   post_type: "LOST" | "FOUND";
   title: string;
@@ -57,7 +61,7 @@ export const postsApi = {
     request<Post>("/posts", body, token),
   createAiAssisted: (body: CreatePost, token: string) =>
     request<Post>("/posts/ai-assisted", body, token),
-  upload: async (id: string, asset: ImagePickerAsset, token: string) => {
+  upload: async (id: string, asset: PostImageAsset, token: string) => {
     const form = new FormData();
     if (Platform.OS === "web") {
       const file = asset.file ?? (await (await fetch(asset.uri)).blob());
