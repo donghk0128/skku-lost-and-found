@@ -17,7 +17,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import DateTimeField from "@/components/ui/date-time-field";
 import { Colors, Fonts } from "@/constants/theme";
-import { imageUrl, postsApi, type Category } from "@/lib/posts-api";
+import {
+  imageUrl,
+  postsApi,
+  type Category,
+  type PostImageAsset,
+} from "@/lib/posts-api";
 import { readSession, writeSession } from "@/lib/session-storage";
 import { authApi } from "@/lib/auth-api";
 import {
@@ -32,7 +37,7 @@ import { useLocale } from "@/i18n/LocaleProvider";
 export default function CreatePostScreen() {
   const { t, categoryLabel } = useLocale();
   const router = useRouter();
-  const { type, editId, creationMethod, title: initialTitle, description: initialDescription, features: initialFeatures, categoryId, place: initialPlace, latitude, longitude, startAt, endAt } = useLocalSearchParams<{
+  const { type, editId, creationMethod, title: initialTitle, description: initialDescription, features: initialFeatures, categoryId, place: initialPlace, latitude, longitude, startAt, endAt, photoAssets } = useLocalSearchParams<{
     type?: string;
     editId?: string;
     creationMethod?: string;
@@ -45,6 +50,7 @@ export default function CreatePostScreen() {
     longitude?: string;
     startAt?: string;
     endAt?: string;
+    photoAssets?: string;
   }>();
   const { user } = useAuth();
   const editing = !!editId;
@@ -65,7 +71,23 @@ export default function CreatePostScreen() {
   const [features, setFeatures] = useState(initialFeatures ?? "");
   const [title, setTitle] = useState(initialTitle ?? "");
   const [description, setDescription] = useState(initialDescription ?? "");
-  const [photos, setPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
+  const [photos, setPhotos] = useState<PostImageAsset[]>(() => {
+    if (!photoAssets) return [];
+    try {
+      const parsed: unknown = JSON.parse(photoAssets);
+      return Array.isArray(parsed)
+        ? parsed.filter(
+            (asset): asset is PostImageAsset =>
+              typeof asset === "object" &&
+              asset !== null &&
+              "uri" in asset &&
+              typeof asset.uri === "string",
+          )
+        : [];
+    } catch {
+      return [];
+    }
+  });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");

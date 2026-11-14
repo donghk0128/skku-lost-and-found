@@ -1,0 +1,48 @@
+name: skku-finder
+
+services:
+  backend:
+    build:
+      context: ./backend
+    image: skku-finder-api:local
+    env_file:
+      - path: ./backend/.env
+        required: true
+    environment:
+      POST_IMAGE_DIR: /app/post_images
+    volumes:
+      - post_images_data:/app/post_images
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  caddy:
+    image: caddy:2
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN to the API hostname}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  post_images_data:
+    external: true
+    name: skku-post-images
+  caddy_data:
+    external: true
+    name: skku-caddy-data
+  caddy_config:
+    external: true
+    name: skku-caddy-config

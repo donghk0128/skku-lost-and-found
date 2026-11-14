@@ -44,7 +44,9 @@ skku-lost-and-found/
 │   │   └── main.py
 │   └── tests/
 ├── frontend/                     # Expo 애플리케이션
-├── compose.yaml
+├── compose.yaml                  # 로컬 개발
+├── compose.deploy.yaml           # EC2 배포
+├── deploy/                       # Caddy 설정과 배포 안내
 └── README.md
 ```
 
@@ -95,7 +97,8 @@ npx tsc --noEmit
 - 프런트엔드는 일부 화면이 백엔드 API와 연결되지 않았습니다.
 - AI 출력은 확정 정보가 아닌 사용자가 검토할 초안입니다.
 - 임베딩 추천은 Gemini API 키와 pgvector 마이그레이션을 적용한 환경에서만 동작합니다. 실제 채팅과 알림은 아직 구현되지 않았습니다.
-- 운영 배포 설정과 공유 이미지 저장소는 제공하지 않습니다.
+- EC2의 사진은 Docker 볼륨에 저장됩니다. 서버 간 공유 이미지 저장소는 제공하지 않습니다.
+
 
 ## 문서
 
@@ -104,4 +107,5 @@ npx tsc --noEmit
 - [게시글 추천과 임베딩](./backend/app/matching/README.md)
 - [채팅 모듈](./backend/app/chat/README.md)
 - [Frontend](./frontend/README.md)
+- [EC2 백엔드 배포](./deploy/README.md)
 - API 명세: Backend 실행 후 <http://127.0.0.1:8000/docs>
