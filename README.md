@@ -13,7 +13,8 @@ AI 모듈은 자연어 대화를 바탕으로 게시글 초안을 생성하며 F
 | 사진 | 구현 | JPEG·PNG·WebP 업로드 및 로컬 볼륨 저장 |
 | 모바일 UI | 진행 중 | 로그인, 홈, 검색·필터와 공통 UI |
 | AI 게시글 작성 | 구현 | 자연어 게시글 초안, 장소 정규화, 한국어·영어 대화 |
-| 매칭·채팅·알림 | 계획 | 유사 게시물 추천, 1:1 채팅과 반환 상태 관리 |
+| 매칭 | 구현 | 규칙 기반 유사 게시물 추천. 임베딩 매칭은 후속 작업 |
+| 채팅·알림 | 계획 | 실제 1:1 채팅과 알림 |
 
 ## 기술 구성
 
@@ -43,7 +44,9 @@ skku-lost-and-found/
 │   │   └── main.py
 │   └── tests/
 ├── frontend/                     # Expo 애플리케이션
-├── compose.yaml
+├── compose.yaml                  # 로컬 개발
+├── compose.deploy.yaml           # EC2 배포
+├── deploy/                       # Caddy 설정과 배포 안내
 └── README.md
 ```
 
@@ -93,8 +96,8 @@ npx tsc --noEmit
 
 - 프런트엔드는 일부 화면이 백엔드 API와 연결되지 않았습니다.
 - AI 출력은 확정 정보가 아닌 사용자가 검토할 초안입니다.
-- 유사 게시물 매칭, 채팅, 알림과 반환 완료 흐름은 아직 구현되지 않았습니다.
-- 운영 배포 설정과 공유 이미지 저장소는 제공하지 않습니다.
+- 임베딩 매칭, 실제 채팅과 알림은 아직 구현되지 않았습니다.
+- EC2의 사진은 Docker 볼륨에 저장됩니다. 서버 간 공유 이미지 저장소는 제공하지 않습니다.
 
 ## 문서
 
@@ -102,4 +105,5 @@ npx tsc --noEmit
 - [게시글 API](./backend/app/posts/README.md)
 - [채팅 모듈](./backend/app/chat/README.md)
 - [Frontend](./frontend/README.md)
+- [EC2 백엔드 배포](./deploy/README.md)
 - API 명세: Backend 실행 후 <http://127.0.0.1:8000/docs>
