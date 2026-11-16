@@ -3,8 +3,11 @@
 from uuid import UUID, uuid4
 
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.chat.model import ChatRoom
+from app.chat.service import close_post_rooms, lock_post
 from app.core.errors import ApiError
 from app.matching.embedding import sync_post_embedding
 from app.posts.model import Category, Post, PostImage, now_utc
@@ -137,16 +140,21 @@ class PostService:
 
     @staticmethod
     def complete(db: Session, post_id: UUID, author: User) -> Post:
+        lock_post(db, post_id)
         post = PostService._get_owned_post(db, post_id, author)
         if post.status != "COMPLETED":
             PostRepository.mark_completed(post)
+            close_post_rooms(db, post_id)
             PostService._commit(db)
             db.refresh(post)
         return post
 
     @staticmethod
     def delete(db: Session, post_id: UUID, author: User) -> None:
+        lock_post(db, post_id)
         post = PostService._get_owned_post(db, post_id, author)
+        if db.scalar(select(ChatRoom.id).where(ChatRoom.post_id == post_id, ChatRoom.status == "ACTIVE").limit(1)) is not None:
+            raise ApiError(409, "active_chat_rooms", "진행 중인 채팅방을 모두 종료한 후 게시글을 삭제해 주세요.")
         PostRepository.mark_deleted(post, now_utc())
         PostService._commit(db)
 

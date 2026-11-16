@@ -24,6 +24,7 @@ function AuthContent() {
         <Stack.Screen name="create-post" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="post/[id]" />
+        <Stack.Screen name="chat/[id]" />
       </Stack.Protected>
       <Stack.Protected guard={!user}>
         <Stack.Screen name="login" />
