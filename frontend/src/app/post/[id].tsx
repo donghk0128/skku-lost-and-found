@@ -17,6 +17,7 @@ import { Colors, Fonts } from "@/constants/theme";
 import { imageUrl, postsApi, type Post } from "@/lib/posts-api";
 import { readSession, writeSession } from "@/lib/session-storage";
 import { authApi } from "@/lib/auth-api";
+import { chatApi } from "@/lib/chat-api";
 import { splitPostDescription } from "@/lib/post-description";
 import { useAuth } from "@/providers/AuthProvider";
 import PostLocationMap from "@/components/PostLocationMap";
@@ -118,6 +119,23 @@ function PostDetail({ id }: { id: string }) {
   const [menu, setMenu] = useState<"actions" | "delete" | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [openingChat, setOpeningChat] = useState(false);
+  const openingChatRef = useRef(false);
+  const openChat = async () => {
+    if (openingChatRef.current) return;
+    openingChatRef.current = true;
+    setOpeningChat(true);
+    setActionError("");
+    try {
+      const room = await chatApi.create(id);
+      router.push({ pathname: "/chat/[id]", params: { id: room.id } });
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : t("common.requestFailed"));
+    } finally {
+      openingChatRef.current = false;
+      setOpeningChat(false);
+    }
+  };
   const pendingDelete = useRef(false);
   const remove = async () => {
     if (pendingDelete.current) return;
@@ -411,14 +429,15 @@ function PostDetail({ id }: { id: string }) {
         ) : null}
       </ScrollView>
       <SafeAreaView edges={["bottom"]} style={styles.chatBar}>
+        {actionError && !menu ? <Text accessibilityRole="alert" style={styles.confirmError}>{actionError}</Text> : null}
         <View style={styles.chatBarContent}>
-          {/* Demo only: no navigation or chat request is attached. */}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t("post.chat")}
             accessibilityHint={isOwnPost ? t("post.ownPost") : undefined}
-            accessibilityState={{ disabled: isOwnPost }}
-            disabled={isOwnPost}
+            accessibilityState={{ disabled: isOwnPost || openingChat, busy: openingChat }}
+            disabled={isOwnPost || openingChat}
+            onPress={() => { void openChat(); }}
             style={[styles.chatButton, isOwnPost && styles.chatButtonDisabled]}
           >
             <Text
@@ -427,7 +446,7 @@ function PostDetail({ id }: { id: string }) {
                 isOwnPost && styles.chatButtonTextDisabled,
               ]}
             >
-              {t("post.chat")}
+              {t(openingChat ? "common.processing" : "post.chat")}
             </Text>
           </Pressable>
           {isOwnPost ? (
