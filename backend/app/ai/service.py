@@ -17,6 +17,9 @@ from app.ai.workflow import run_chat_workflow
 from app.core.errors import ApiError
 from app.ai.core.providers import DraftProvider
 from app.ai.core.schemas import DraftRequest, PostDraft, RequiredFields
+from app.ai.core.vision_providers import VisionProvider
+from app.ai.core.vision_schemas import ImageInput, MergedImageAttributes
+from app.ai.core.vision_service import VisionAnalysisService
 from app.ai.knowledge.location_retriever import LocationMatch, find_locations
 from app.posts.repository import PostRepository
 
@@ -30,6 +33,7 @@ class AIDraftService:
         request: AIDraftCreateRequest,
         provider: DraftProvider,
         location_matches: tuple[LocationMatch, ...] | None = None,
+        image_attributes: MergedImageAttributes | None = None,
     ) -> AIDraftResponse:
         """Generate, validate, and normalize an editable post draft."""
 
@@ -41,7 +45,51 @@ class AIDraftService:
                 locale=request.locale,
             )
         )
-        category = PostRepository.get_category_by_code(db, result.draft.category_code)
+        draft = result.draft
+        if image_attributes:
+            image_fields = VisionAnalysisService.draft_fields(image_attributes, request.locale)
+            same_item = bool(
+                draft.item_name
+                and image_fields.item_name
+                and draft.item_name.casefold().strip()
+                == image_fields.item_name.casefold().strip()
+            )
+            compatible = (
+                not draft.item_name
+                or not image_fields.item_name
+                or same_item
+                or draft.category_code == image_fields.category_code
+            )
+            updates: dict[str, object] = {
+                "warnings": list(dict.fromkeys([*draft.warnings, *image_fields.warnings]))[:10],
+            }
+            if compatible:
+                updates.update({
+                    "keywords": list(
+                        dict.fromkeys([*draft.keywords, *image_fields.keywords])
+                    )[:10],
+                    "description": " ".join(
+                        value
+                        for value in (draft.description, image_fields.description)
+                        if value
+                    )[:4000],
+                })
+            if compatible and not draft.item_name and image_fields.item_name:
+                updates.update({
+                    "item_name": image_fields.item_name,
+                    "category_code": (
+                        image_fields.category_code
+                        if image_fields.category_code != "OTHER"
+                        else draft.category_code
+                    ),
+                    "title": image_fields.title or draft.title,
+                    "missing_fields": [
+                        field for field in draft.missing_fields if field != "item_name"
+                    ],
+                })
+            draft = draft.model_copy(update=updates)
+
+        category = PostRepository.get_category_by_code(db, draft.category_code)
         if category is None:
             raise ApiError(503, "ai_category_unavailable", "AI 카테고리 설정을 확인해 주세요.")
 
@@ -52,7 +100,7 @@ class AIDraftService:
             if request.confirmed_event_start_at == request.confirmed_event_end_at
             else "RANGE"
         )
-        event_start_at, event_end_at = AIDraftService._event_range(result.draft)
+        event_start_at, event_end_at = AIDraftService._event_range(draft)
         matches = location_matches if location_matches is not None else (
             find_locations(request.natural_language, locale=request.locale)
             if request.locale == "en"
@@ -82,7 +130,7 @@ class AIDraftService:
             location_text = None
         missing_fields = [
             field
-            for field in result.draft.missing_fields
+            for field in draft.missing_fields
             if not (field == "location" and location_confirmed)
             and not (field == "event_time" and event_time_confirmed)
         ]
@@ -90,8 +138,8 @@ class AIDraftService:
             missing_fields.append("location")
         if (location_confirmed or selected_names) and "location" in missing_fields:
             missing_fields.remove("location")
-        warnings = list(result.draft.warnings)
-        if not location_confirmed and not matches and result.draft.location_text is not None:
+        warnings = list(draft.warnings)
+        if not location_confirmed and not matches and draft.location_text is not None:
             warnings.append(
                 "The location is not in the campus directory and could not be confirmed automatically."
                 if request.locale == "en"
@@ -99,9 +147,9 @@ class AIDraftService:
             )
         return AIDraftResponse(
             post_type=request.post_type,
-            title=result.draft.title,
-            description=result.draft.description,
-            item_name=result.draft.item_name,
+            title=draft.title,
+            description=draft.description,
+            item_name=draft.item_name,
             category_id=category.id,
             category_code=category.code,
             location_text=location_text,
@@ -112,8 +160,8 @@ class AIDraftService:
             longitude=(float(request.confirmed_location.longitude) if location_confirmed else None),
             event_start_at=(request.confirmed_event_start_at if event_time_confirmed else event_start_at),
             event_end_at=(request.confirmed_event_end_at if event_time_confirmed else event_end_at),
-            time_precision=(confirmed_precision if event_time_confirmed else result.draft.time_precision),
-            keywords=result.draft.keywords,
+            time_precision=(confirmed_precision if event_time_confirmed else draft.time_precision),
+            keywords=draft.keywords,
             missing_fields=missing_fields,
             warnings=warnings,
         )
@@ -139,8 +187,14 @@ class AIDraftService:
         return start_at, end_at
 
     @staticmethod
-    def continue_chat(db: Session, request: AIChatRequest, provider: DraftProvider) -> AIChatResponse:
-        """Run the text-only LangGraph workflow for one stateless chat turn."""
+    def continue_chat(
+        db: Session,
+        request: AIChatRequest,
+        provider: DraftProvider,
+        images: list[ImageInput] | None = None,
+        vision_provider: VisionProvider | None = None,
+    ) -> AIChatResponse:
+        """Run one stateless chat turn with optional in-memory images."""
 
         if request.pending_field == "location_selection":
             if request.required_fields is None:
@@ -169,6 +223,10 @@ class AIDraftService:
             selected_ids = [options[0].id] if len(options) == 1 else []
             names = [option.name for option in options if option.id in selected_ids]
             missing = [field for field in extracted.missing_fields if field != "location"]
+            if not extracted.item_name:
+                missing.append("item_name")
+            if extracted.event_start_date is None or extracted.event_end_date is None:
+                missing.append("event_time")
             if not names:
                 missing.append("location")
             return AIRequiredFields(
@@ -188,7 +246,7 @@ class AIDraftService:
             locale=request.locale,
             user_messages=[message.content for message in request.messages],
             field_extractor=extract_fields,
-            draft_generator=lambda conversation, location_matches: AIDraftService.generate(
+            draft_generator=lambda conversation, location_matches, image_attributes: AIDraftService.generate(
                 db,
                 AIDraftCreateRequest(
                     post_type=request.post_type,
@@ -199,6 +257,7 @@ class AIDraftService:
                 ),
                 provider,
                 location_matches,
+                image_attributes,
             ),
             previous_required_fields=(
                 None if request.confirmed_location else request.required_fields
@@ -206,6 +265,13 @@ class AIDraftService:
             pending_field=None if request.confirmed_location else request.pending_field,
             selected_location_ids=request.selected_location_ids,
             location_correction=request.location_correction,
+            images=images,
+            image_analyzer=(
+                VisionAnalysisService(vision_provider).analyze
+                if images and vision_provider
+                else None
+            ),
+            image_attributes=request.image_attributes,
         )
         return AIChatResponse(
             status=state["status"],
@@ -215,4 +281,6 @@ class AIDraftService:
             pending_field=state.get("pending_field"),
             collected_fields=request.collected_fields,
             selected_location_ids=state["fields"].selected_location_ids,
+            images_analyzed=state.get("images_analyzed", False),
+            image_attributes=state.get("image_attributes"),
         )

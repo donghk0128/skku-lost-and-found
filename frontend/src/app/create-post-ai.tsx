@@ -90,6 +90,7 @@ export default function CreatePostAiScreen() {
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState("");
   const [photos, setPhotos] = useState<PostImageAsset[]>([]);
+  const [photosDirty, setPhotosDirty] = useState(false);
   const [savedPostId, setSavedPostId] = useState<string | null>(null);
   const features = draft?.keywords.join(", ") ?? "";
 
@@ -105,6 +106,7 @@ export default function CreatePostAiScreen() {
   const continueChat = async (
     userMessages: { role: "user"; content: string }[],
     location = confirmedLocation,
+    attachedPhotos: PostImageAsset[] = [],
   ) => {
     setBusy(true);
     setError("");
@@ -128,7 +130,9 @@ export default function CreatePostAiScreen() {
             : undefined,
         },
         await authenticatedToken(),
+        attachedPhotos,
       );
+      if (attachedPhotos.length && result.images_analyzed) setPhotosDirty(false);
       setDraft(result.draft);
       setRequiredFields(result.required_fields);
       setPendingField(result.pending_field);
@@ -163,7 +167,8 @@ export default function CreatePostAiScreen() {
 
   const send = async () => {
     const content = message.trim();
-    if (!content || busy || publishing) return;
+    const attachedPhotos = photos;
+    if ((!content && !photosDirty) || busy || publishing) return;
     const location =
       pendingField === "location" && confirmedLocation?.address !== content
         ? null
@@ -175,7 +180,7 @@ export default function CreatePostAiScreen() {
       ...messages,
       {
         role: "user" as const,
-        content,
+        content: content || t("ai.attachImage"),
       },
     ];
     const userMessages = nextMessages
@@ -187,7 +192,7 @@ export default function CreatePostAiScreen() {
     setMessages(nextMessages);
     setMessage("");
     setReady(false);
-    await continueChat(userMessages, location);
+    await continueChat(userMessages, location, attachedPhotos);
   };
 
   const confirmLocation = (location: PickedLocation) => {
@@ -235,6 +240,7 @@ export default function CreatePostAiScreen() {
         return;
       }
       setPhotos((current) => [...current, ...result.assets].slice(0, 5));
+      setPhotosDirty(true);
       setError("");
     } catch {
       setError(t(source === "camera" ? "ai.cameraFailed" : "createPost.photoPermission"));
@@ -251,6 +257,7 @@ export default function CreatePostAiScreen() {
   const removePhoto = (index: number) => {
     if (savedPostId || publishing) return;
     setPhotos((current) => current.filter((_, currentIndex) => currentIndex !== index));
+    setPhotosDirty(photos.length > 1);
     setError("");
   };
 
@@ -526,11 +533,11 @@ export default function CreatePostAiScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t("ai.sendAnswer")}
-            disabled={busy || publishing || !message.trim()}
+            disabled={busy || publishing || (!message.trim() && !photosDirty)}
             onPress={() => void send()}
             style={[
               styles.send,
-              (busy || publishing || !message.trim()) && styles.sendDisabled,
+              (busy || publishing || (!message.trim() && !photosDirty)) && styles.sendDisabled,
             ]}
           >
             <Text style={styles.sendText}>↑</Text>

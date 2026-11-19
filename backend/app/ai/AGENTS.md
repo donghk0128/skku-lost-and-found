@@ -54,13 +54,6 @@
 - 기존 `/ai/post-drafts`, `/ai/post-draft-chat` 응답은 승인 전까지 변경하지 않는다.
 - 필요한 경우에만 내부 결과를 기존 `AIDraftResponse`로 변환하는 호환 어댑터만 준비한다.
 
-### 4. AI 검증과 문서화
-
-- provider를 호출하지 않는 fake provider 기반 단위 테스트를 우선 작성한다.
-- OpenAI/Ollama가 동일한 내부 schema를 만족하는지 contract test를 추가한다.
-- 장소 단일·복수 검출, 이미지 병합, 한·영 출력, 텍스트와 이미지의 상충 정보를 검증한다.
-- `backend/app/ai/README.md`에는 현재 구현 상태와 API 미연결 상태를 명확히 구분한다.
-- 백엔드·프런트 담당자에게 전달할 요청/응답 예시와 오류 코드를 별도 연동 명세로 작성한다.
 
 ## 승인 후 진행할 백엔드 연동 작업
 

@@ -22,7 +22,7 @@ If the date is absent or too vague, both event dates must be null and missing_fi
 Do not add event_time to missing_fields merely because optional time-of-day information is absent.
 If item identity is unclear, item_name must be null and missing_fields must contain item_name.
 Keywords must be observable traits only, unique, short, and no more than 10.
-Warnings must be concise explanations of ambiguity in the requested language. Return JSON only."""
+"""
 
 LANGUAGE_INSTRUCTIONS = {
     "ko": "Write title, description, item_name, keywords, and warnings in Korean.",

@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Literal, Self
 
 from app.ai.core.schemas import TimePrecision
+from app.ai.core.vision_schemas import MergedImageAttributes
 from app.posts.schemas import PostCreateRequest
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
@@ -125,6 +126,7 @@ class AIChatRequest(BaseModel):
     selected_location_ids: list[str] = Field(default_factory=list, max_length=20)
     location_correction: str | None = Field(default=None, min_length=1, max_length=255)
     confirmed_location: ConfirmedLocation | None = None
+    image_attributes: MergedImageAttributes | None = None
 
     @model_validator(mode="after")
     def validate_total_content_length(self) -> Self:
@@ -156,3 +158,5 @@ class AIChatResponse(BaseModel):
     pending_field: PendingDraftField | None = None
     collected_fields: dict[RequiredDraftField, str] = Field(default_factory=dict)
     selected_location_ids: list[str] = Field(default_factory=list)
+    images_analyzed: bool = False
+    image_attributes: MergedImageAttributes | None = None

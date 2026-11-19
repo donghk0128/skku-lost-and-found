@@ -29,7 +29,8 @@ class Settings(BaseSettings):
     allowed_email_domain: str = "skku.edu"
 
     ai_provider: Literal["ollama", "openai"] = "ollama"
-    ai_model: str = "llama3.2:3b"
+    ai_model: str = "gpt-6-luna"
+    ai_vision_model: str = "gpt-6-luna"
     ai_timeout_seconds: float = 120
     ai_reasoning_effort: Literal["none", "low", "medium", "high", "xhigh", "max"] = "none"
     openai_api_key: str = ""

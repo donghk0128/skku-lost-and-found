@@ -262,5 +262,9 @@ def provider_error_message(error: ProviderError) -> str:
         "invalid_response": "모델 응답이 게시글 스키마와 일치하지 않습니다.",
         "not_configured": "OpenAI API key가 설정되지 않았습니다.",
         "unsupported_image": "지원하지 않는 이미지 형식입니다.",
+        "empty_image": "빈 이미지는 분석할 수 없습니다.",
+        "too_many_images": "이미지는 최대 5장까지 분석할 수 있습니다.",
+        "image_too_large": "이미지는 장당 5MiB 이하여야 합니다.",
+        "invalid_image": "이미지 형식과 파일 내용이 일치하지 않습니다.",
     }
     return messages.get(error.kind, "알 수 없는 모델 오류가 발생했습니다.")
