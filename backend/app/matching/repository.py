@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.matching.model import PostEmbedding
 from app.posts.model import Post
+from app.posts.repository import PostRepository
 
 
 class MatchingRepository:
@@ -33,11 +34,32 @@ class MatchingRepository:
         }
 
     @staticmethod
-    def list_candidates(db: Session, source: Post) -> list[Post]:
+    def list_candidates(
+        db: Session, source: Post, category_id: int | None = None, search: str | None = None
+    ) -> list[Post]:
         opposite_type = "FOUND" if source.post_type == "LOST" else "LOST"
-        statement = select(Post).where(
+        filters = [
             Post.post_type == opposite_type,
             Post.status == "OPEN",
             Post.deleted_at.is_(None),
+        ]
+        if category_id is not None:
+            filters.append(Post.category_id == category_id)
+        if search is not None:
+            filters.extend(PostRepository.search_filters(search))
+        statement = select(Post).where(*filters)
+        return list(db.scalars(statement).all())
+
+    @staticmethod
+    def list_owned_open(db: Session, author_id: UUID, post_type: str) -> list[Post]:
+        statement = (
+            select(Post)
+            .where(
+                Post.author_id == author_id,
+                Post.post_type == post_type,
+                Post.status == "OPEN",
+                Post.deleted_at.is_(None),
+            )
+            .order_by(Post.created_at.desc(), Post.id.desc())
         )
         return list(db.scalars(statement).all())

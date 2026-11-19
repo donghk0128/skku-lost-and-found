@@ -1,14 +1,55 @@
 """Deterministic rule signals used alongside optional embedding similarity."""
 
 from math import asin, cos, exp, radians, sin, sqrt
+import re
 import unicodedata
+from dataclasses import dataclass
 
 from app.posts.model import Post
 
-TEXT_WEIGHT = 0.55
-CATEGORY_WEIGHT = 0.20
-TIME_WEIGHT = 0.15
-LOCATION_WEIGHT = 0.10
+TEXT_WEIGHT = 0.15
+CATEGORY_WEIGHT = 0.25
+TIME_WEIGHT = 0.30
+LOCATION_WEIGHT = 0.30
+
+# Compare explicit colors only when both posts describe the same part of an item.
+_COLORS = {
+    "black": r"검은색|검정색|검은|검정|까만|블랙|black",
+    "white": r"흰색|하얀색|흰|하얀|화이트|white",
+    "green": r"초록색|초록|녹색|그린|green",
+    "blue": r"파란색|파란|파랑|푸른|청색|블루|blue",
+    "red": r"빨간색|빨간|빨강|붉은|적색|레드|red",
+    "yellow": r"노란색|노란|노랑|황색|옐로|yellow",
+    "pink": r"분홍색|분홍|핑크|pink",
+    "purple": r"보라색|보라|퍼플|purple",
+    "gray": r"회색|그레이|gray|grey",
+    "brown": r"갈색|브라운|brown",
+}
+_COLOR_WORDS = "|".join(f"(?P<{color}>{pattern})" for color, pattern in _COLORS.items())
+_COLOR_COMPONENT = re.compile(
+    rf"(?:{_COLOR_WORDS})\s*(?P<part>케이스|스티커|에어팟|이어폰|헤드폰|지갑|노트북|가방|모자|열쇠|우산|휴대폰|핸드폰|텀블러)",
+    re.IGNORECASE,
+)
+
+
+@dataclass(frozen=True)
+class RuleSignals:
+    text: float
+    category: float
+    time: float
+    location: float
+    distance_km: float | None
+    time_gap_hours: float | None
+    color_conflict: bool = False
+
+    @property
+    def score(self) -> float:
+        return (
+            TEXT_WEIGHT * self.text
+            + CATEGORY_WEIGHT * self.category
+            + TIME_WEIGHT * self.time
+            + LOCATION_WEIGHT * self.location
+        )
 
 
 def _compact(text: str) -> str:
@@ -25,6 +66,24 @@ def _text_similarity(left: str, right: str) -> float:
     if not left_parts or not right_parts:
         return 0.0
     return 2 * len(left_parts & right_parts) / (len(left_parts) + len(right_parts))
+
+
+def _explicit_colors(post: Post) -> dict[str, set[str]]:
+    colors: dict[str, set[str]] = {}
+    for match in _COLOR_COMPONENT.finditer(" ".join((post.title, post.item_name or "", post.description))):
+        part = match.group("part")
+        key = part if part in {"케이스", "스티커"} else "물건"
+        color = next(name for name in _COLORS if match.group(name) is not None)
+        colors.setdefault(key, set()).add(color)
+    return colors
+
+
+def _color_conflict(source: Post, candidate: Post) -> bool:
+    source_colors, candidate_colors = _explicit_colors(source), _explicit_colors(candidate)
+    return any(
+        part in candidate_colors and source_values.isdisjoint(candidate_colors[part])
+        for part, source_values in source_colors.items()
+    )
 
 
 def _distance_km(source: Post, candidate: Post) -> float | None:
@@ -60,8 +119,7 @@ def _time_gap_hours(source: Post, candidate: Post) -> float | None:
     return max(0.0, gap.total_seconds() / 3600)
 
 
-def score_posts(source: Post, candidate: Post) -> float:
-    """Return a ranking score in [0, 1], not a match probability."""
+def rule_signals(source: Post, candidate: Post) -> RuleSignals:
     source_name = source.item_name or source.title
     candidate_name = candidate.item_name or candidate.title
     source_text = " ".join((source.title, source.item_name or "", source.description))
@@ -76,9 +134,17 @@ def score_posts(source: Post, candidate: Post) -> float:
     time_gap = _time_gap_hours(source, candidate)
     time_score = exp(-time_gap / 48) if time_gap is not None else 0.0
 
-    return (
-        TEXT_WEIGHT * text_score
-        + CATEGORY_WEIGHT * category_score
-        + TIME_WEIGHT * time_score
-        + LOCATION_WEIGHT * location_score
+    return RuleSignals(
+        text=text_score,
+        category=category_score,
+        time=time_score,
+        location=location_score,
+        distance_km=distance,
+        time_gap_hours=time_gap,
+        color_conflict=_color_conflict(source, candidate),
     )
+
+
+def score_posts(source: Post, candidate: Post) -> float:
+    """Return a ranking score in [0, 1], not a match probability."""
+    return rule_signals(source, candidate).score

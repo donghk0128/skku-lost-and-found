@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.service import get_current_user
 from app.core.database import get_db
+from app.matching.repository import MatchingRepository
 from app.posts.model import Category, Post, PostImage
 from app.posts.schemas import CategoryResponse, PostCreateRequest, PostImageResponse, PostListResponse, PostResponse, PostStatus, PostStatusUpdateRequest, PostType, PostUpdateRequest
 from app.posts.service import PostService
@@ -55,6 +56,18 @@ def list_posts(
 ) -> PostListResponse:
     posts, total = PostService.list_visible(db, post_type, category_id, status, q, limit, offset)
     return PostListResponse(items=posts, total=total, limit=limit, offset=offset)
+
+
+@router.get("/mine", response_model=PostListResponse)
+def list_my_open_posts(
+    post_type: PostType,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> PostListResponse:
+    posts = MatchingRepository.list_owned_open(db, current_user.id, post_type)
+    return PostListResponse(items=posts[offset : offset + limit], total=len(posts), limit=limit, offset=offset)
 
 
 @router.get("/{post_id}", response_model=PostResponse)

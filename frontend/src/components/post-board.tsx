@@ -9,12 +9,15 @@ import {
   View,
 } from "react-native";
 import { BottomTabInset, Colors, Fonts } from "@/constants/theme";
-import { imageUrl, postsApi, type Category, type Post } from "@/lib/posts-api";
+import { imageUrl, postsApi, type Category, type Post, type RecommendationReason } from "@/lib/posts-api";
 import { useFocusEffect, useRouter } from "expo-router";
 import { splitPostDescription } from "@/lib/post-description";
 import { useAuth } from "@/providers/AuthProvider";
 import { useLocale } from "@/i18n/LocaleProvider";
 import type { TranslateFn } from "@/i18n";
+import { readSession } from "@/lib/session-storage";
+
+type BoardItem = { post: Post; rank?: number; reasons?: RecommendationReason[] };
 
 function relativeTime(date: string, t: TranslateFn) {
   const minutes = Math.max(
@@ -31,14 +34,24 @@ function relativeTime(date: string, t: TranslateFn) {
 function PostRow({
   post,
   category,
+  rank,
+  reasons,
 }: {
   post: Post;
   category?: Category;
+  rank?: number;
+  reasons?: RecommendationReason[];
 }) {
   const { t, categoryLabel } = useLocale();
   const { user } = useAuth();
   const router = useRouter();
   const [thumbnail, setThumbnail] = useState<string | null>(null);
+  const reasonLabels: Record<RecommendationReason, string> = {
+    NEARBY_LOCATION: t("board.nearbyLocation"),
+    OVERLAPPING_TIME: t("board.overlappingTime"),
+    SAME_CATEGORY: t("board.sameCategory"),
+    SIMILAR_MEANING: t("board.similarMeaning"),
+  };
   useEffect(() => {
     let active = true;
     postsApi
@@ -64,6 +77,7 @@ function PostRow({
       style={styles.row}
     >
       <View style={styles.copy}>
+        {rank !== undefined ? <Text style={styles.rank}>{t("board.rank", { rank })}</Text> : null}
         <Text numberOfLines={1} style={styles.title}>
           {post.title}
         </Text>
@@ -87,6 +101,13 @@ function PostRow({
         {post.status === "COMPLETED" ? (
           <Text style={styles.completed}>{t("board.completed")}</Text>
         ) : null}
+        {reasons && reasons.length > 0 ? (
+          <View style={styles.reasons}>
+            {reasons.map((reason) => (
+              <Text key={reason} style={styles.reason}>{reasonLabels[reason]}</Text>
+            ))}
+          </View>
+        ) : null}
       </View>
       {thumbnail ? (
         <Image
@@ -103,13 +124,20 @@ function PostRow({
 export default function PostBoard({
   type,
   search,
+  sortMode,
+  categoryId,
+  sourcePostId,
 }: {
   type: "LOST" | "FOUND";
   search: string;
+  sortMode: "newest" | "candidates";
+  categoryId: number | null;
+  sourcePostId: string | null;
 }) {
   const { locale, t } = useLocale();
+  const { user } = useAuth();
   const [query, setQuery] = useState(search);
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [posts, setPosts] = useState<BoardItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -133,6 +161,12 @@ export default function PostBoard({
   }, []);
   const load = useCallback(
     async (offset: number) => {
+      if (sortMode === "candidates" && !sourcePostId) {
+        setPosts([]);
+        setTotal(0);
+        setLoading(false);
+        return;
+      }
       if (offset > 0 && requests.current.busy) return;
       const version =
         offset === 0
@@ -142,7 +176,21 @@ export default function PostBoard({
       setLoading(true);
       setError("");
       try {
-        const result = await postsApi.list(type, query, offset);
+        let result: { items: BoardItem[]; total: number };
+        if (sortMode === "candidates" && sourcePostId) {
+          const session = await readSession();
+          if (!session) throw new Error(t("common.loginRequired"));
+          const ranked = await postsApi.rankedCandidates(
+            sourcePostId, query, categoryId, offset, session.access_token,
+          );
+          result = {
+            items: ranked.items.map(({ post, rank, reasons }) => ({ post, rank, reasons })),
+            total: ranked.total,
+          };
+        } else {
+          const newest = await postsApi.list(type, query, offset, categoryId);
+          result = { items: newest.items.map((post) => ({ post })), total: newest.total };
+        }
         if (version !== requests.current.generation) return;
         setPosts((current) =>
           offset === 0 ? result.items : [...current, ...result.items],
@@ -162,7 +210,7 @@ export default function PostBoard({
         }
       }
     },
-    [type, query, requests],
+    [type, query, sortMode, categoryId, sourcePostId, t],
   );
   useFocusEffect(
     useCallback(() => {
@@ -183,12 +231,14 @@ export default function PostBoard({
     <FlatList
       data={posts}
       extraData={locale}
-      keyExtractor={(post) => post.id}
+      keyExtractor={(item) => item.post.id}
       renderItem={({ item }) => (
         <PostRow
-          post={item}
+          post={item.post}
+          rank={item.rank}
+          reasons={item.reasons}
           category={categories.find(
-            (category) => category.id === item.category_id,
+            (category) => category.id === item.post.category_id,
           )}
         />
       )}
@@ -204,7 +254,9 @@ export default function PostBoard({
       ListEmptyComponent={
         !loading && !error ? (
           <Text style={styles.empty}>
-            {query.trim()
+            {sortMode === "candidates" && !sourcePostId
+              ? user ? t("home.selectSourcePrompt") : t("common.loginRequired")
+              : query.trim()
               ? t("board.searchEmpty")
               : type === "LOST"
                 ? t("board.lostEmpty")
@@ -246,6 +298,11 @@ const styles = StyleSheet.create({
     borderBottomColor: "#E9E9E9",
   },
   copy: { flex: 1, minWidth: 0, gap: 12 },
+  rank: {
+    color: Colors.primary,
+    fontSize: 12,
+    fontFamily: Fonts.pretendardSemiBold,
+  },
   title: {
     fontFamily: Fonts.pretendardRegular,
     fontSize: 18,
@@ -286,6 +343,17 @@ const styles = StyleSheet.create({
   completed: {
     fontSize: 12,
     color: Colors.primary,
+    fontFamily: Fonts.pretendardMedium,
+  },
+  reasons: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  reason: {
+    color: Colors.primary,
+    backgroundColor: Colors.softgreen,
+    borderRadius: 8,
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    fontSize: 11,
     fontFamily: Fonts.pretendardMedium,
   },
   image: {

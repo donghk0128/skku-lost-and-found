@@ -13,6 +13,19 @@ class PostRepository:
     SEARCH_WHITESPACE = (" ", "\t", "\n", "\r", "\u00a0")
 
     @staticmethod
+    def search_filters(search: str) -> list:
+        search_fields = []
+        for field in (Post.title, Post.description, Post.item_name):
+            compact = func.coalesce(field, "")
+            for whitespace in PostRepository.SEARCH_WHITESPACE:
+                compact = func.replace(compact, whitespace, "")
+            search_fields.append(func.lower(compact))
+        return [
+            or_(*(field.contains(term.lower(), autoescape=True) for field in search_fields))
+            for term in search.split()
+        ]
+
+    @staticmethod
     def add_image(db: Session, image: PostImage) -> None:
         db.add(image)
 
@@ -85,15 +98,7 @@ class PostRepository:
         if post_status is not None:
             filters.append(Post.status == post_status)
         if search is not None:
-            search_fields = []
-            for field in (Post.title, Post.description, Post.item_name):
-                compact = func.coalesce(field, "")
-                for whitespace in PostRepository.SEARCH_WHITESPACE:
-                    compact = func.replace(compact, whitespace, "")
-                search_fields.append(func.lower(compact))
-            for term in search.split():
-                compact_term = term.lower()
-                filters.append(or_(*(field.contains(compact_term, autoescape=True) for field in search_fields)))
+            filters.extend(PostRepository.search_filters(search))
 
         total = db.scalar(select(func.count()).select_from(Post).where(*filters)) or 0
         statement = (

@@ -21,6 +21,19 @@ export type Post = {
   event_end_at: string | null;
 };
 export type Category = { id: number; name: string; code: string };
+export type RecommendationReason =
+  | "NEARBY_LOCATION"
+  | "OVERLAPPING_TIME"
+  | "SAME_CATEGORY"
+  | "SIMILAR_MEANING";
+export type RankedCandidate = {
+  post: Post;
+  rank: number;
+  score: number;
+  rule_score: number;
+  semantic_score: number | null;
+  reasons: RecommendationReason[];
+};
 export type PostImageAsset = Pick<ImagePickerAsset, "uri"> &
   Partial<
     Pick<ImagePickerAsset, "file" | "fileName" | "fileSize" | "mimeType">
@@ -84,14 +97,44 @@ export const postsApi = {
       );
     }
   },
-  list: (type: "LOST" | "FOUND", search: string, offset: number) => {
+  list: (
+    type: "LOST" | "FOUND",
+    search: string,
+    offset: number,
+    categoryId: number | null = null,
+  ) => {
     const query = new URLSearchParams({
       post_type: type,
       limit: "20",
       offset: String(offset),
     });
     if (search.trim()) query.set("q", search.trim());
+    if (categoryId !== null) query.set("category_id", String(categoryId));
     return request<{ items: Post[]; total: number }>(`/posts?${query}`);
+  },
+  mine: (type: "LOST" | "FOUND", token: string) =>
+    request<{ items: Post[]; total: number }>(
+      `/posts/mine?post_type=${type}&limit=100`,
+      undefined,
+      token,
+    ),
+  rankedCandidates: (
+    sourcePostId: string,
+    search: string,
+    categoryId: number | null,
+    offset: number,
+    token: string,
+  ) => {
+    const query = new URLSearchParams({ limit: "20", offset: String(offset) });
+    if (search.trim()) query.set("q", search.trim());
+    if (categoryId !== null) query.set("category_id", String(categoryId));
+    return request<{
+      source_post_id: string;
+      run_id: string;
+      algorithm_version: string;
+      items: RankedCandidate[];
+      total: number;
+    }>(`/posts/${sourcePostId}/ranked-candidates?${query}`, undefined, token);
   },
   categories: () => request<Category[]>("/categories"),
   images: (id: string) =>
