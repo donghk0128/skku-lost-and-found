@@ -13,7 +13,7 @@ DATA_PATH = Path(__file__).with_name("campus_locations.json")
 FLOOR_PATTERN = re.compile(r"^\s*((?:지하\s*)?\d+\s*층|B\s*\d+\s*층?)", re.IGNORECASE)
 CAMPUS_HINTS = {
     "HSSC": (
-        "인문사회과학캠퍼스", "인사", "명륜캠퍼스", "명륜", "서울", "서울 캠퍼스" "혜화",
+        "인문사회과학캠퍼스", "인사", "명륜캠퍼스", "명륜", "서울", "서울 캠퍼스", "혜화",
         "humanities and social sciences campus", "humanities campus", "seoul campus",
     ),
     "NSC": (
