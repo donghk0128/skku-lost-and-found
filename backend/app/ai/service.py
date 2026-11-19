@@ -5,7 +5,13 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
-from app.ai.schemas import AIChatRequest, AIChatResponse, AIDraftCreateRequest, AIDraftResponse
+from app.ai.schemas import (
+    AIChatRequest,
+    AIChatResponse,
+    AIDraftCreateRequest,
+    AIDraftResponse,
+    LocationOption,
+)
 from app.ai.workflow import run_chat_workflow
 from app.core.errors import ApiError
 from app.ai.core.providers import DraftProvider
@@ -52,10 +58,47 @@ class AIDraftService:
             else find_locations(request.natural_language)
         )
         location_candidates = [match.resolved_name for match in matches]
+        duplicate_names = {
+            name for name in location_candidates if location_candidates.count(name) > 1
+        }
+        campus_labels = (
+            {"HSSC": "Humanities and Social Sciences Campus", "NSC": "Natural Sciences Campus"}
+            if request.locale == "en"
+            else {"HSSC": "인문사회과학캠퍼스", "NSC": "자연과학캠퍼스"}
+        )
+        location_options = [
+            LocationOption(
+                id=match.location.location_id,
+                campus=match.location.campus,
+                name=match.resolved_name,
+                label=(
+                    f"{campus_labels[match.location.campus]} {match.resolved_name}"
+                    if match.resolved_name in duplicate_names
+                    and match.location.campus in campus_labels
+                    else match.resolved_name
+                ),
+            )
+            for match in matches
+            if match.location.location_id is not None
+        ]
+        option_ids = {option.id for option in location_options}
+        unknown_ids = set(request.selected_location_ids) - option_ids
+        if unknown_ids:
+            raise ApiError(
+                422,
+                "invalid_location_selection",
+                "현재 장소 후보에 포함된 장소만 선택할 수 있습니다.",
+            )
+        selected_location_ids = request.selected_location_ids or (
+            [location_options[0].id] if len(location_options) == 1 else []
+        )
+        selected_names = [
+            option.name for option in location_options if option.id in selected_location_ids
+        ]
         if location_confirmed:
             location_text = request.confirmed_location.text
-        elif len(matches) == 1:
-            location_text = matches[0].resolved_name
+        elif selected_names:
+            location_text = ", ".join(selected_names)
         else:
             location_text = None
         missing_fields = [
@@ -64,18 +107,12 @@ class AIDraftService:
             if not (field == "location" and location_confirmed)
             and not (field == "event_time" and event_time_confirmed)
         ]
-        if not location_confirmed and len(matches) != 1 and "location" not in missing_fields:
+        if not location_confirmed and not selected_names and "location" not in missing_fields:
             missing_fields.append("location")
-        if (location_confirmed or len(matches) == 1) and "location" in missing_fields:
+        if (location_confirmed or selected_names) and "location" in missing_fields:
             missing_fields.remove("location")
         warnings = list(result.draft.warnings)
-        if not location_confirmed and len(matches) > 1:
-            warnings.append(
-                "Multiple campus locations were found. Please confirm the location."
-                if request.locale == "en"
-                else "여러 학교 장소가 발견되어 사용자 확인이 필요합니다."
-            )
-        elif not location_confirmed and not matches and result.draft.location_text is not None:
+        if not location_confirmed and not matches and result.draft.location_text is not None:
             warnings.append(
                 "The location is not in the campus directory and could not be confirmed automatically."
                 if request.locale == "en"
@@ -90,6 +127,8 @@ class AIDraftService:
             category_code=category.code,
             location_text=location_text,
             location_candidates=location_candidates,
+            location_options=location_options,
+            selected_location_ids=selected_location_ids,
             latitude=(float(request.confirmed_location.latitude) if location_confirmed else None),
             longitude=(float(request.confirmed_location.longitude) if location_confirmed else None),
             event_start_at=(request.confirmed_event_start_at if event_time_confirmed else event_start_at),
@@ -134,6 +173,7 @@ class AIDraftService:
                     post_type=request.post_type,
                     locale=request.locale,
                     natural_language=conversation,
+                    selected_location_ids=request.selected_location_ids,
                     confirmed_location=request.confirmed_location,
                 ),
                 provider,
@@ -149,4 +189,5 @@ class AIDraftService:
             draft=state["draft"],
             pending_field=state.get("pending_field"),
             collected_fields=state.get("collected_fields", {}),
+            selected_location_ids=state["draft"].selected_location_ids,
         )

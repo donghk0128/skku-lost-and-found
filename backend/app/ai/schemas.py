@@ -13,6 +13,16 @@ from pydantic_core import PydanticCustomError
 PostType = Literal["LOST", "FOUND"]
 Locale = Literal["ko", "en"]
 RequiredDraftField = Literal["item_name", "location", "event_time"]
+PendingDraftField = Literal["item_name", "location", "location_selection", "event_time"]
+
+
+class LocationOption(BaseModel):
+    """One normalized campus-directory location offered for selection."""
+
+    id: str
+    campus: str | None = None
+    name: str
+    label: str
 
 
 class ConfirmedLocation(BaseModel):
@@ -33,12 +43,18 @@ class AIDraftCreateRequest(BaseModel):
     post_type: PostType
     locale: Locale = "ko"
     natural_language: str = Field(min_length=1, max_length=4000)
+    selected_location_ids: list[str] = Field(default_factory=list, max_length=20)
     confirmed_location: ConfirmedLocation | None = None
     confirmed_event_start_at: AwareDatetime | None = None
     confirmed_event_end_at: AwareDatetime | None = None
 
     @model_validator(mode="after")
     def validate_event_time(self) -> Self:
+        if len(self.selected_location_ids) != len(set(self.selected_location_ids)):
+            raise PydanticCustomError(
+                "duplicate_location_selection",
+                "같은 장소를 중복 선택할 수 없습니다.",
+            )
         if (self.confirmed_event_start_at is None) != (self.confirmed_event_end_at is None):
             raise PydanticCustomError(
                 "event_time_pair",
@@ -67,6 +83,8 @@ class AIDraftResponse(BaseModel):
     category_code: str
     location_text: str | None
     location_candidates: list[str] = Field(default_factory=list)
+    location_options: list[LocationOption] = Field(default_factory=list)
+    selected_location_ids: list[str] = Field(default_factory=list)
     latitude: float | None
     longitude: float | None
     event_start_at: datetime | None
@@ -95,8 +113,9 @@ class AIChatRequest(BaseModel):
     locale: Locale = "ko"
     messages: list[AIChatMessage] = Field(min_length=1, max_length=12)
     draft: AIDraftResponse | None = None
-    pending_field: RequiredDraftField | None = None
+    pending_field: PendingDraftField | None = None
     collected_fields: dict[RequiredDraftField, str] = Field(default_factory=dict)
+    selected_location_ids: list[str] = Field(default_factory=list, max_length=20)
     confirmed_location: ConfirmedLocation | None = None
 
     @model_validator(mode="after")
@@ -105,6 +124,11 @@ class AIChatRequest(BaseModel):
             raise PydanticCustomError(
                 "chat_content_too_long",
                 "전체 대화 내용은 3,600자 이하여야 합니다.",
+            )
+        if len(self.selected_location_ids) != len(set(self.selected_location_ids)):
+            raise PydanticCustomError(
+                "duplicate_location_selection",
+                "같은 장소를 중복 선택할 수 없습니다.",
             )
         return self
 
@@ -115,5 +139,6 @@ class AIChatResponse(BaseModel):
     status: Literal["NEEDS_INPUT", "READY"]
     assistant_message: str
     draft: AIDraftResponse
-    pending_field: RequiredDraftField | None = None
+    pending_field: PendingDraftField | None = None
     collected_fields: dict[RequiredDraftField, str] = Field(default_factory=dict)
+    selected_location_ids: list[str] = Field(default_factory=list)

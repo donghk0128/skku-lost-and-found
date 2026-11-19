@@ -100,7 +100,6 @@ export default function CreatePostAiScreen() {
   const continueChat = async (
     userMessages: { role: "user"; content: string }[],
     location = confirmedLocation,
-    wasLocationAnswer = false,
   ) => {
     setBusy(true);
     setError("");
@@ -127,12 +126,18 @@ export default function CreatePostAiScreen() {
       setDraft(result.draft);
       setPendingField(result.pending_field);
       setCollectedFields(result.collected_fields);
-      setReady(result.status === "READY");
+      setReady(result.status === "READY" && Boolean(location));
+      const hasAllRequiredInputs = (
+        ["item_name", "location", "event_time"] as const
+      ).every(
+        (field) =>
+          !result.draft.missing_fields.includes(field) ||
+          Boolean(result.collected_fields[field]),
+      );
       const shouldShowLocationPicker =
         !locationPickerShown.current &&
-        (wasLocationAnswer ||
-          Boolean(result.draft.location_text) ||
-          result.draft.location_candidates.length > 0);
+        !location &&
+        hasAllRequiredInputs;
       if (shouldShowLocationPicker) locationPickerShown.current = true;
       setMessages((current) => [
         ...current,
@@ -175,7 +180,7 @@ export default function CreatePostAiScreen() {
     setMessages(nextMessages);
     setMessage("");
     setReady(false);
-    await continueChat(userMessages, location, pendingField === "location");
+    await continueChat(userMessages, location);
   };
 
   const confirmLocation = async (location: PickedLocation) => {

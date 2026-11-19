@@ -5,7 +5,13 @@ from typing import Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from app.ai.schemas import AIDraftResponse, Locale, PostType, RequiredDraftField
+from app.ai.schemas import (
+    AIDraftResponse,
+    Locale,
+    PendingDraftField,
+    PostType,
+    RequiredDraftField,
+)
 from app.ai.knowledge.location_retriever import LocationMatch, find_locations
 
 
@@ -21,7 +27,7 @@ class ChatWorkflowState(TypedDict, total=False):
     user_messages: list[str]
     draft: AIDraftResponse
     previous_draft: AIDraftResponse
-    pending_field: RequiredDraftField | None
+    pending_field: PendingDraftField | None
     collected_fields: dict[RequiredDraftField, str]
     location_matches: tuple[LocationMatch, ...]
     status: ChatStatus
@@ -89,13 +95,19 @@ def build_chat_workflow(draft_generator: DraftGenerator):
             _conversation_text(state["user_messages"], state["locale"]),
             state.get("location_matches", ()),
         )
-        pending_field = next(
-            (field for field in MISSING_FIELD_PRIORITY if field in draft.missing_fields),
-            None,
+        pending_field = (
+            "location_selection"
+            if len(draft.location_options) > 1 and not draft.selected_location_ids
+            else next(
+                (field for field in MISSING_FIELD_PRIORITY if field in draft.missing_fields),
+                None,
+            )
         )
         return {"draft": draft, "pending_field": pending_field}
 
     def route_at_start(state: ChatWorkflowState) -> Literal["collect_answer", "extract_draft"]:
+        if state.get("pending_field") == "location_selection":
+            return "extract_draft"
         if state.get("previous_draft") is not None and state.get("pending_field") is not None:
             return "collect_answer"
         return "extract_draft"
@@ -132,15 +144,15 @@ def build_chat_workflow(draft_generator: DraftGenerator):
         pending_field = state["pending_field"]
         if pending_field is None:
             raise ValueError("pending_field is required when requesting input")
-        if pending_field == "location" and state["draft"].location_candidates:
+        if pending_field == "location_selection":
             candidates = "\n".join(
-                f"{index}. {candidate}"
-                for index, candidate in enumerate(state["draft"].location_candidates, start=1)
+                f"{index}. {candidate.label}"
+                for index, candidate in enumerate(state["draft"].location_options, start=1)
             )
             introduction = (
-                "Multiple locations were found. Which one is correct?"
+                "Multiple locations were found. Select all applicable locations."
                 if state["locale"] == "en"
-                else "여러 장소가 확인됐어요. 어느 장소인가요?"
+                else "여러 장소가 확인됐어요. 해당하는 장소를 모두 선택해 주세요."
             )
             assistant_message = f"{introduction}\n{candidates}"
         else:
@@ -196,7 +208,7 @@ def run_chat_workflow(
     draft_generator: DraftGenerator,
     locale: Locale = "ko",
     previous_draft: AIDraftResponse | None = None,
-    pending_field: RequiredDraftField | None = None,
+    pending_field: PendingDraftField | None = None,
     collected_fields: dict[RequiredDraftField, str] | None = None,
 ) -> ChatWorkflowState:
     """Run one stateless graph turn using the complete client-side conversation."""
