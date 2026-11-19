@@ -2,6 +2,7 @@
 
 from math import asin, cos, exp, radians, sin, sqrt
 import unicodedata
+from dataclasses import dataclass
 
 from app.posts.model import Post
 
@@ -9,6 +10,25 @@ TEXT_WEIGHT = 0.55
 CATEGORY_WEIGHT = 0.20
 TIME_WEIGHT = 0.15
 LOCATION_WEIGHT = 0.10
+
+
+@dataclass(frozen=True)
+class RuleSignals:
+    text: float
+    category: float
+    time: float
+    location: float
+    distance_km: float | None
+    time_gap_hours: float | None
+
+    @property
+    def score(self) -> float:
+        return (
+            TEXT_WEIGHT * self.text
+            + CATEGORY_WEIGHT * self.category
+            + TIME_WEIGHT * self.time
+            + LOCATION_WEIGHT * self.location
+        )
 
 
 def _compact(text: str) -> str:
@@ -60,8 +80,7 @@ def _time_gap_hours(source: Post, candidate: Post) -> float | None:
     return max(0.0, gap.total_seconds() / 3600)
 
 
-def score_posts(source: Post, candidate: Post) -> float:
-    """Return a ranking score in [0, 1], not a match probability."""
+def rule_signals(source: Post, candidate: Post) -> RuleSignals:
     source_name = source.item_name or source.title
     candidate_name = candidate.item_name or candidate.title
     source_text = " ".join((source.title, source.item_name or "", source.description))
@@ -76,9 +95,16 @@ def score_posts(source: Post, candidate: Post) -> float:
     time_gap = _time_gap_hours(source, candidate)
     time_score = exp(-time_gap / 48) if time_gap is not None else 0.0
 
-    return (
-        TEXT_WEIGHT * text_score
-        + CATEGORY_WEIGHT * category_score
-        + TIME_WEIGHT * time_score
-        + LOCATION_WEIGHT * location_score
+    return RuleSignals(
+        text=text_score,
+        category=category_score,
+        time=time_score,
+        location=location_score,
+        distance_km=distance,
+        time_gap_hours=time_gap,
     )
+
+
+def score_posts(source: Post, candidate: Post) -> float:
+    """Return a ranking score in [0, 1], not a match probability."""
+    return rule_signals(source, candidate).score

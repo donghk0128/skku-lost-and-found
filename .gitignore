@@ -4,6 +4,7 @@
 .env.local
 !.env.example
 .venv/
+.deps/
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -24,3 +25,5 @@ local.properties
 # Local database files
 *.db
 *.sqlite
+backend/evaluation/labels.csv
+backend/evaluation/result.json
