@@ -4,7 +4,7 @@ from datetime import datetime
 from uuid import UUID
 
 from pgvector.sqlalchemy import VECTOR
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, JSON, String, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, JSON, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import Uuid
 
@@ -54,6 +54,7 @@ class RecommendationItem(Base):
     category_score: Mapped[float] = mapped_column(Float, nullable=False)
     time_score: Mapped[float] = mapped_column(Float, nullable=False)
     location_score: Mapped[float] = mapped_column(Float, nullable=False)
+    color_conflict: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     distance_km: Mapped[float | None] = mapped_column(Float, nullable=True)
     time_gap_hours: Mapped[float | None] = mapped_column(Float, nullable=True)
     reasons: Mapped[list[str]] = mapped_column(JSON, nullable=False)

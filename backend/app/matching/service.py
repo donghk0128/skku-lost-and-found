@@ -94,6 +94,7 @@ class MatchingService:
                         category_score=item.signals.category,
                         time_score=item.signals.time,
                         location_score=item.signals.location,
+                        color_conflict=item.signals.color_conflict,
                         distance_km=item.signals.distance_km,
                         time_gap_hours=item.signals.time_gap_hours,
                         reasons=item.reasons,
@@ -123,10 +124,5 @@ class MatchingService:
         candidates.sort(key=lambda item: (item[1], item[0].created_at, str(item[0].id)), reverse=True)
         shortlist = candidates[:MAX_SEMANTIC_CANDIDATES]
         similarities = MatchingRepository.cosine_similarities(db, source, [post.id for post, _ in shortlist])
-        ranked = []
-        for candidate, rule_score in shortlist:
-            semantic_score = similarities.get(candidate.id)
-            score = rule_score if semantic_score is None else 0.7 * rule_score + 0.3 * semantic_score
-            ranked.append((candidate, score))
-        ranked.sort(key=lambda item: (item[1], item[0].created_at, str(item[0].id)), reverse=True)
-        return source, ranked[:limit]
+        ranked = rank_candidates(source, [candidate for candidate, _ in shortlist], similarities)
+        return source, [(item.post, item.score) for item in ranked[:limit]]

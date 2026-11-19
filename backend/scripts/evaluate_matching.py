@@ -6,6 +6,7 @@ This script never calls Gemini and never writes to the database.
 
 import argparse
 import csv
+import hashlib
 import json
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -17,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.core.database import engine
 from app.matching.embedding import MODEL
 from app.matching.evaluation import ranking_metrics
-from app.matching.ranking import ALGORITHM_VERSION, rank_candidates
+from app.matching.ranking import ALGORITHM_VERSION, COLOR_CONFLICT_PENALTY, RULE_WEIGHT, SEMANTIC_WEIGHT, rank_candidates
 from app.matching.repository import MatchingRepository
 from app.posts.model import Post
 
@@ -73,6 +74,7 @@ def evaluate(path: Path) -> dict:
                         "category": round(item.signals.category, 6),
                         "time": round(item.signals.time, 6),
                         "location": round(item.signals.location, 6),
+                        "color_conflict": item.signals.color_conflict,
                     },
                 })
             methods["hybrid"][source_id] = [item.post.id for item in ranked]
@@ -82,6 +84,12 @@ def evaluate(path: Path) -> dict:
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "algorithm_version": ALGORITHM_VERSION,
+        "label_file_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "scoring": {
+            "rule_weight": RULE_WEIGHT,
+            "semantic_weight": SEMANTIC_WEIGHT,
+            "color_conflict_penalty": COLOR_CONFLICT_PENALTY,
+        },
         "embedding_model": MODEL,
         "source_count": len(labels),
         "labeled_pair_count": sum(map(len, labels.values())),
