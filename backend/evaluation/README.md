@@ -30,4 +30,10 @@ source_post_id,candidate_post_id,label
 python -m scripts.evaluate_matching --labels evaluation/labels.csv --output evaluation/result.json
 ```
 
+EC2 배포 Compose를 쓰는 경우에는 서버의 저장소 루트에서 아래처럼 실행합니다. `backend/evaluation/labels.csv`를 서버에 준비한 뒤 실행하면 결과가 같은 폴더의 `result.json`에 남습니다. 실제 글 ID가 담긴 `labels.csv`는 Git에 추가하지 않습니다.
+
+```sh
+docker compose -f compose.deploy.yaml run --rm -v "$(pwd)/backend/evaluation:/app/evaluation" backend python -m scripts.evaluate_matching --labels /app/evaluation/labels.csv --output /app/evaluation/result.json
+```
+
 평가 도구는 DB를 읽기만 하며 Gemini 호출이나 게시글 수정은 하지 않습니다. 모든 비교 글에 호환되는 벡터가 있어야 세 방식의 지표를 공정하게 비교할 수 있습니다. 출력에는 실제 게시글 ID를 넣지 않고 익명 코드, 정답 여부, 개별 점수와 집계 지표를 남깁니다. 이 파일을 개발 DB와 별도로 보관하면 가중치 변경 전후를 다시 비교할 수 있습니다. `labels.csv`는 실제 게시글 ID가 들어 있으므로 Git에 올리지 않습니다. 포트폴리오에는 익명화한 입력 예시와 지표·해석을 함께 보관합니다.
