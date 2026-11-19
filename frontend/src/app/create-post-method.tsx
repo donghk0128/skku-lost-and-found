@@ -1,7 +1,9 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ImageBackground,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -21,6 +23,9 @@ export default function CreatePostMethodScreen() {
       ? t("createMethod.lostQuestion")
       : t("createMethod.foundQuestion");
 
+  const isWeb = Platform.OS === "web";
+  const ContentContainer = isWeb ? ScrollView : View;
+
   return (
     <SafeAreaView style={styles.root}>
       <View style={styles.header}>
@@ -34,7 +39,14 @@ export default function CreatePostMethodScreen() {
         <Text style={styles.headerTitle}>{t("createMethod.title")}</Text>
         <View style={styles.back} />
       </View>
-      <View style={styles.content}>
+      <ContentContainer
+        {...(isWeb
+          ? {
+              style: styles.webScroll,
+              contentContainerStyle: [styles.content, styles.webContent],
+            }
+          : { style: styles.content })}
+      >
         <Text style={styles.title}>{action}</Text>
         <Text style={styles.subtitle}>{t("createMethod.prompt")}</Text>
         <View style={styles.options}>
@@ -48,6 +60,7 @@ export default function CreatePostMethodScreen() {
             }
             style={({ pressed }) => [
               styles.option,
+              isWeb && styles.webOption,
               styles.aiOption,
               pressed && styles.pressed,
             ]}
@@ -79,6 +92,7 @@ export default function CreatePostMethodScreen() {
             }
             style={({ pressed }) => [
               styles.option,
+              isWeb && styles.webOption,
               styles.manualOption,
               pressed && styles.pressed,
             ]}
@@ -96,7 +110,7 @@ export default function CreatePostMethodScreen() {
             </View>
           </Pressable>
         </View>
-      </View>
+      </ContentContainer>
     </SafeAreaView>
   );
 }
@@ -123,6 +137,14 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 20,
   },
+  webScroll: { flex: 1 },
+  webContent: {
+    flex: 0,
+    flexShrink: 0,
+    width: "100%",
+    maxWidth: 720,
+    alignSelf: "center",
+  },
   title: { color: "#111", fontFamily: Fonts.pretendardSemiBold, fontSize: 24 },
   subtitle: {
     color: "#888",
@@ -142,6 +164,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 5,
   },
+  webOption: { aspectRatio: "auto", minHeight: 220, flexShrink: 0 },
   pressed: { opacity: 0.9, transform: [{ scale: 0.99 }] },
   aiOption: { backgroundColor: "#061810", justifyContent: "center" },
   aiArtwork: {
