@@ -1,6 +1,6 @@
 # EC2 백엔드 배포
 
-백엔드는 평소 각자의 컴퓨터에서 개발하고 테스트합니다. 팀에서 배포할 코드를 `main`에 반영하면, 배포 담당자가 EC2에서 최신 코드를 받아 서버를 다시 실행합니다. GitHub에 코드를 올리는 것만으로 EC2 서버가 자동 업데이트되지는 않습니다.
+백엔드는 평소 각자의 컴퓨터에서 개발하고 테스트합니다. 큰 기능 시험이나 변경 사항을 공용 서버에서 확인할 필요가 있을 때 배포 담당자가 반영 시점과 배포할 커밋을 결정합니다. GitHub에 코드를 올리는 것만으로 EC2 서버가 자동 업데이트되지는 않습니다.
 
 ## 로컬과 EC2에서 쓰는 파일
 
@@ -13,8 +13,8 @@
 ## 팀에서 변경 사항을 반영하는 순서
 
 1. 각자 기능 브랜치에서 수정하고 로컬에서 테스트합니다.
-2. PR을 `develop`에 병합합니다. 여러 기능을 함께 확인한 뒤 배포할 때 `develop`을 `main`에 병합합니다.
-3. 배포 담당자가 EC2에서 `main`을 받아 Compose로 백엔드를 다시 만듭니다.
+2. 팀에서 공용 서버로 시험할 변경 사항과 배포할 브랜치·커밋을 확인합니다.
+3. 배포 담당자가 EC2에서 해당 브랜치의 코드를 받아 Compose로 백엔드를 다시 만듭니다. DB 구조가 바뀌었다면 Alembic 마이그레이션도 적용합니다.
 4. 공개 주소의 `/api/v1/health`와 변경된 API를 확인합니다.
 
 프론트에서 배포 서버를 사용하려면 `frontend/.env.local`의 `EXPO_PUBLIC_API_URL`을 `https://skku-finder-api.duckdns.org/api/v1`로 설정하고 Expo를 다시 시작합니다. 로컬 백엔드를 테스트할 때는 각자 로컬 주소를 사용하면 됩니다.
@@ -29,27 +29,14 @@
 
 현재 AI 게시글 작성은 OpenAI API 또는 Ollama 방식입니다. OpenAI를 쓸 때는 EC2의 `backend/.env`에 실제 키와 모델 설정이 필요합니다. Gemini로 바꾸려면 주소만 수정하는 것으로는 부족하고 백엔드 연동 코드도 바꿔야 합니다.
 
-## 처음 Compose 배포로 전환할 때
+## 이후 변경 사항을 배포할 때
 
-배포 파일이 `main`에 반영된 뒤 EC2의 `~/skku-lost-and-found`에서 실행합니다. 위의 `.env` 파일과 Docker 볼륨을 먼저 확인하세요.
-
-```sh
-git pull --ff-only origin main
-sudo docker volume ls --format '{{.Name}}' | grep -E '^skku-(post-images|caddy-data|caddy-config)$'
-sudo docker compose -f compose.deploy.yaml config --quiet
-sudo docker stop skku-caddy skku-finder-api
-sudo docker rm skku-caddy skku-finder-api
-sudo docker compose -f compose.deploy.yaml up -d --build
-curl -fsS https://skku-finder-api.duckdns.org/api/v1/health
-```
-
-앞의 `stop`과 `rm`은 현재 수동으로 띄운 컨테이너를 Compose 관리로 옮기는 첫 배포에만 필요합니다. 컨테이너를 삭제해도 Docker 볼륨은 유지되지만, `docker compose down -v`나 볼륨 삭제 명령은 실행하지 마세요.
-
-## 이후 `main`을 다시 배포할 때
+EC2에서 현재 체크아웃된 브랜치와 연결된 원격 브랜치를 먼저 확인하고, 이번에 배포하기로 한 커밋이 그 브랜치에 있는지 확인합니다. 아래 `git pull --ff-only`는 현재 브랜치의 설정된 upstream에서만 최신 코드를 받습니다.
 
 ```sh
 cd ~/skku-lost-and-found
-git pull --ff-only origin main
+git branch --show-current
+git pull --ff-only
 sudo docker compose -f compose.deploy.yaml build backend
 sudo docker compose -f compose.deploy.yaml run --rm backend alembic current
 # 새 DB 마이그레이션을 확인한 뒤 필요한 경우 실행
