@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { Keyboard, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { Keyboard, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
@@ -15,11 +15,16 @@ import CreatePostButton from "@/components/create-post-button";
 import SettingIcon from "@/assets/icons/setting.svg";
 import { useLocale } from "@/i18n/LocaleProvider";
 import LanguageSelector from "@/components/language-selector";
+import { postsApi, type Category, type Post } from "@/lib/posts-api";
+import { readSession } from "@/lib/session-storage";
+import { useAuth } from "@/providers/AuthProvider";
 
 type BoardTab = "lost" | "found";
+type SortMode = "newest" | "candidates";
 
 export default function HomeScreen() {
-  const { t } = useLocale();
+  const { t, categoryLabel } = useLocale();
+  const { user } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams<{ board?: string; refresh?: string }>();
   const [selectedTab, setActiveTab] = useState<{
@@ -33,9 +38,61 @@ export default function HomeScreen() {
         : "lost"
       : selectedTab.tab;
   const [search, setSearch] = useState("");
+  const [sortMode, setSortMode] = useState<SortMode>("newest");
+  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [sources, setSources] = useState<Post[]>([]);
+  const [selectedSourceIds, setSelectedSourceIds] = useState<Record<BoardTab, string | null>>({
+    lost: null,
+    found: null,
+  });
+  const [sourcesLoading, setSourcesLoading] = useState(false);
+  const [sourceError, setSourceError] = useState("");
+  const [sourceMenuOpen, setSourceMenuOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const sourceType = activeTab === "lost" ? "FOUND" : "LOST";
+  const selectedSource = sources.find((post) => post.id === selectedSourceIds[activeTab]);
+
+  useEffect(() => {
+    let active = true;
+    postsApi.categories().then((items) => {
+      if (active) setCategories(items);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+
+  useFocusEffect(useCallback(() => {
+    if (sortMode !== "candidates" || !user) return;
+    let active = true;
+    setSourcesLoading(true);
+    setSourceError("");
+    async function loadSources() {
+      try {
+        const session = await readSession();
+        if (!session) throw new Error(t("common.loginRequired"));
+        const result = await postsApi.mine(sourceType, session.access_token);
+        if (!active) return;
+        setSources(result.items);
+        setSelectedSourceIds((current) => ({
+          ...current,
+          [activeTab]: result.items.some((post) => post.id === current[activeTab])
+            ? current[activeTab]
+            : null,
+        }));
+      } catch (error) {
+        if (active) setSourceError(error instanceof Error ? error.message : t("common.postLoadFailed"));
+      } finally {
+        if (active) setSourcesLoading(false);
+      }
+    }
+    void loadSources();
+    return () => { active = false; };
+  }, [sortMode, sourceType, activeTab, user, t]));
 
   const changeTab = (tab: BoardTab) => {
     Keyboard.dismiss();
+    setSourceMenuOpen(false);
+    setFilterOpen(false);
     setActiveTab({ tab, version: params.refresh });
   };
 
@@ -108,26 +165,36 @@ export default function HomeScreen() {
           {/* Sort, filter, and search */}
           <View style={styles.toolbar}>
             <Pressable
-              disabled
+              onPress={() => {
+                setSortMode((current) => current === "newest" ? "candidates" : "newest");
+                setSourceMenuOpen(false);
+                setFilterOpen(false);
+              }}
               accessibilityRole="button"
-              accessibilityLabel={t("home.sortNewest")}
+              accessibilityLabel={sortMode === "newest" ? t("home.sortCandidates") : t("home.sortNewest")}
               style={({ pressed }) => [
                 styles.toolButton,
+                sortMode === "candidates" && styles.activeToolButton,
                 pressed && styles.pressed,
               ]}
             >
               <ThemedText style={styles.sortIcon}>↕</ThemedText>
 
               <ThemedText type="small" style={styles.toolText}>
-                {t("home.newest")}
+                {sortMode === "newest" ? t("home.newest") : t("home.candidates")}
               </ThemedText>
             </Pressable>
 
             <Pressable
-              onPress={null}
+              onPress={() => {
+                setFilterOpen((current) => !current);
+                setSourceMenuOpen(false);
+              }}
               accessibilityRole="button"
+              accessibilityLabel={t("home.filter")}
               style={({ pressed }) => [
                 styles.toolButton,
+                categoryId !== null && styles.activeToolButton,
                 pressed && styles.pressed,
               ]}
             >
@@ -166,6 +233,75 @@ export default function HomeScreen() {
             </View>
           </View>
 
+          {filterOpen ? (
+            <View style={styles.choicePanel}>
+              <ThemedText type="small" style={styles.panelTitle}>{t("home.categoryFilter")}</ThemedText>
+              <View style={styles.filterOptions}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => { setCategoryId(null); setFilterOpen(false); }}
+                  style={[styles.choiceChip, categoryId === null && styles.selectedChoice]}
+                >
+                  <ThemedText type="small">{t("home.allCategories")}</ThemedText>
+                </Pressable>
+                {categories.map((category) => (
+                  <Pressable
+                    key={category.id}
+                    accessibilityRole="button"
+                    onPress={() => { setCategoryId(category.id); setFilterOpen(false); }}
+                    style={[styles.choiceChip, categoryId === category.id && styles.selectedChoice]}
+                  >
+                    <ThemedText type="small">{categoryLabel(category.code, category.name)}</ThemedText>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
+
+          {sortMode === "candidates" ? (
+            <View style={styles.sourceArea}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("home.selectSource")}
+                onPress={() => { setSourceMenuOpen((current) => !current); setFilterOpen(false); }}
+                style={styles.sourceButton}
+              >
+                <ThemedText type="small" style={styles.sourceLabel}>
+                  {activeTab === "lost" ? t("home.myFoundPost") : t("home.myLostPost")}
+                </ThemedText>
+                <ThemedText type="small" numberOfLines={1} style={styles.sourceTitle}>
+                  {selectedSource?.title ?? t("home.selectSource")}
+                </ThemedText>
+                <ThemedText type="small">{sourceMenuOpen ? "⌃" : "⌄"}</ThemedText>
+              </Pressable>
+              {sourceMenuOpen ? (
+                <View style={styles.choicePanel}>
+                  {sourcesLoading ? <ThemedText type="small">{t("common.loading")}</ThemedText> : null}
+                  {sourceError ? <ThemedText type="small" style={styles.errorText}>{sourceError}</ThemedText> : null}
+                  {!user ? <ThemedText type="small">{t("common.loginRequired")}</ThemedText> : null}
+                  {!sourcesLoading && !sourceError && user && sources.length === 0 ? (
+                    <ThemedText type="small">{t("home.noSourcePosts")}</ThemedText>
+                  ) : null}
+                  <ScrollView style={styles.sourceOptions} nestedScrollEnabled>
+                    {user ? sources.map((post) => (
+                      <Pressable
+                        key={post.id}
+                        accessibilityRole="button"
+                        onPress={() => {
+                          setSelectedSourceIds((current) => ({ ...current, [activeTab]: post.id }));
+                          setSourceMenuOpen(false);
+                        }}
+                        style={[styles.sourceOption, selectedSourceIds[activeTab] === post.id && styles.selectedChoice]}
+                      >
+                        <ThemedText type="small" numberOfLines={1}>{post.title}</ThemedText>
+                      </Pressable>
+                    )) : null}
+                  </ScrollView>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
           {/* Post list */}
           <View
             style={styles.boardArea}
@@ -177,6 +313,9 @@ export default function HomeScreen() {
               key={`${activeTab}-${params.refresh ?? ""}`}
               type={activeTab === "lost" ? "LOST" : "FOUND"}
               search={search}
+              sortMode={sortMode}
+              categoryId={categoryId}
+              sourcePostId={selectedSourceIds[activeTab]}
             />
           </View>
 
@@ -278,6 +417,10 @@ const styles = StyleSheet.create({
   toolText: {
     color: "#222222",
   },
+  activeToolButton: {
+    backgroundColor: Colors.softgreen,
+    borderColor: Colors.softgreen,
+  },
   sortIcon: {
     color: "#30353A",
     fontSize: 19,
@@ -361,6 +504,41 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.pretendardMedium,
   },
 
+  choicePanel: {
+    marginTop: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#DDDEE0",
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    gap: 8,
+  },
+  panelTitle: { color: "#555555" },
+  filterOptions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  choiceChip: {
+    borderWidth: 1,
+    borderColor: "#DDDEE0",
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  selectedChoice: { backgroundColor: Colors.softgreen, borderColor: Colors.primary },
+  sourceArea: { marginTop: 10 },
+  sourceButton: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: "#DDDEE0",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  sourceLabel: { color: Colors.primary },
+  sourceTitle: { flex: 1, color: "#222222" },
+  sourceOptions: { maxHeight: 220 },
+  sourceOption: { paddingVertical: 12, paddingHorizontal: 8 },
+  errorText: { color: "#B54747" },
   boardArea: {
     flex: 1,
     marginTop: 20,
