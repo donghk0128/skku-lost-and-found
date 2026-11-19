@@ -9,6 +9,8 @@ export type AIDraft = {
   category_code: string;
   location_text: string | null;
   location_candidates: string[];
+  location_options: LocationOption[];
+  selected_location_ids: string[];
   latitude: number | null;
   longitude: number | null;
   event_start_at: string | null;
@@ -19,12 +21,40 @@ export type AIDraft = {
   warnings: string[];
 };
 
+export type LocationOption = {
+  id: string;
+  campus: string | null;
+  name: string;
+  label: string;
+};
+
+export type AIRequiredFields = {
+  item_name: string | null;
+  location_text: string | null;
+  location_candidates: string[];
+  location_options: LocationOption[];
+  selected_location_ids: string[];
+  event_start_at: string | null;
+  event_end_at: string | null;
+  time_precision: "DATE_ONLY" | "EXACT" | "APPROXIMATE" | "RANGE" | null;
+  missing_fields: ("item_name" | "location" | "event_time")[];
+};
+
+export type PendingField =
+  | "item_name"
+  | "location"
+  | "location_selection"
+  | "event_time"
+  | null;
+
 export type AIChatResult = {
   status: "NEEDS_INPUT" | "READY";
   assistant_message: string;
-  draft: AIDraft;
-  pending_field: "item_name" | "location" | "event_time" | null;
+  draft: AIDraft | null;
+  required_fields: AIRequiredFields;
+  pending_field: PendingField;
   collected_fields: Partial<Record<"item_name" | "location" | "event_time", string>>;
+  selected_location_ids: string[];
 };
 
 export const aiApi = {
@@ -48,8 +78,10 @@ export const aiApi = {
       post_type: "LOST" | "FOUND";
       messages: { role: "user"; content: string }[];
       draft?: AIDraft;
-      pending_field?: "item_name" | "location" | "event_time" | null;
+      required_fields?: AIRequiredFields;
+      pending_field?: PendingField;
       collected_fields?: Partial<Record<"item_name" | "location" | "event_time", string>>;
+      selected_location_ids?: string[];
       confirmed_location?: {
         text: string;
         latitude: number;

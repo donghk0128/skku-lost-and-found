@@ -18,7 +18,12 @@ import Svg, { Circle, Path, Rect } from "react-native-svg";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors, Fonts } from "@/constants/theme";
-import { aiApi, type AIDraft } from "@/lib/ai-api";
+import {
+  aiApi,
+  type AIDraft,
+  type AIRequiredFields,
+  type PendingField,
+} from "@/lib/ai-api";
 import ChatLocationPicker from "@/components/ChatLocationPicker";
 import { authApi } from "@/lib/auth-api";
 import { postsApi, type PostImageAsset } from "@/lib/posts-api";
@@ -72,9 +77,9 @@ export default function CreatePostAiScreen() {
     },
   ]);
   const [draft, setDraft] = useState<AIDraft | null>(null);
-  const [pendingField, setPendingField] = useState<
-    "item_name" | "location" | "event_time" | null
-  >(null);
+  const [requiredFields, setRequiredFields] =
+    useState<AIRequiredFields | null>(null);
+  const [pendingField, setPendingField] = useState<PendingField>(null);
   const [collectedFields, setCollectedFields] = useState<
     Partial<Record<"item_name" | "location" | "event_time", string>>
   >({});
@@ -111,6 +116,7 @@ export default function CreatePostAiScreen() {
           post_type: postType,
           messages: userMessages,
           draft: draft ?? undefined,
+          required_fields: requiredFields ?? undefined,
           pending_field: pendingField,
           collected_fields: collectedFields,
           confirmed_location: location
@@ -124,14 +130,15 @@ export default function CreatePostAiScreen() {
         await authenticatedToken(),
       );
       setDraft(result.draft);
+      setRequiredFields(result.required_fields);
       setPendingField(result.pending_field);
       setCollectedFields(result.collected_fields);
-      setReady(result.status === "READY" && Boolean(location));
+      setReady(result.status === "READY" && Boolean(result.draft) && Boolean(location));
       const hasAllRequiredInputs = (
         ["item_name", "location", "event_time"] as const
       ).every(
         (field) =>
-          !result.draft.missing_fields.includes(field) ||
+          !result.required_fields.missing_fields.includes(field) ||
           Boolean(result.collected_fields[field]),
       );
       const shouldShowLocationPicker =
@@ -183,17 +190,11 @@ export default function CreatePostAiScreen() {
     await continueChat(userMessages, location);
   };
 
-  const confirmLocation = async (location: PickedLocation) => {
+  const confirmLocation = (location: PickedLocation) => {
     if (busy || publishing) return;
     setConfirmedLocation(location);
     locationPickerShown.current = true;
-    const userMessages = messages
-      .filter(
-        (item): item is { role: "user"; content: string } =>
-          item.role === "user",
-      )
-      .slice(-12);
-    await continueChat(userMessages, location);
+    setReady(Boolean(draft));
   };
 
   const pickPhotos = async (source: "camera" | "library" = "library") => {
@@ -368,7 +369,10 @@ export default function CreatePostAiScreen() {
                 <ChatLocationPicker
                   disabled={busy || publishing}
                   locationText={
-                    draft?.location_text ?? draft?.location_candidates[0] ?? ""
+                    draft?.location_text ??
+                    requiredFields?.location_text ??
+                    requiredFields?.location_candidates[0] ??
+                    ""
                   }
                   onConfirm={(location) => void confirmLocation(location)}
                 />

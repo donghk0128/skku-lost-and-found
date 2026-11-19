@@ -1,235 +1,159 @@
-"""LangGraph workflow for text-only, human-reviewed post drafting."""
+"""Collect required fields before generating a final AI post draft."""
 
 from collections.abc import Callable
 from typing import Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from app.ai.schemas import (
-    AIDraftResponse,
-    Locale,
-    PendingDraftField,
-    PostType,
-    RequiredDraftField,
-)
 from app.ai.knowledge.location_retriever import LocationMatch, find_locations
+from app.ai.location_options import build_location_options
+from app.ai.schemas import AIDraftResponse, AIRequiredFields, Locale, PendingDraftField, PostType
 
-
-ChatStatus = Literal["NEEDS_INPUT", "READY"]
+FieldExtractor = Callable[[str, tuple[LocationMatch, ...]], AIRequiredFields]
 DraftGenerator = Callable[[str, tuple[LocationMatch, ...]], AIDraftResponse]
+PRIORITY = ("item_name", "location", "event_time")
+QUESTIONS = {
+    "ko": {"item_name": "어떤 물건인지 알려주세요.", "location": "분실 추정 위치는 어디인가요?", "event_time": "분실 추정 시간은 언제인가요?"},
+    "en": {"item_name": "What item was it?", "location": "Where did it happen?", "event_time": "When did it happen?"},
+}
 
 
-class ChatWorkflowState(TypedDict, total=False):
-    """Serializable drafting state that can later accept RAG and image evidence."""
-
-    post_type: PostType
+class State(TypedDict, total=False):
     locale: Locale
-    user_messages: list[str]
+    messages: list[str]
+    fields: AIRequiredFields
+    previous_fields: AIRequiredFields
     draft: AIDraftResponse
-    previous_draft: AIDraftResponse
     pending_field: PendingDraftField | None
-    collected_fields: dict[RequiredDraftField, str]
-    location_matches: tuple[LocationMatch, ...]
-    status: ChatStatus
+    matches: tuple[LocationMatch, ...]
+    selected_location_ids: list[str]
+    location_correction: str | None
+    status: Literal["NEEDS_INPUT", "READY"]
     assistant_message: str
 
 
-QUESTIONS = {
-    "ko": {
-        "item_name": "어떤 물건인지 조금 더 구체적으로 알려주세요.",
-        "location": "어디에서 있었던 일인가요? 건물이나 장소를 알려주세요.",
-        "event_time": "언제 있었던 일인가요? 분실 예상 날짜를 알려주세요.",
-    },
-    "en": {
-        "item_name": "Could you describe the item more specifically?",
-        "location": "Where did this happen? Please provide a building or location.",
-        "event_time": "When did this happen? Please provide the lost or found date.",
-    },
-}
-MISSING_FIELD_PRIORITY: tuple[RequiredDraftField, ...] = (
-    "item_name",
-    "location",
-    "event_time",
-)
-TRACE_TAGS = ["ai", "post-draft", "text-chat"]
+def _text(messages: list[str]) -> str:
+    return "\n".join(messages)
 
 
-def _conversation_text(messages: list[str], locale: Locale) -> str:
-    if locale == "en":
-        return "\n".join(
-            f"User input {index + 1}: {message}"
-            for index, message in enumerate(messages)
+def _pending(fields: AIRequiredFields) -> PendingDraftField | None:
+    if len(fields.location_options) > 1 and not fields.selected_location_ids:
+        return "location_selection"
+    return next((field for field in PRIORITY if field in fields.missing_fields), None)
+
+
+def build_chat_workflow(extract_fields: FieldExtractor, generate_draft: DraftGenerator):
+    def retrieve(state: State) -> State:
+        query = state.get("location_correction") or state["messages"][-1]
+        latest = find_locations(query, locale=state["locale"])
+        matches = latest if state.get("location_correction") or len(latest) == 1 else find_locations(
+            _text(state["messages"]), locale=state["locale"]
         )
-    return "\n".join(
-        f"사용자 {index + 1}번째 입력: {message}"
-        for index, message in enumerate(messages)
-    )
+        return {"matches": matches}
 
+    def route_start(state: State) -> Literal["collect", "extract", "draft"]:
+        previous = state.get("previous_fields")
+        if previous and _pending(previous) is None:
+            return "draft"
+        return "collect" if previous else "extract"
 
-def build_chat_workflow(draft_generator: DraftGenerator):
-    """Compile the text drafting graph with an injected, testable model operation."""
+    def extract(state: State) -> State:
+        fields = extract_fields(_text(state["messages"]), state.get("matches", ()))
+        return {"fields": fields, "pending_field": _pending(fields)}
 
-    def retrieve_location(state: ChatWorkflowState) -> ChatWorkflowState:
-        locale = state["locale"]
-        latest_matches = (
-            find_locations(state["user_messages"][-1], locale=locale)
-            if locale == "en"
-            else find_locations(state["user_messages"][-1])
-        )
-        matches = (
-            latest_matches
-            if len(latest_matches) == 1
-            else (
-                find_locations(
-                    _conversation_text(state["user_messages"], locale),
-                    locale=locale,
-                )
-                if locale == "en"
-                else find_locations(_conversation_text(state["user_messages"], locale))
-            )
-        )
-        return {"location_matches": matches}
+    def collect(state: State) -> State:
+        pending = state.get("pending_field")
+        fields = state["previous_fields"]
+        if pending == "location_selection":
+            options = build_location_options(state.get("matches", ()), state["locale"]) if state.get("location_correction") else fields.location_options
+            selected = state.get("selected_location_ids", [])
+            if state.get("location_correction") and len(options) == 1:
+                selected = [options[0].id]
+            names = [option.name for option in options if option.id in selected]
+            missing = [field for field in fields.missing_fields if field != "location"]
+            if not names:
+                missing.append("location")
+            updated = fields.model_copy(update={
+                "location_text": ", ".join(names) or None,
+                "location_candidates": [option.name for option in options],
+                "location_options": options,
+                "selected_location_ids": selected,
+                "missing_fields": missing,
+            })
+            return {"fields": updated, "pending_field": _pending(updated)}
+        if pending == "item_name":
+            updated = fields.model_copy(update={
+                "item_name": state["messages"][-1],
+                "missing_fields": [field for field in fields.missing_fields if field != "item_name"],
+            })
+            return {"fields": updated, "pending_field": _pending(updated)}
+        if pending == "event_time":
+            extracted = extract_fields(_text(state["messages"]), state.get("matches", ()))
+            missing = [field for field in extracted.missing_fields if field != "location"]
+            if not fields.location_text:
+                missing.append("location")
+            updated = extracted.model_copy(update={
+                "location_text": fields.location_text,
+                "location_candidates": fields.location_candidates,
+                "location_options": fields.location_options,
+                "selected_location_ids": fields.selected_location_ids,
+                "missing_fields": list(dict.fromkeys(missing)),
+            })
+            return {"fields": updated, "pending_field": _pending(updated)}
+        return extract(state)
 
-    def extract_draft(state: ChatWorkflowState) -> ChatWorkflowState:
-        draft = draft_generator(
-            _conversation_text(state["user_messages"], state["locale"]),
-            state.get("location_matches", ()),
-        )
-        pending_field = (
-            "location_selection"
-            if len(draft.location_options) > 1 and not draft.selected_location_ids
-            else next(
-                (field for field in MISSING_FIELD_PRIORITY if field in draft.missing_fields),
-                None,
-            )
-        )
-        return {"draft": draft, "pending_field": pending_field}
+    def route(state: State) -> Literal["request", "draft"]:
+        return "request" if state.get("pending_field") else "draft"
 
-    def route_at_start(state: ChatWorkflowState) -> Literal["collect_answer", "extract_draft"]:
-        if state.get("pending_field") == "location_selection":
-            return "extract_draft"
-        if state.get("previous_draft") is not None and state.get("pending_field") is not None:
-            return "collect_answer"
-        return "extract_draft"
-
-    def collect_answer(state: ChatWorkflowState) -> ChatWorkflowState:
-        pending_field = state["pending_field"]
-        if pending_field is None:
-            raise ValueError("pending_field is required when collecting an answer")
-        collected_fields = dict(state.get("collected_fields", {}))
-        collected_fields[pending_field] = state["user_messages"][-1]
-        remaining_fields = [
-            field
-            for field in state["previous_draft"].missing_fields
-            if field not in collected_fields
-        ]
-        draft = state["previous_draft"].model_copy(update={"missing_fields": remaining_fields})
-        next_field = next(
-            (field for field in MISSING_FIELD_PRIORITY if field in remaining_fields),
-            None,
-        )
-        return {
-            "draft": draft,
-            "pending_field": next_field,
-            "collected_fields": collected_fields,
-        }
-
-    def route_after_draft(state: ChatWorkflowState) -> Literal["request_input", "prepare_review"]:
-        return "request_input" if state.get("pending_field") else "prepare_review"
-
-    def route_after_collection(state: ChatWorkflowState) -> Literal["request_input", "extract_draft"]:
-        return "request_input" if state.get("pending_field") else "extract_draft"
-
-    def request_input(state: ChatWorkflowState) -> ChatWorkflowState:
-        pending_field = state["pending_field"]
-        if pending_field is None:
-            raise ValueError("pending_field is required when requesting input")
-        if pending_field == "location_selection":
-            candidates = "\n".join(
-                f"{index}. {candidate.label}"
-                for index, candidate in enumerate(state["draft"].location_options, start=1)
-            )
-            introduction = (
-                "Multiple locations were found. Select all applicable locations."
-                if state["locale"] == "en"
-                else "여러 장소가 확인됐어요. 해당하는 장소를 모두 선택해 주세요."
-            )
-            assistant_message = f"{introduction}\n{candidates}"
+    def request(state: State) -> State:
+        pending = state["pending_field"]
+        if pending == "location_selection":
+            labels = "\n".join(f"{i}. {option.label}" for i, option in enumerate(state["fields"].location_options, 1))
+            intro = "Select all applicable locations." if state["locale"] == "en" else "해당하는 장소를 모두 선택해 주세요."
+            message = f"{intro}\n{labels}"
         else:
-            assistant_message = QUESTIONS[state["locale"]][pending_field]
-        return {
-            "status": "NEEDS_INPUT",
-            "assistant_message": assistant_message,
-        }
+            message = QUESTIONS[state["locale"]][pending]
+        return {"status": "NEEDS_INPUT", "assistant_message": message}
 
-    def prepare_review(state: ChatWorkflowState) -> ChatWorkflowState:
-        return {
-            "status": "READY",
-            "assistant_message": (
-                "I have all the required information. Please review the draft below."
-                if state["locale"] == "en"
-                else "필요한 정보를 모두 확인했어요. 아래 초안을 확인해주세요."
-            ),
-        }
+    def draft(state: State) -> State:
+        result = generate_draft(_text(state["messages"]), state.get("matches", ()))
+        message = "Please review the draft." if state["locale"] == "en" else "아래 초안을 확인해주세요."
+        return {"draft": result, "status": "READY", "assistant_message": message}
 
-    graph = StateGraph(ChatWorkflowState)
-    graph.add_node("retrieve_location", retrieve_location)
-    graph.add_node("extract_draft", extract_draft)
-    graph.add_node("collect_answer", collect_answer)
-    graph.add_node("request_input", request_input)
-    graph.add_node("prepare_review", prepare_review)
-    graph.add_edge(START, "retrieve_location")
-    graph.add_conditional_edges(
-        "retrieve_location",
-        route_at_start,
-        {"collect_answer": "collect_answer", "extract_draft": "extract_draft"},
-    )
-    graph.add_conditional_edges(
-        "extract_draft",
-        route_after_draft,
-        {
-            "request_input": "request_input",
-            "prepare_review": "prepare_review",
-        },
-    )
-    graph.add_conditional_edges(
-        "collect_answer",
-        route_after_collection,
-        {"request_input": "request_input", "extract_draft": "extract_draft"},
-    )
-    graph.add_edge("request_input", END)
-    graph.add_edge("prepare_review", END)
+    graph = StateGraph(State)
+    graph.add_node("retrieve", retrieve)
+    graph.add_node("extract", extract)
+    graph.add_node("collect", collect)
+    graph.add_node("request", request)
+    graph.add_node("draft", draft)
+    graph.add_edge(START, "retrieve")
+    graph.add_conditional_edges("retrieve", route_start)
+    graph.add_conditional_edges("extract", route)
+    graph.add_conditional_edges("collect", route)
+    graph.add_edge("request", END)
+    graph.add_edge("draft", END)
     return graph.compile(name="skku-post-draft-chat")
 
 
 def run_chat_workflow(
     post_type: PostType,
     user_messages: list[str],
+    field_extractor: FieldExtractor,
     draft_generator: DraftGenerator,
     locale: Locale = "ko",
-    previous_draft: AIDraftResponse | None = None,
+    previous_required_fields: AIRequiredFields | None = None,
     pending_field: PendingDraftField | None = None,
-    collected_fields: dict[RequiredDraftField, str] | None = None,
-) -> ChatWorkflowState:
-    """Run one stateless graph turn using the complete client-side conversation."""
-
-    graph = build_chat_workflow(draft_generator)
-    return graph.invoke(
-        {
-            "post_type": post_type,
-            "locale": locale,
-            "user_messages": user_messages,
-            "previous_draft": previous_draft,
-            "pending_field": pending_field,
-            "collected_fields": collected_fields or {},
-        },
-        config={
-            "run_name": "post-draft-chat-turn",
-            "tags": TRACE_TAGS,
-            "metadata": {
-                "post_type": post_type,
-                "locale": locale,
-                "message_count": len(user_messages),
-            },
-        },
-    )
+    selected_location_ids: list[str] | None = None,
+    location_correction: str | None = None,
+) -> State:
+    initial_state: State = {
+        "locale": locale,
+        "messages": user_messages,
+        "previous_fields": previous_required_fields,
+        "pending_field": pending_field,
+        "selected_location_ids": selected_location_ids or [],
+        "location_correction": location_correction,
+    }
+    if previous_required_fields is not None:
+        initial_state["fields"] = previous_required_fields
+    return build_chat_workflow(field_extractor, draft_generator).invoke(initial_state)

@@ -7,8 +7,16 @@ from typing import Any
 import httpx
 from pydantic import ValidationError
 
-from .prompt import build_messages
-from .schemas import DraftRequest, GenerationResult, PostDraft, Usage, strict_json_schema
+from .prompt import build_messages, build_required_field_messages
+from .schemas import (
+    DraftRequest,
+    GenerationResult,
+    PostDraft,
+    RequiredFields,
+    Usage,
+    strict_json_schema,
+    strict_required_fields_json_schema,
+)
 
 
 class ProviderError(Exception):
@@ -26,6 +34,10 @@ class DraftProvider(ABC):
     @abstractmethod
     def generate(self, request: DraftRequest) -> GenerationResult:
         """Generate a draft from one normalized request."""
+
+    @abstractmethod
+    def extract_required_fields(self, request: DraftRequest) -> RequiredFields:
+        """Extract only the fields required before final draft generation."""
 
 
 class HttpProvider(DraftProvider):
@@ -104,6 +116,22 @@ class OllamaProvider(HttpProvider):
             model=self.model,
         )
 
+    def extract_required_fields(self, request: DraftRequest) -> RequiredFields:
+        payload, _ = self._post(
+            f"{self.base_url}/api/chat",
+            json={
+                "model": self.model,
+                "messages": build_required_field_messages(request),
+                "format": strict_required_fields_json_schema(),
+                "stream": False,
+                "options": {"temperature": 0},
+            },
+        )
+        try:
+            return RequiredFields.model_validate_json(payload["message"]["content"])
+        except (KeyError, TypeError, ValueError, ValidationError) as error:
+            raise ProviderError("invalid_response") from error
+
 
 class OpenAIProvider(HttpProvider):
     """Use OpenAI Responses API with strict Structured Outputs."""
@@ -159,6 +187,31 @@ class OpenAIProvider(HttpProvider):
             model=self.model,
         )
 
+    def extract_required_fields(self, request: DraftRequest) -> RequiredFields:
+        if not self.api_key:
+            raise ProviderError("not_configured")
+        payload, _ = self._post(
+            f"{self.base_url}/responses",
+            headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+            json={
+                "model": self.model,
+                "reasoning": {"effort": self.reasoning_effort},
+                "input": build_required_field_messages(request),
+                "text": {
+                    "format": {
+                        "type": "json_schema",
+                        "name": "required_lost_and_found_fields",
+                        "strict": True,
+                        "schema": strict_required_fields_json_schema(),
+                    }
+                },
+            },
+        )
+        try:
+            return RequiredFields.model_validate_json(self._output_text(payload))
+        except (KeyError, TypeError, ValueError, ValidationError) as error:
+            raise ProviderError("invalid_response") from error
+
     @staticmethod
     def _output_text(payload: dict[str, Any]) -> str:
         for output in payload.get("output", []):
@@ -182,6 +235,17 @@ class FakeProvider(DraftProvider):
             usage=Usage(input_tokens=0, output_tokens=0, duration_seconds=0),
             provider="fake",
             model="fake",
+        )
+
+    def extract_required_fields(self, request: DraftRequest) -> RequiredFields:
+        return RequiredFields(
+            item_name=self.draft.item_name,
+            event_start_date=self.draft.event_start_date,
+            event_end_date=self.draft.event_end_date,
+            event_start_time=self.draft.event_start_time,
+            event_end_time=self.draft.event_end_time,
+            time_precision=self.draft.time_precision,
+            missing_fields=self.draft.missing_fields,
         )
 
 

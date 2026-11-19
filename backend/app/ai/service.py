@@ -5,17 +5,18 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
+from app.ai.location_options import build_location_options
 from app.ai.schemas import (
     AIChatRequest,
     AIChatResponse,
     AIDraftCreateRequest,
     AIDraftResponse,
-    LocationOption,
+    AIRequiredFields,
 )
 from app.ai.workflow import run_chat_workflow
 from app.core.errors import ApiError
 from app.ai.core.providers import DraftProvider
-from app.ai.core.schemas import DraftRequest, PostDraft
+from app.ai.core.schemas import DraftRequest, PostDraft, RequiredFields
 from app.ai.knowledge.location_retriever import LocationMatch, find_locations
 from app.posts.repository import PostRepository
 
@@ -58,29 +59,7 @@ class AIDraftService:
             else find_locations(request.natural_language)
         )
         location_candidates = [match.resolved_name for match in matches]
-        duplicate_names = {
-            name for name in location_candidates if location_candidates.count(name) > 1
-        }
-        campus_labels = (
-            {"HSSC": "Humanities and Social Sciences Campus", "NSC": "Natural Sciences Campus"}
-            if request.locale == "en"
-            else {"HSSC": "인문사회과학캠퍼스", "NSC": "자연과학캠퍼스"}
-        )
-        location_options = [
-            LocationOption(
-                id=match.location.location_id,
-                campus=match.location.campus,
-                name=match.resolved_name,
-                label=(
-                    f"{campus_labels[match.location.campus]} {match.resolved_name}"
-                    if match.resolved_name in duplicate_names
-                    and match.location.campus in campus_labels
-                    else match.resolved_name
-                ),
-            )
-            for match in matches
-            if match.location.location_id is not None
-        ]
+        location_options = build_location_options(matches, request.locale)
         option_ids = {option.id for option in location_options}
         unknown_ids = set(request.selected_location_ids) - option_ids
         if unknown_ids:
@@ -140,7 +119,7 @@ class AIDraftService:
         )
 
     @staticmethod
-    def _event_range(draft: PostDraft) -> tuple[datetime | None, datetime | None]:
+    def _event_range(draft: PostDraft | RequiredFields) -> tuple[datetime | None, datetime | None]:
         """Convert extracted date and optional time precision into a KST range."""
 
         start_date = draft.event_start_date
@@ -163,10 +142,52 @@ class AIDraftService:
     def continue_chat(db: Session, request: AIChatRequest, provider: DraftProvider) -> AIChatResponse:
         """Run the text-only LangGraph workflow for one stateless chat turn."""
 
+        if request.pending_field == "location_selection":
+            if request.required_fields is None:
+                raise ApiError(422, "missing_location_draft", "장소 후보 초안이 필요합니다.")
+            option_ids = {option.id for option in request.required_fields.location_options}
+            if request.selected_location_ids and set(request.selected_location_ids) - option_ids:
+                raise ApiError(
+                    422,
+                    "invalid_location_selection",
+                    "현재 장소 후보에 포함된 장소만 선택할 수 있습니다.",
+                )
+
+        def extract_fields(
+            conversation: str, location_matches: tuple[LocationMatch, ...]
+        ) -> AIRequiredFields:
+            extracted = provider.extract_required_fields(
+                DraftRequest(
+                    post_type=request.post_type,
+                    locale=request.locale,
+                    natural_language=conversation,
+                    reference_time=datetime.now(ZoneInfo("Asia/Seoul")),
+                )
+            )
+            start_at, end_at = AIDraftService._event_range(extracted)
+            options = build_location_options(location_matches, request.locale)
+            selected_ids = [options[0].id] if len(options) == 1 else []
+            names = [option.name for option in options if option.id in selected_ids]
+            missing = [field for field in extracted.missing_fields if field != "location"]
+            if not names:
+                missing.append("location")
+            return AIRequiredFields(
+                item_name=extracted.item_name,
+                location_text=", ".join(names) or None,
+                location_candidates=[option.name for option in options],
+                location_options=options,
+                selected_location_ids=selected_ids,
+                event_start_at=start_at,
+                event_end_at=end_at,
+                time_precision=extracted.time_precision,
+                missing_fields=list(dict.fromkeys(missing)),
+            )
+
         state = run_chat_workflow(
             post_type=request.post_type,
             locale=request.locale,
             user_messages=[message.content for message in request.messages],
+            field_extractor=extract_fields,
             draft_generator=lambda conversation, location_matches: AIDraftService.generate(
                 db,
                 AIDraftCreateRequest(
@@ -179,15 +200,19 @@ class AIDraftService:
                 provider,
                 location_matches,
             ),
-            previous_draft=None if request.confirmed_location else request.draft,
+            previous_required_fields=(
+                None if request.confirmed_location else request.required_fields
+            ),
             pending_field=None if request.confirmed_location else request.pending_field,
-            collected_fields=request.collected_fields,
+            selected_location_ids=request.selected_location_ids,
+            location_correction=request.location_correction,
         )
         return AIChatResponse(
             status=state["status"],
             assistant_message=state["assistant_message"],
-            draft=state["draft"],
+            draft=state.get("draft"),
+            required_fields=state["fields"],
             pending_field=state.get("pending_field"),
-            collected_fields=state.get("collected_fields", {}),
-            selected_location_ids=state["draft"].selected_location_ids,
+            collected_fields=request.collected_fields,
+            selected_location_ids=state["fields"].selected_location_ids,
         )

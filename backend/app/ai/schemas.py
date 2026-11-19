@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Literal, Self
 
 from app.ai.core.schemas import TimePrecision
+from app.posts.schemas import PostCreateRequest
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 from pydantic_core import PydanticCustomError
@@ -72,27 +73,32 @@ class AIDraftCreateRequest(BaseModel):
         return self
 
 
-class AIDraftResponse(BaseModel):
-    """Validated, editable fields returned to the client without provider internals."""
+class AIDraftResponse(PostCreateRequest):
+    """Manual post-create fields plus AI review metadata."""
 
-    post_type: PostType
-    title: str
-    description: str
-    item_name: str | None
-    category_id: int
+    category_id: int = Field(ge=1)
     category_code: str
-    location_text: str | None
     location_candidates: list[str] = Field(default_factory=list)
     location_options: list[LocationOption] = Field(default_factory=list)
     selected_location_ids: list[str] = Field(default_factory=list)
-    latitude: float | None
-    longitude: float | None
-    event_start_at: datetime | None
-    event_end_at: datetime | None
     time_precision: TimePrecision | None = None
     keywords: list[str]
     missing_fields: list[str]
     warnings: list[str]
+
+
+class AIRequiredFields(BaseModel):
+    """Required information collected before final draft generation."""
+
+    item_name: str | None = None
+    location_text: str | None = None
+    location_candidates: list[str] = Field(default_factory=list)
+    location_options: list[LocationOption] = Field(default_factory=list)
+    selected_location_ids: list[str] = Field(default_factory=list)
+    event_start_at: datetime | None = None
+    event_end_at: datetime | None = None
+    time_precision: TimePrecision | None = None
+    missing_fields: list[RequiredDraftField] = Field(default_factory=list)
 
 
 class AIChatMessage(BaseModel):
@@ -107,15 +113,17 @@ class AIChatMessage(BaseModel):
 class AIChatRequest(BaseModel):
     """Conversation and optional confirmed map location sent on each drafting turn."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     post_type: PostType
     locale: Locale = "ko"
     messages: list[AIChatMessage] = Field(min_length=1, max_length=12)
     draft: AIDraftResponse | None = None
+    required_fields: AIRequiredFields | None = None
     pending_field: PendingDraftField | None = None
     collected_fields: dict[RequiredDraftField, str] = Field(default_factory=dict)
     selected_location_ids: list[str] = Field(default_factory=list, max_length=20)
+    location_correction: str | None = Field(default=None, min_length=1, max_length=255)
     confirmed_location: ConfirmedLocation | None = None
 
     @model_validator(mode="after")
@@ -130,6 +138,11 @@ class AIChatRequest(BaseModel):
                 "duplicate_location_selection",
                 "같은 장소를 중복 선택할 수 없습니다.",
             )
+        if self.selected_location_ids and self.location_correction:
+            raise PydanticCustomError(
+                "conflicting_location_answer",
+                "장소 선택과 장소 정정은 동시에 입력할 수 없습니다.",
+            )
         return self
 
 
@@ -138,7 +151,8 @@ class AIChatResponse(BaseModel):
 
     status: Literal["NEEDS_INPUT", "READY"]
     assistant_message: str
-    draft: AIDraftResponse
+    draft: AIDraftResponse | None = None
+    required_fields: AIRequiredFields
     pending_field: PendingDraftField | None = None
     collected_fields: dict[RequiredDraftField, str] = Field(default_factory=dict)
     selected_location_ids: list[str] = Field(default_factory=list)
