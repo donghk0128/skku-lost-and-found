@@ -98,6 +98,66 @@ class PostDraft(BaseModel):
         return self
 
 
+class RequiredFields(BaseModel):
+    """Small model output used before generating the final post draft."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    item_name: Optional[str] = Field(default=None, max_length=100)
+    event_start_date: Optional[date] = None
+    event_end_date: Optional[date] = None
+    event_start_time: Optional[time] = None
+    event_end_time: Optional[time] = None
+    time_precision: Optional[TimePrecision] = None
+    missing_fields: list[MissingField] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_single_values(cls, values: object) -> object:
+        if not isinstance(values, dict):
+            return values
+        normalized = dict(values)
+        start_date = normalized.get("event_start_date")
+        end_date = normalized.get("event_end_date")
+        if start_date is not None and end_date is None:
+            normalized["event_end_date"] = start_date
+        elif end_date is not None and start_date is None:
+            normalized["event_start_date"] = end_date
+        start_time = normalized.get("event_start_time")
+        end_time = normalized.get("event_end_time")
+        if start_time is not None and end_time is None:
+            normalized["event_end_time"] = start_time
+        elif end_time is not None and start_time is None:
+            normalized["event_start_time"] = end_time
+        if normalized.get("event_start_date") is not None:
+            if normalized.get("time_precision") is None:
+                normalized["time_precision"] = (
+                    "EXACT" if normalized.get("event_start_time") is not None else "DATE_ONLY"
+                )
+            normalized["missing_fields"] = [
+                field
+                for field in normalized.get("missing_fields", [])
+                if field != "event_time"
+            ]
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_time(self) -> "RequiredFields":
+        PostDraft(
+            title="required-fields",
+            description="required-fields",
+            category_code="OTHER",
+            item_name=self.item_name,
+            event_start_date=self.event_start_date,
+            event_end_date=self.event_end_date,
+            event_start_time=self.event_start_time,
+            event_end_time=self.event_end_time,
+            time_precision=self.time_precision,
+            missing_fields=self.missing_fields,
+        )
+        return self
+
+
 class Usage(BaseModel):
     """Comparable request telemetry without user content."""
 
@@ -141,6 +201,25 @@ def strict_json_schema() -> dict:
     """Return the draft schema with every property required for strict APIs."""
 
     schema = PostDraft.model_json_schema()
+
+    def normalize(node: object) -> None:
+        if isinstance(node, dict):
+            properties = node.get("properties")
+            if isinstance(properties, dict):
+                node["required"] = list(properties)
+                node["additionalProperties"] = False
+            for value in node.values():
+                normalize(value)
+        elif isinstance(node, list):
+            for value in node:
+                normalize(value)
+
+    normalize(schema)
+    return schema
+
+
+def strict_required_fields_json_schema() -> dict:
+    schema = RequiredFields.model_json_schema()
 
     def normalize(node: object) -> None:
         if isinstance(node, dict):

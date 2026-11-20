@@ -1,37 +1,80 @@
 {
   "locations": [
-    {
-      "id": "samsung_library",
-      "names": {
-        "ko": "삼성학술정보관",
-        "en": "Samsung Library"
-      },
-      "aliases": {
-        "ko": ["디도", "디지털도서관", "삼성도서관", "율전 도서관"],
-        "en": ["Samsung Library", "Samsung Academic Information Center", "Digital Library"]
-      }
-    },
-    {
-      "id": "student_center",
-      "names": {
-        "ko": "학생회관",
-        "en": "Student Center"
-      },
-      "aliases": {
-        "ko": ["학관", "학생회관"],
-        "en": ["Student Center", "Student Union"]
-      }
-    },
-    {
-      "id": "central_library",
-      "names": {
-        "ko": "중앙학술정보관",
-        "en": "Central Library"
-      },
-      "aliases": {
-        "ko": ["명륜 도서관", "중도"],
-        "en": ["Central Library", "Central Academic Information Center"]
-      }
-    }
+    {"id":"hssc_main_gate","campus":"HSSC","names":{"ko":"인사캠 정문","en":"Main Gate"},"aliases":{"ko":["인사캠 정문","명륜 정문", "정문"],"en":["HSSC Main Gate", "HSSC Main Entrance"]}},
+    {"id":"hssc_back_gate","campus":"HSSC","names":{"ko":"인사캠 후문","en":"Back Gate"},"aliases":{"ko":["인사캠 후문","명륜 후문", "후문"],"en":["HSSC Back Gate", "HSSC Back Entrance"]}},
+    {"id":"hssc_iron_gate","campus":"HSSC","names":{"ko":"인사캠 철문","en":"Iron Gate"},"aliases":{"ko":["인사캠 철문","명륜 철문", "철문"],"en":["HSSC Iron Gate", "iron gate"]}},
+    {"id":"hssc_side_gate","campus":"HSSC","names":{"ko":"인사캠 쪽문","en":"Side Gate"},"aliases":{"ko":["인사캠 쪽문","명륜 쪽문", "쪽문"],"en":["HSSC Side Gate", "side gate", "elevator gate"]}},
+
+    {"id":"hssc_large_playground","campus":"HSSC","names":{"ko":"인사캠 대운동장","en":"Large Playground"},"aliases":{"ko":["인사캠 대운동장"],"en":["HSSC Playground"]}},
+    {"id":"hssc_geumjandi_square","campus":"HSSC","names":{"ko":"금잔디광장","en":"Geumjandi Square"},"aliases":{"ko":["금잔디"],"en":["Geumjandi Plaza"]}},
+    {"id":"hssc_okryujeong","campus":"HSSC","names":{"ko":"옥류정","en":"Okryujeong"},"aliases":{"ko":[],"en":["Oacknyujeong"]}},
+    {"id":"hssc_yurim_hall","campus":"HSSC","names":{"ko":"유림회관","en":"Yurim Hall"},"aliases":{"ko":[],"en":[]}},
+    {"id":"hssc_basketball_court","campus":"HSSC","names":{"ko":"농구코트","en":"Basketball Court"},"aliases":{"ko":["농구장"],"en":[]}},
+    {"id":"hssc_600th_anniversary_hall","campus":"HSSC","building_number":"01","names":{"ko":"600주년기념관","en":"600th Anniversary Hall"},"aliases":{"ko":["육백주년기념관","육백주년관","600주년관"],"en":["Anniversary Hall"]}},
+    {"id":"hssc_law_school","campus":"HSSC","building_number":"02","names":{"ko":"법학관","en":"Law School"},"aliases":{"ko":["법대"],"en":["Law Building"]}},
+    {"id":"hssc_faculty_hall","campus":"HSSC","building_number":"04","names":{"ko":"교수회관","en":"Faculty Hall"},"aliases":{"ko":[],"en":[]}},
+    {"id":"hssc_central_library","campus":"HSSC","building_number":"07","names":{"ko":"중앙학술정보관","en":"Central Library"},"aliases":{"ko":["중도","명륜 도서관","중앙도서관", "도서관"],"en":["Central Academic Information Center"]}},
+    {"id":"hssc_student_center","campus":"HSSC","building_number":"08","names":{"ko":"인사캠 학생회관","en":"HSSC Student Center"},"aliases":{"ko":["학생회관","인사캠 학관","명륜 학관", "학생회관 라운지", "학관 라운지", "학관"],"en":["Student Center","HSSC Student Center","HSSC Student Union", "student center lounge", "student union lounge"]}},
+    {"id":"hssc_international_hall","campus":"HSSC","building_number":"09","names":{"ko":"국제관","en":"International Hall"},"aliases":{"ko":[],"en":[]}},
+    {"id":"hssc_international_house","campus":"HSSC","building_number":"16","names":{"ko":"인터내셔널하우스","en":"International House"},"aliases":{"ko":["아이하우스","I하우스"],"en":["I-House"]}},
+    {"id":"hssc_yanghyeongwan","campus":"HSSC","building_number":"17","names":{"ko":"양현관","en":"Yanghyeongwan"},"aliases":{"ko":[],"en":["Yang Hyeon Gwan"]}},
+    {"id":"hssc_toegye_hall","campus":"HSSC","building_number":"31","names":{"ko":"퇴계인문관","en":"Toegye Hall of Humanities"},"aliases":{"ko":["퇴계관", "인문관"],"en":["Toegye Hall"]}},
+    {"id":"hssc_dasan_hall","campus":"HSSC","building_number":"32","names":{"ko":"다산경제관","en":"Dasan Hall of Economics"},"aliases":{"ko":["다산관", "경제관"],"en":["Dasan Hall"]}},
+    {"id":"hssc_business_school","campus":"HSSC","building_number":"33","names":{"ko":"경영관","en":"Business School"},"aliases":{"ko":["경도"],"en":["Business School Building","Business Hall"]}},
+    {"id":"hssc_hoam_hall","campus":"HSSC","building_number":"50","names":{"ko":"호암관","en":"Hoam Hall"},"aliases":{"ko":[],"en":[]}},
+    {"id":"hssc_suseon_hall","campus":"HSSC","building_number":"61","names":{"ko":"수선관","en":"Suseon Hall"},"aliases":{"ko":[],"en":[]}},
+    {"id":"hssc_suseon_hall_annex","campus":"HSSC","building_number":"62","names":{"ko":"수선관 별관","en":"Suseon Hall Annex"},"aliases":{"ko":["수선관별관"],"en":["Suseon Hall (Annex)"]}},
+    {"id":"hssc_kingo_house","campus":"HSSC","building_number":"75","names":{"ko":"킹고하우스","en":"Kingo House"},"aliases":{"ko":["K하우스","케이하우스"],"en":["K-House"]}},
+    {"id":"hssc_bicheondang","campus":"HSSC","building_number":"97","names":{"ko":"비천당","en":"Bicheondang"},"aliases":{"ko":[],"en":[]}},
+    {"id":"hssc_myeongnyundang","campus":"HSSC","building_number":"98","names":{"ko":"명륜당","en":"Myeongnyundang"},"aliases":{"ko":[],"en":[]}},
+    {"id":"hssc_daeseongjeon","campus":"HSSC","building_number":"99","names":{"ko":"대성전","en":"Daeseongjeon"},"aliases":{"ko":[],"en":[]}},
+
+    {"id":"nsc_main_gate","campus":"NSC","names":{"ko":"자과캠 정문","en":"Main Gate"},"aliases":{"ko":["자과캠 정문","율전 정문"],"en":["NSC Main Gate"]}},
+    {"id":"nsc_north_gate","campus":"NSC","names":{"ko":"자과캠 북문","en":"North Gate"},"aliases":{"ko":["자과캠 북문"],"en":["NSC North Gate"]}},
+    {"id":"nsc_northwest_gate","campus":"NSC","names":{"ko":"자과캠 북서문","en":"Northwest Gate"},"aliases":{"ko":[],"en":["North West Gate"]}},
+    {"id":"nsc_back_gate","campus":"NSC","names":{"ko":"자과캠 후문","en":"Back Gate(West Gate)"},"aliases":{"ko":["서문","자과캠 후문"],"en":["Back Gate", "west gate"]}},
+    {"id":"nsc_kingo_square","campus":"NSC","names":{"ko":"킹고광장(자과캠 학생회관 앞)","en":"Kingo Square"},"aliases":{"ko":["학생회관 앞", "학관 앞"],"en":["Kingo Plaza"]}},
+    {"id":"nsc_global_square","campus":"NSC","names":{"ko":"글로벌광장(디도 앞 잔디밭)","en":"Global Square"},"aliases":{"ko":["잔디밭"],"en":["Global Plaza", "lawn"]}},
+    {"id":"nsc_gongja_road","campus":"NSC","names":{"ko":"공자로","en":"Gongja Road"},"aliases":{"ko":[],"en":[]}},
+    {"id":"nsc_haeoreum_road","campus":"NSC","names":{"ko":"해오름길","en":"Haeoreum Road"},"aliases":{"ko":[],"en":[]}},
+    {"id":"nsc_large_playground","campus":"NSC","names":{"ko":"자과캠 대운동장","en":"Large Playground"},"aliases":{"ko":["자과캠 대운동장"],"en":["NSC Playground"]}},
+    
+    {"id":"nsc_cns_center","campus":"NSC", "names":{"ko":"CNS 센터","en":"CNS Center"},"aliases":{"ko":["CNS"],"en":[]}},
+    {"id":"nsc_e_center","campus":"NSC", "names":{"ko":"E 센터","en":"E Center"},"aliases":{"ko":[],"en":[]}},
+    {"id":"nsc_student_center","campus":"NSC","building_number":"03","names":{"ko":"자과캠 학생회관","en":"NSC Student Center"},"aliases":{"ko":["학생회관","자과캠 학관","율전 학관", "학관", "에라", "에스카라 라운지"],"en":["Student Center","NSC Student Center","NSC Student Union", "ESKARA Lounge", "Student Union Lounge"]}},
+    {"id":"nsc_welfare_center","campus":"NSC","building_number":"04","names":{"ko":"복지회관","en":"Shops and Service Center"},"aliases":{"ko":["복지관"],"en":["Welfare Center"]}},
+    {"id":"nsc_suseong_hall","campus":"NSC","building_number":"05","names":{"ko":"수성관","en":"Suseong Hall"},"aliases":{"ko":[],"en":["Gymnasium Complex"]}},
+    {"id":"nsc_utility_center","campus":"NSC","building_number":"11","names":{"ko":"유틸리티센터","en":"Utility Center"},"aliases":{"ko":[],"en":[]}},
+    {"id":"nsc_environment_plant","campus":"NSC","building_number":"12","names":{"ko":"환경플랜트","en":"Environment Plant"},"aliases":{"ko":[],"en":[]}},
+    {"id":"nsc_engineering_building_1","campus":"NSC","building_number":"21-23","names":{"ko":"제1공학관","en":"Engineering Building 1"},"aliases":{"ko":["1공학관","일공","제1공대", "1공"],"en":["Engineering Building One"]}},
+    {"id":"nsc_engineering_lab_b","campus":"NSC","building_number":"24","names":{"ko":"공학실습동B","en":"Engineering Lab B"},"aliases":{"ko":["공학실습동 B"],"en":[]}},
+    {"id":"nsc_engineering_building_2","campus":"NSC","building_number":"25-27","names":{"ko":"제2공학관","en":"Engineering Building 2"},"aliases":{"ko":["2공학관","이공","제2공대", "2공"],"en":["Engineering Building Two"]}},
+    {"id":"nsc_engineering_lab_a","campus":"NSC","building_number":"28","names":{"ko":"공학실습동A","en":"Engineering Lab A"},"aliases":{"ko":["공학실습동 A"],"en":[]}},
+    {"id":"nsc_architecture_environment_lab","campus":"NSC","building_number":"30","names":{"ko":"건축환경실습동","en":"Architecture Environment Lab"},"aliases":{"ko":[],"en":[]}},
+    {"id":"nsc_natural_sciences_building_1","campus":"NSC","building_number":"31","names":{"ko":"제1과학관","en":"Natural Sciences Building 1"},"aliases":{"ko":["1과학관","일과", "벤젠고리관"],"en":["Natural Science Building 1"]}},
+    {"id":"nsc_natural_sciences_building_2","campus":"NSC","building_number":"32","names":{"ko":"제2과학관","en":"Natural Sciences Building 2"},"aliases":{"ko":["2과학관","이과", "벤젠고리관"],"en":["Natural Science Building 2"]}},
+    {"id":"nsc_chemistry_building","campus":"NSC","building_number":"33","names":{"ko":"화학관","en":"Chemistry Building"},"aliases":{"ko":[],"en":[]}},
+    {"id":"nsc_semiconductor_building","campus":"NSC","building_number":"40","names":{"ko":"반도체관","en":"Semiconductor Building"},"aliases":{"ko":[],"en":[]}},
+    {"id":"nsc_samsung_library","campus":"NSC","building_number":"48","names":{"ko":"삼성학술정보관","en":"Samsung Library"},"aliases":{"ko":["디도","삼도","디지털도서관","삼성도서관","자과캠 도서관","율전 도서관","도서관"],"en":["Samsung Academic Information Center","Digital Library"]}},
+    {"id":"nsc_yun_yong_jae","campus":"NSC","building_number":"49","names":{"ko":"운용재","en":"Unyong-Jae"},"aliases":{"ko":[],"en":[]}},
+    {"id":"nsc_general_studies_building","campus":"NSC","building_number":"51","names":{"ko":"기초학문관","en":"General Studies Building"},"aliases":{"ko":["기학", "벤젠고리관", "기학관"],"en":["General Education Building"]}},
+    {"id":"nsc_pharmacy_building","campus":"NSC","building_number":"53","names":{"ko":"약학관","en":"School of Pharmacy Building"},"aliases":{"ko":["약대"],"en":["Pharmacy Building"]}},
+    {"id":"nsc_life_science_building","campus":"NSC","building_number":"61-63","names":{"ko":"생명공학관","en":"Life Science and Technology Building"},"aliases":{"ko":["생공","생명공학동", "생공관", "벤젠고리관"],"en":["Life Science Building"]}},
+    {"id":"nsc_life_science_lab","campus":"NSC","building_number":"64","names":{"ko":"생명공학실습동","en":"Life Science and Technology Lab"},"aliases":{"ko":[],"en":["Life Science Lab"]}},
+    {"id":"nsc_auditorium","campus":"NSC","building_number":"70","names":{"ko":"대강당","en":"Auditorium"},"aliases":{"ko":[],"en":[]}},
+    {"id":"nsc_medical_school","campus":"NSC","building_number":"71","names":{"ko":"의학관","en":"Medical School Building"},"aliases":{"ko":["의대"],"en":["Medicine School"]}},
+    {"id":"nsc_gymnasium","campus":"NSC","building_number":"72","names":{"ko":"체육관","en":"Gymnasium"},"aliases":{"ko":[],"en":[]}},
+    {"id":"nsc_research_complex_1","campus":"NSC","building_number":"81","names":{"ko":"제1종합연구동","en":"Research Complex 1"},"aliases":{"ko":["1종합연구동","일연"],"en":["Research Complex One"]}},
+    {"id":"nsc_research_complex_2","campus":"NSC","building_number":"83","names":{"ko":"제2종합연구동","en":"Research Complex 2"},"aliases":{"ko":["2종합연구동","이연"],"en":["Research Complex Two"]}},
+    {"id":"nsc_drc","campus":"NSC","building_number":"84","names":{"ko":"DRC","en":"DRC"},"aliases":{"ko":["디알씨"],"en":[]}},
+    {"id":"nsc_research_business_center","campus":"NSC","building_number":"85","names":{"ko":"산학협력센터","en":"Research and Business Center"},"aliases":{"ko":["산학협력관"],"en":[]}},
+    {"id":"nsc_n_center","campus":"NSC","building_number":"86","names":{"ko":"N센터","en":"N Center"},"aliases":{"ko":["엔센터"],"en":[]}},
+    {"id":"nsc_rotc_building","campus":"NSC","building_number":"89","names":{"ko":"학군단","en":"ROTC Building"},"aliases":{"ko":["ROTC관"],"en":[]}},
+    {"id":"nsc_dormitory_in","campus":"NSC","building_number":"91","names":{"ko":"인관","en":"Dormitory In"},"aliases":{"ko":["기숙사 인관"],"en":["In Hall"]}},
+    {"id":"nsc_dormitory_ui","campus":"NSC","building_number":"92","names":{"ko":"의관","en":"Dormitory Ui"},"aliases":{"ko":["기숙사 의관"],"en":["Ui Hall"]}},
+    {"id":"nsc_dormitory_ye","campus":"NSC","building_number":"93","names":{"ko":"예관","en":"Dormitory Ye"},"aliases":{"ko":["기숙사 예관"],"en":["Ye Hall"]}},
+    {"id":"nsc_dormitory_ji","campus":"NSC","building_number":"95","names":{"ko":"지관","en":"Dormitory Ji"},"aliases":{"ko":["기숙사 지관"],"en":["Ji Hall"]}},
+    {"id":"nsc_guest_house","campus":"NSC","building_number":"96","names":{"ko":"게스트하우스","en":"Guest House"},"aliases":{"ko":[],"en":[]}},
+    {"id":"nsc_dormitory_shin","campus":"NSC","building_number":"298","names":{"ko":"신관","en":"Dormitory Shin"},"aliases":{"ko":["기숙사 신관"],"en":["Shin Hall"]}}
   ]
 }

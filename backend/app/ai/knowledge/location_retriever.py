@@ -11,6 +11,16 @@ from pathlib import Path
 
 DATA_PATH = Path(__file__).with_name("campus_locations.json")
 FLOOR_PATTERN = re.compile(r"^\s*((?:지하\s*)?\d+\s*층|B\s*\d+\s*층?)", re.IGNORECASE)
+CAMPUS_HINTS = {
+    "HSSC": (
+        "인문사회과학캠퍼스", "인사", "명륜캠퍼스", "명륜", "서울", "서울 캠퍼스", "혜화",
+        "humanities and social sciences campus", "humanities campus", "seoul campus",
+    ),
+    "NSC": (
+        "자연과학캠퍼스", "자과", "율전캠퍼스", "율전", "수원 캠퍼스", "수원",
+        "natural sciences campus", "natural science campus", "suwon campus",
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -20,6 +30,8 @@ class CampusLocation:
     canonical_name: str
     aliases: tuple[str, ...]
     location_id: str | None = None
+    campus: str | None = None
+    building_number: str | None = None
     localized_names: dict[str, str] | None = None
     localized_aliases: dict[str, tuple[str, ...]] | None = None
 
@@ -59,6 +71,7 @@ class LocationMatch:
     matched_name: str
     floor: str | None = None
     locale: str = "ko"
+    position: int = 0
 
     @property
     def resolved_name(self) -> str:
@@ -89,6 +102,8 @@ def load_locations(path: Path = DATA_PATH) -> tuple[CampusLocation, ...]:
                 canonical_name=names.get("ko") or next(iter(names.values())),
                 aliases=tuple(dict.fromkeys(alias for values in aliases.values() for alias in values)),
                 location_id=entry["id"],
+                campus=entry.get("campus"),
+                building_number=entry.get("building_number"),
                 localized_names=names,
                 localized_aliases=aliases,
             )
@@ -117,7 +132,19 @@ def find_locations(
     if not normalized_query:
         return ()
     candidates = locations if locations is not None else load_locations()
-    matches: dict[str, LocationMatch] = {}
+    mentioned_campuses = {
+        campus
+        for campus, hints in CAMPUS_HINTS.items()
+        if any(_normalize(hint) in normalized_query for hint in hints)
+    }
+    if len(mentioned_campuses) == 1:
+        campus = next(iter(mentioned_campuses))
+        candidates = tuple(
+            location for location in candidates
+            if location.campus is None or location.campus == campus
+        )
+
+    matches: dict[str, tuple[LocationMatch, int, int]] = {}
     for location in candidates:
         names = sorted(
             location.search_names(locale),
@@ -128,18 +155,55 @@ def find_locations(
             normalized_name = _normalize(name)
             if len(normalized_name) < 2 or normalized_name not in normalized_query:
                 continue
+            position = normalized_query.find(normalized_name)
             match_key = location.location_id or location.canonical_name
             current = matches.get(match_key)
-            if current is None or len(normalized_name) > len(_normalize(current.matched_name)):
-                matches[match_key] = LocationMatch(
-                    location=location,
-                    matched_name=name,
-                    floor=_floor_after(query, name),
-                    locale=locale,
+            if current is None or len(normalized_name) > current[2] - current[1]:
+                matches[match_key] = (
+                    LocationMatch(
+                        location=location,
+                        matched_name=name,
+                        floor=_floor_after(query, name),
+                        locale=locale,
+                        position=position,
+                    ),
+                    position,
+                    position + len(normalized_name),
                 )
-    return tuple(
-        sorted(matches.values(), key=lambda match: len(_normalize(match.matched_name)), reverse=True)
-    )
+
+    match_values = list(matches.values())
+    if not mentioned_campuses:
+        by_span: dict[tuple[int, int], list[tuple[LocationMatch, int, int]]] = {}
+        for value in match_values:
+            by_span.setdefault((value[1], value[2]), []).append(value)
+        inferred_campuses = {
+            group[0][0].location.campus
+            for group in by_span.values()
+            if len(group) == 1 and group[0][0].location.campus is not None
+        }
+        if len(inferred_campuses) == 1:
+            inferred_campus = next(iter(inferred_campuses))
+            match_values = [
+                value
+                for value in match_values
+                if len(by_span[(value[1], value[2])]) == 1
+                or value[0].location.campus == inferred_campus
+            ]
+
+    # Prefer a more specific name at the same text span. This prevents, for
+    # example, "수선관" from also matching inside "수선관 별관".
+    distinct: list[tuple[LocationMatch, int, int]] = []
+    for candidate in sorted(match_values, key=lambda value: (value[1], -(value[2] - value[1]))):
+        _, start, end = candidate
+        if any(
+            start >= kept_start
+            and end <= kept_end
+            and (start, end) != (kept_start, kept_end)
+            for _, kept_start, kept_end in distinct
+        ):
+            continue
+        distinct.append(candidate)
+    return tuple(match for match, _, _ in sorted(distinct, key=lambda value: value[1]))
 
 
 def find_location(
