@@ -82,6 +82,7 @@ def test_create_and_read_post_through_http(api_client: tuple[TestClient, Engine]
     assert created_response.status_code == 201
     created = created_response.json()
     assert created["author_id"] == str(author_id)
+    assert created["author_nickname"] == "작성자"
     assert created["post_type"] == "LOST"
     assert created["title"] == "에어팟 분실"
     assert created["description"] == "검은색 케이스"
@@ -184,6 +185,7 @@ def test_list_posts_filters_paginates_and_hides_deleted(api_client: tuple[TestCl
     assert all_posts.json()["limit"] == 20
     assert all_posts.json()["offset"] == 0
     assert [item["id"] for item in all_posts.json()["items"]] == [post_ids[2], post_ids[1], post_ids[0]]
+    assert {item["author_nickname"] for item in all_posts.json()["items"]} == {"작성자"}
 
     second_lost_post = client.get("/api/v1/posts?post_type=LOST&limit=1&offset=1")
     assert second_lost_post.status_code == 200

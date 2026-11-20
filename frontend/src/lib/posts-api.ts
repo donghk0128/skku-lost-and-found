@@ -7,6 +7,8 @@ import { t } from "@/i18n";
 export type Post = {
   id: string;
   author_id: string;
+  /** Optional while a client is connected to a pre-nickname backend deployment. */
+  author_nickname?: string;
   post_type: "LOST" | "FOUND";
   title: string;
   description: string;
