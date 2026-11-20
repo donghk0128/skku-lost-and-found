@@ -95,6 +95,7 @@ class PostResponse(BaseModel):
 
     id: UUID
     author_id: UUID
+    author_nickname: str
     post_type: PostType
     title: str
     description: str

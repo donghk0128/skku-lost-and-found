@@ -94,7 +94,10 @@ function PostRow({
           ) : null}
           <View style={styles.avatar} />
           <Text numberOfLines={1} style={styles.author}>
-            {post.author_id === user?.id ? user.nickname : t("common.postAuthor")}
+            {post.author_nickname ??
+              (post.author_id === user?.id
+                ? user.nickname
+                : t("common.postAuthor"))}
           </Text>
           <Text style={styles.time}>{relativeTime(post.created_at, t)}</Text>
         </View>

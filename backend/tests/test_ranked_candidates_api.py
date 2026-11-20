@@ -82,6 +82,7 @@ def test_my_posts_and_filtered_ranking(client_and_engine) -> None:
     assert body["algorithm_version"] == "hybrid-v3"
     assert body["total"] == 2
     assert [item["post"]["id"] for item in body["items"]] == [str(posts["best"].id), str(posts["bag"].id)]
+    assert {item["post"]["author_nickname"] for item in body["items"]} == {"other"}
     assert body["items"][0]["rank"] == 1
     assert "SAME_CATEGORY" in body["items"][0]["reasons"]
     assert body["items"][0]["semantic_score"] is None

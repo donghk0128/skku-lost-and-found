@@ -362,14 +362,16 @@ function PostDetail({ id }: { id: string }) {
           <View style={styles.authorRow}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
-                {post.author_id === user?.id ? user.nickname.slice(0, 1) : "·"}
+                {(post.author_nickname ??
+                  (post.author_id === user?.id ? user.nickname : "·")).slice(0, 1)}
               </Text>
             </View>
             <View style={styles.authorCopy}>
               <Text style={styles.author}>
-                {post.author_id === user?.id
-                  ? user.nickname
-                  : t("common.postAuthor")}
+                {post.author_nickname ??
+                  (post.author_id === user?.id
+                    ? user.nickname
+                    : t("common.postAuthor"))}
               </Text>
               <Text style={styles.small}>
                 {formatDate(post.created_at, locale)}
