@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import { AppState, Text, View } from "react-native";
 import { AccountButton, AccountError, AccountField, AccountScreen, accountStyles as s } from "@/components/account-screen";
+import AppModal from "@/components/Modal";
 import { accountApi } from "@/lib/account-api";
 import { ApiError } from "@/lib/auth-api";
 import { useAuth } from "@/providers/AuthProvider";
@@ -21,6 +22,7 @@ export default function Withdrawal() {
   const [now, setNow] = useState(Date.now);
   const [verified, setVerified] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [confirmWithdrawal, setConfirmWithdrawal] = useState(false);
   const [error, setError] = useState("");
   const pending = useRef(false);
   useEffect(() => {
@@ -56,7 +58,7 @@ export default function Withdrawal() {
     setCodeDeadline(Date.parse(result.expires_at)); setVerified(true); setCode("");
   });
   const withdraw = () => void run(async () => {
-    if (!verified || proofExpired || codeExpired) return;
+    if (!verified || proofExpired || codeExpired || Date.now() >= proofDeadline || Date.now() >= codeDeadline) return;
     try { await accountApi.withdraw(token); }
     catch (e) {
       // A retry after an already-committed deletion can only see an invalid login.
@@ -68,7 +70,7 @@ export default function Withdrawal() {
   const cancel = () => router.replace("/(tabs)/account");
   return <AccountScreen title={t(stage === "password" ? "withdrawal.passwordTitle" : "account.withdraw")} busy={busy} footer={<>
     <AccountButton label={busy ? t("account.processing") : t(stage === "password" ? "withdrawal.next" : "withdrawal.submit")}
-      onPress={stage === "password" ? start : withdraw} danger={stage === "email"}
+      onPress={stage === "password" ? start : () => setConfirmWithdrawal(true)} danger={stage === "email"}
       disabled={busy || (stage === "email" && (!verified || proofExpired || codeExpired))} />
     <AccountButton label={t("common.cancel")} secondary disabled={busy} onPress={cancel} />
   </>}>
@@ -98,6 +100,17 @@ export default function Withdrawal() {
         setToken(""); setCode(""); setVerified(false); setError(""); setStage("password");
       }} />
     </>}
-    <AccountError message={error} />
+    <AccountError message={confirmWithdrawal ? "" : error} />
+    <AppModal
+      visible={confirmWithdrawal}
+      title={t("withdrawal.confirmTitle")}
+      description={t("withdrawal.confirmDescription")}
+      confirmLabel={busy ? t("account.processing") : t("withdrawal.submit")}
+      loading={busy}
+      confirmDisabled={!verified || proofExpired || codeExpired}
+      errorMessage={proofExpired || codeExpired ? t("withdrawal.expired") : error}
+      onConfirm={withdraw}
+      onClose={() => setConfirmWithdrawal(false)}
+    />
   </AccountScreen>;
 }

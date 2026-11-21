@@ -8,6 +8,8 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Colors, Fonts } from "@/constants/theme";
 import { pickLocation } from "@/lib/location-picker";
 import { useLocale } from "@/i18n/LocaleProvider";
+import ChevronLeft from "@/assets/icons/chevron-left.svg";
+
 const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 // Approximate coordinates; replace them with verified campus locations.
 const CAMPUSES = {
@@ -18,9 +20,10 @@ type LatLng = { latitude: number; longitude: number };
 
 export default function CreatePostMap() {
   const { locale, t } = useLocale();
-  const { latitude, longitude } = useLocalSearchParams<{
+  const { latitude, longitude, requestId } = useLocalSearchParams<{
     latitude?: string;
     longitude?: string;
+    requestId?: string;
   }>();
   const mapRef = useRef<MapView>(null);
   const [pin, setPin] = useState<LatLng | undefined>(() => {
@@ -94,8 +97,11 @@ export default function CreatePostMap() {
           height: 64,
         }}
       >
-        <Pressable onPress={() => router.back()} accessibilityLabel={t("common.back")}>
-          <Text style={{ fontSize: 36, color: "#111" }}>‹</Text>
+        <Pressable
+          onPress={() => router.back()}
+          accessibilityLabel={t("common.back")}
+        >
+          <ChevronLeft width={24} height={24} color="#000000" />
         </Pressable>
         <Text
           style={{
@@ -137,7 +143,11 @@ export default function CreatePostMap() {
             gap: 8,
           }}
         >
-          <Chip label={t("map.currentLocation")} primary onPress={goToMyLocation} />
+          <Chip
+            label={t("map.currentLocation")}
+            primary
+            onPress={goToMyLocation}
+          />
           <Chip
             label={t("map.humanitiesCampus")}
             onPress={() => moveTo(CAMPUSES.humanities)}
@@ -180,7 +190,7 @@ export default function CreatePostMap() {
             disabled={!pin || !placeName}
             onPress={() => {
               if (!pin || !placeName) return;
-              pickLocation({ address: placeName, ...pin });
+              pickLocation({ address: placeName, ...pin, requestId });
               router.back();
             }}
             style={{

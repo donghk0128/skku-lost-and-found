@@ -10,28 +10,30 @@ import { reverseGeocode } from "@/lib/google-maps.web";
 type Props = {
   disabled: boolean;
   locationText: string;
+  initialLocation?: PickedLocation | null;
   onConfirm: (location: PickedLocation) => void;
 };
 
 export default function ChatLocationPicker({
   disabled,
   locationText,
+  initialLocation = null,
   onConfirm,
 }: Props) {
   const { locale, t } = useLocale();
   const [pin, setPin] = useState<{
     latitude: number;
     longitude: number;
-  } | null>(null);
-  const [address, setAddress] = useState("");
-  const [addressLoading, setAddressLoading] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
+  } | null>(initialLocation);
+  const [address, setAddress] = useState(initialLocation?.address ?? "");
+  const [addressLoading, setAddressLoading] = useState(
+    Boolean(initialLocation),
+  );
+  const [confirmed, setConfirmed] = useState(Boolean(initialLocation));
 
   useEffect(() => {
     if (!pin) return;
     let active = true;
-    setAddress("");
-    setAddressLoading(true);
     reverseGeocode(pin, locale)
       .then((result) => {
         if (active) setAddress(result);
@@ -51,10 +53,12 @@ export default function ChatLocationPicker({
     <View style={styles.card}>
       <Text style={styles.title}>{t("ai.pinLocationPrompt")}</Text>
       <GoogleMap
-        center={{ latitude: 37.2939, longitude: 126.9751 }}
+        center={initialLocation ?? { latitude: 37.2939, longitude: 126.9751 }}
         marker={pin}
         interactive={!disabled}
         onMapPress={(coordinates) => {
+          if (disabled) return;
+          setAddressLoading(true);
           setPin(coordinates);
           setAddress("");
           setConfirmed(false);
@@ -110,9 +114,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#F4F7F6",
     borderRadius: 16,
     gap: 10,
-    maxWidth: "92%",
+    maxWidth: "100%",
     padding: 14,
-    width: 340,
+    width: "100%",
   },
   map: {
     height: 210,

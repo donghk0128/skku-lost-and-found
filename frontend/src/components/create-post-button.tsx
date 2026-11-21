@@ -63,7 +63,7 @@ export default function CreatePostButton() {
         styles.button,
         expanded && anchor
           ? { left: anchor.left, top: anchor.top }
-          : { bottom: BottomTabInset + 20, right: 24 },
+          : { bottom: BottomTabInset + 50, right: 24 },
         !expanded && open && { opacity: 0 },
       ]}
     >

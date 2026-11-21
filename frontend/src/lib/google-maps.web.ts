@@ -25,9 +25,15 @@ export type GoogleMapInstance = {
     handler: (event: GoogleMapClickEvent) => void,
   ) => GoogleMapsListener;
   setCenter: (center: GoogleLatLng) => void;
+  setZoom: (zoom: number) => void;
+  fitBounds: (
+    bounds: { north: number; south: number; east: number; west: number },
+    padding?: number,
+  ) => void;
 };
 
 export type GoogleMapMarker = {
+  addListener: (eventName: string, handler: () => void) => GoogleMapsListener;
   setMap: (map: GoogleMapInstance | null) => void;
   setPosition: (position: GoogleLatLng | null) => void;
 };
@@ -57,6 +63,20 @@ type GoogleMapsApi = {
     Marker: new (options: {
       map: GoogleMapInstance;
       position?: GoogleLatLng;
+      label?: {
+        text: string;
+        color: string;
+        fontSize: string;
+        fontWeight: string;
+      };
+      icon?: {
+        path: string;
+        fillColor: string;
+        fillOpacity: number;
+        strokeColor: string;
+        strokeWeight: number;
+        scale: number;
+      };
     }) => GoogleMapMarker;
   };
 };

@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import ChevronLeftIcon from "@/assets/icons/chevron-left.svg";
 import { Fonts } from "@/constants/theme";
 import { useLocale } from "@/i18n/LocaleProvider";
 
@@ -34,7 +35,7 @@ export default function CreatePostMethodScreen() {
           onPress={() => router.back()}
           style={styles.back}
         >
-          <Text style={styles.backText}>‹</Text>
+          <ChevronLeftIcon width={24} height={24} color={"#000000"} />
         </Pressable>
         <Text style={styles.headerTitle}>{t("createMethod.title")}</Text>
         <View style={styles.back} />
@@ -125,7 +126,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   back: { width: 44, height: 44, justifyContent: "center" },
-  backText: { fontSize: 34, color: "#111" },
   headerTitle: {
     color: "#111",
     fontFamily: Fonts.pretendardSemiBold,

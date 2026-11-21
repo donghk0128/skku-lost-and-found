@@ -18,19 +18,21 @@ const INITIAL_REGION = {
 type Props = {
   disabled: boolean;
   locationText: string;
+  initialLocation?: PickedLocation | null;
   onConfirm: (location: PickedLocation) => void;
 };
 
 export default function ChatLocationPicker({
   disabled,
   locationText,
+  initialLocation = null,
   onConfirm,
 }: Props) {
   const { locale, t } = useLocale();
   const mapRef = useRef<MapView>(null);
-  const [pin, setPin] = useState<PickedLocation | null>(null);
-  const [address, setAddress] = useState("");
-  const [confirmed, setConfirmed] = useState(false);
+  const [pin, setPin] = useState<PickedLocation | null>(initialLocation);
+  const [address, setAddress] = useState(initialLocation?.address ?? "");
+  const [confirmed, setConfirmed] = useState(Boolean(initialLocation));
 
   useEffect(() => {
     if (!pin) return;
@@ -41,11 +43,14 @@ export default function ChatLocationPicker({
     if (googleMapsApiKey) url.searchParams.set("key", googleMapsApiKey);
 
     axios
-      .get<{ results: { formatted_address: string }[]; status: string }>(url.toString())
+      .get<{ results: { formatted_address: string }[]; status: string }>(
+        url.toString(),
+      )
       .then((response) => {
         if (!active) return;
         setAddress(
-          response.data.results[0]?.formatted_address ?? t("map.unknownAddress"),
+          response.data.results[0]?.formatted_address ??
+            t("map.unknownAddress"),
         );
       })
       .catch(() => {
@@ -64,7 +69,15 @@ export default function ChatLocationPicker({
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={styles.map}
-        initialRegion={INITIAL_REGION}
+        initialRegion={
+          initialLocation
+            ? {
+                ...INITIAL_REGION,
+                latitude: initialLocation.latitude,
+                longitude: initialLocation.longitude,
+              }
+            : INITIAL_REGION
+        }
         onPress={(event) => {
           if (disabled) return;
           const { latitude, longitude } = event.nativeEvent.coordinate;
@@ -75,16 +88,16 @@ export default function ChatLocationPicker({
         scrollEnabled={!disabled}
         zoomEnabled={!disabled}
       >
-        {pin ? (
-          <Marker coordinate={pin} pinColor={Colors.primary} />
-        ) : null}
+        {pin ? <Marker coordinate={pin} pinColor={Colors.primary} /> : null}
       </MapView>
       <Text style={styles.address} numberOfLines={2}>
         {pin ? address || t("map.loadingAddress") : t("map.tapToChoose")}
       </Text>
       <Pressable
         accessibilityRole="button"
-        disabled={disabled || !pin || !address || address === t("map.addressLoadFailed")}
+        disabled={
+          disabled || !pin || !address || address === t("map.addressLoadFailed")
+        }
         onPress={() => {
           if (!pin || !address) return;
           onConfirm({
@@ -96,7 +109,10 @@ export default function ChatLocationPicker({
         }}
         style={[
           styles.button,
-          (disabled || !pin || !address || address === t("map.addressLoadFailed")) &&
+          (disabled ||
+            !pin ||
+            !address ||
+            address === t("map.addressLoadFailed")) &&
             styles.buttonDisabled,
         ]}
       >
@@ -114,9 +130,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#F4F7F6",
     borderRadius: 16,
     gap: 10,
-    maxWidth: "92%",
+    maxWidth: "100%",
     padding: 12,
-    width: 340,
+    width: "100%",
   },
   title: {
     color: "#333",

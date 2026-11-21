@@ -13,7 +13,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -30,6 +29,7 @@ import {
 } from "@/lib/chat-api";
 import { useAuth } from "@/providers/AuthProvider";
 import { useLocale } from "@/i18n/LocaleProvider";
+import ChatComposer from "@/components/ChatComposer";
 import ChatMessageBubble from "@/components/ChatMessageBubble";
 import ChatPostCard from "@/components/ChatPostCard";
 
@@ -169,8 +169,19 @@ function ChatDetail({ id }: { id: string }) {
                       }
                     : current,
                 );
-                void chatApi.room(id).then(detail => { if (active) setRoom(detail); })
-                  .catch(error => { if (active) setError(error instanceof Error ? error.message : t("common.requestFailed")); });
+                void chatApi
+                  .room(id)
+                  .then((detail) => {
+                    if (active) setRoom(detail);
+                  })
+                  .catch((error) => {
+                    if (active)
+                      setError(
+                        error instanceof Error
+                          ? error.message
+                          : t("common.requestFailed"),
+                      );
+                  });
               } else if (data.type === "error") setError(data.error.message);
             } catch {
               setError(t("common.requestFailed"));
@@ -391,7 +402,9 @@ function ChatDetail({ id }: { id: string }) {
             <View style={styles.headerAvatar} />
             <View style={styles.heading}>
               <Text style={styles.name}>
-                {room?.other_withdrawn ? t("chat.withdrawnUser") : room?.other_nickname ?? t("tabs.chat")}
+                {room?.other_withdrawn
+                  ? t("chat.withdrawnUser")
+                  : (room?.other_nickname ?? t("tabs.chat"))}
               </Text>
               {closed || !connected ? (
                 <Text style={styles.small}>
@@ -540,42 +553,20 @@ function ChatDetail({ id }: { id: string }) {
                 </ScrollView>
               </View>
             ) : null}
-            <View style={styles.composer}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t("chat.attach")}
-                disabled={composerDisabled}
-                onPress={() => {
-                  void photo();
-                }}
-                style={composerDisabled && styles.disabled}
-              >
-                <Text style={styles.attach}>＋</Text>
-              </Pressable>
-              <TextInput
-                accessibilityLabel={t("chat.placeholder")}
-                placeholder={t("chat.placeholder")}
-                value={text}
-                onChangeText={setText}
-                maxLength={2000}
-                multiline
-                editable={!composerDisabled}
-                style={styles.input}
-              />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ disabled: sendDisabled, busy }}
-                disabled={sendDisabled}
-                onPress={() => {
-                  void send();
-                }}
-                style={[styles.send, sendDisabled && styles.disabled]}
-              >
-                <Text style={styles.ownText}>
-                  {busy ? "…" : t("chat.send")}
-                </Text>
-              </Pressable>
-            </View>
+            <ChatComposer
+              value={text}
+              onChangeText={setText}
+              onAttach={() => {
+                void photo();
+              }}
+              onSend={() => {
+                void send();
+              }}
+              inputDisabled={Boolean(composerDisabled)}
+              sendDisabled={Boolean(sendDisabled)}
+              busy={busy}
+              maxLength={2000}
+            />
           </View>
         )}
         <Modal
@@ -903,23 +894,6 @@ const styles = StyleSheet.create({
   },
   previewClose: { alignSelf: "flex-end", padding: 14 },
   largePreview: { flex: 1, width: "100%" },
-  composer: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 10,
-    padding: 14,
-  },
-  attach: { fontSize: 28, color: Colors.primary, paddingVertical: 4 },
-  input: {
-    flex: 1,
-    maxHeight: 120,
-    minHeight: 44,
-    padding: 12,
-    backgroundColor: "#F0F4F1",
-    borderRadius: 16,
-    fontSize: 15,
-  },
-  send: { backgroundColor: Colors.primary, padding: 13, borderRadius: 16 },
   disabled: { opacity: 0.4 },
   closed: { padding: 20, backgroundColor: "#EEF3EF", alignItems: "center" },
   error: { color: "#B54747", padding: 14 },

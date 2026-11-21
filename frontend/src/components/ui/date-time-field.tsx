@@ -7,6 +7,8 @@ import {
   Text,
   View,
 } from "react-native";
+import XIcon from "@/assets/icons/x.svg";
+import ChevronLeftIcon from "@/assets/icons/chevron-left.svg";
 import { Colors, Fonts } from "@/constants/theme";
 import { useLocale } from "@/i18n/LocaleProvider";
 
@@ -14,6 +16,8 @@ type Props = {
   value: Date | null;
   onChange: (value: Date) => void;
   label?: string;
+  compact?: boolean;
+  disabled?: boolean;
 };
 const pad = (value: number) => String(value).padStart(2, "0");
 
@@ -22,6 +26,8 @@ export default function DateTimeField({
   value,
   onChange,
   label,
+  compact = false,
+  disabled = false,
 }: Props) {
   const { locale, t } = useLocale();
   const fieldLabel = label ?? t("datetime.eventTime");
@@ -34,15 +40,20 @@ export default function DateTimeField({
     t("datetime.weekdayFri"),
     t("datetime.weekdaySat"),
   ];
-  const [mode, setMode] = useState<"date" | "time" | null>(null);
+  // Retain the current content until the native fade-out finishes.
+  const [mode, setMode] = useState<"date" | "time">("date");
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [hasSelection, setHasSelection] = useState(false);
   const [draft, setDraft] = useState(() => new Date());
   const [month, setMonth] = useState(() => new Date());
   const open = (nextMode: "date" | "time") => {
     const initial = new Date(value ?? new Date());
     initial.setSeconds(0, 0);
+    setHasSelection(false);
     setDraft(initial);
     setMonth(new Date(initial.getFullYear(), initial.getMonth(), 1));
     setMode(nextMode);
+    setPickerVisible(true);
   };
   const changeMonth = (offset: number) =>
     setMonth(
@@ -60,7 +71,8 @@ export default function DateTimeField({
     draft.getMonth() === month.getMonth()
       ? draft.getDate()
       : null;
-  const chooseDay = (day: number) =>
+  const chooseDay = (day: number) => {
+    setHasSelection(true);
     setDraft(
       (current) =>
         new Date(
@@ -71,53 +83,85 @@ export default function DateTimeField({
           current.getMinutes(),
         ),
     );
-  const chooseTime = (unit: "hour" | "minute", number: number) =>
+  };
+  const chooseTime = (unit: "hour" | "minute", number: number) => {
+    setHasSelection(true);
     setDraft((current) => {
       const next = new Date(current);
       if (unit === "hour") next.setHours(number);
       else next.setMinutes(number);
       return next;
     });
+  };
   return (
-    <View style={styles.field}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t("datetime.selectDateAccessibility", { label: fieldLabel })}
-        onPress={() => open("date")}
-        style={styles.trigger}
-      >
-        <Text style={[styles.triggerText, !value && styles.placeholder]}>
-          {value
-            ? `${value.getFullYear()}.${pad(value.getMonth() + 1)}.${pad(value.getDate())}`
-            : t("datetime.selectDate")}
-        </Text>
-        <Text style={styles.arrow}>⌄</Text>
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t("datetime.selectTimeAccessibility", { label: fieldLabel })}
-        onPress={() => open("time")}
-        style={styles.trigger}
-      >
-        <Text style={[styles.triggerText, !value && styles.placeholder]}>
-          {value
-            ? `${pad(value.getHours())}:${pad(value.getMinutes())}`
-            : t("datetime.selectTime")}
-        </Text>
-        <Text style={styles.arrow}>⌄</Text>
-      </Pressable>
+    <View style={[styles.field, compact && styles.compactField]}>
+      {compact ? <Text style={styles.compactLabel}>{fieldLabel}</Text> : null}
+      <View style={styles.inputs}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("datetime.selectDateAccessibility", {
+            label: fieldLabel,
+          })}
+          disabled={disabled}
+          onPress={() => open("date")}
+          style={[
+            styles.trigger,
+            compact && styles.compactTrigger,
+            disabled && styles.disabled,
+          ]}
+        >
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.triggerText,
+              compact && styles.compactText,
+              !value && styles.placeholder,
+            ]}
+          >
+            {value
+              ? `${value.getFullYear()}.${pad(value.getMonth() + 1)}.${pad(value.getDate())}`
+              : t("datetime.dateShort")}
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("datetime.selectTimeAccessibility", {
+            label: fieldLabel,
+          })}
+          disabled={disabled}
+          onPress={() => open("time")}
+          style={[
+            styles.trigger,
+            compact && styles.compactTrigger,
+            disabled && styles.disabled,
+          ]}
+        >
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.triggerText,
+              compact && styles.compactText,
+              !value && styles.placeholder,
+            ]}
+          >
+            {value
+              ? `${pad(value.getHours())}:${pad(value.getMinutes())}`
+              : t("datetime.timeShort")}
+          </Text>
+        </Pressable>
+      </View>
       <Modal
-        visible={mode !== null}
+        visible={pickerVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setMode(null)}
+        onRequestClose={() => setPickerVisible(false)}
         statusBarTranslucent
       >
         <View style={styles.overlay}>
           <Pressable
             style={StyleSheet.absoluteFill}
             accessibilityLabel={t("datetime.cancelSelection")}
-            onPress={() => setMode(null)}
+            onPress={() => setPickerVisible(false)}
           />
           <View style={styles.dialog} accessibilityViewIsModal>
             <ScrollView
@@ -125,55 +169,81 @@ export default function DateTimeField({
               contentContainerStyle={styles.dialogContent}
             >
               <View style={styles.header}>
-                <View>
-                  <Text style={styles.eyebrow}>{fieldLabel}</Text>
-                  <Text style={styles.title}>
-                    {mode === "date"
-                      ? t("datetime.selectDate")
-                      : t("datetime.selectTime")}
-                  </Text>
-                </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t("datetime.close")}
-                  onPress={() => setMode(null)}
-                  style={styles.close}
-                >
-                  <Text style={styles.closeText}>×</Text>
-                </Pressable>
-              </View>
-              {mode === "date" ? (
-                <>
-                  <View style={styles.monthHeader}>
+                {mode === "date" ? (
+                  <View style={styles.monthControls}>
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel={t("datetime.previousMonth")}
                       onPress={() => changeMonth(-1)}
-                      style={styles.close}
+                      style={({ pressed }) => [
+                        styles.monthControl,
+                        pressed && styles.pressed,
+                      ]}
                     >
-                      <Text style={styles.nav}>‹</Text>
+                      <ChevronLeftIcon width={18} height={18} color="#303A35" />
                     </Pressable>
                     <Text style={styles.month}>
-                      {new Intl.DateTimeFormat(
-                        locale === "en" ? "en-US" : "ko-KR",
-                        {
-                        year: "numeric",
-                        month: "long",
-                        },
-                      ).format(month)}
+                      {month.getFullYear()}/{pad(month.getMonth() + 1)}
                     </Text>
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel={t("datetime.nextMonth")}
                       onPress={() => changeMonth(1)}
-                      style={styles.close}
+                      style={({ pressed }) => [
+                        styles.monthControl,
+                        pressed && styles.pressed,
+                      ]}
                     >
-                      <Text style={styles.nav}>›</Text>
+                      <View style={styles.nextArrow}>
+                        <ChevronLeftIcon
+                          width={18}
+                          height={18}
+                          color="#303A35"
+                        />
+                      </View>
                     </Pressable>
                   </View>
+                ) : (
+                  <Text style={styles.month}>
+                    {pad(draft.getHours())}:{pad(draft.getMinutes())}
+                  </Text>
+                )}
+                <View style={styles.headerActions}>
+                  {hasSelection ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => {
+                        onChange(new Date(draft));
+                        setPickerVisible(false);
+                      }}
+                      style={({ pressed }) => [
+                        styles.confirmAction,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={styles.confirmText}>
+                        {t("datetime.done")}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t("datetime.close")}
+                    onPress={() => setPickerVisible(false)}
+                    style={({ pressed }) => [
+                      styles.closeAction,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <XIcon width={22} height={22} color="#535F58" />
+                  </Pressable>
+                </View>
+              </View>
+              {mode === "date" ? (
+                <>
                   <View style={styles.grid}>
                     {weekdays.map((day, index) => (
-                      <View key={day} style={styles.cell}>
+                      <View key={day} style={styles.weekdayCell}>
                         <Text
                           style={[styles.weekday, index === 0 && styles.sunday]}
                         >
@@ -189,25 +259,30 @@ export default function DateTimeField({
                         const day = index - firstDay + 1;
                         if (day < 1 || day > dayCount)
                           return <View key={index} style={styles.cell} />;
-                        const selected = selectedDay === day;
+                        const selected =
+                          selectedDay === day &&
+                          (hasSelection || value !== null);
                         return (
                           <Pressable
                             key={index}
                             accessibilityRole="button"
-                            accessibilityLabel={t("datetime.dateAccessibility", {
-                              date: new Intl.DateTimeFormat(
-                                locale === "en" ? "en-US" : "ko-KR",
-                                {
-                                dateStyle: "full",
-                                },
-                              ).format(
-                                new Date(
-                                  month.getFullYear(),
-                                  month.getMonth(),
-                                  day,
+                            accessibilityLabel={t(
+                              "datetime.dateAccessibility",
+                              {
+                                date: new Intl.DateTimeFormat(
+                                  locale === "en" ? "en-US" : "ko-KR",
+                                  {
+                                    dateStyle: "full",
+                                  },
+                                ).format(
+                                  new Date(
+                                    month.getFullYear(),
+                                    month.getMonth(),
+                                    day,
+                                  ),
                                 ),
-                              ),
-                            })}
+                              },
+                            )}
                             accessibilityState={{ selected }}
                             onPress={() => chooseDay(day)}
                             style={styles.cell}
@@ -233,14 +308,6 @@ export default function DateTimeField({
                 </>
               ) : (
                 <>
-                  <View style={styles.preview}>
-                    <Text style={styles.previewText}>
-                      {pad(draft.getHours())}
-                      <Text style={styles.colon}> : </Text>
-                      {pad(draft.getMinutes())}
-                    </Text>
-                    <Text style={styles.caption}>{t("datetime.24Hour")}</Text>
-                  </View>
                   <View style={styles.timeColumns}>
                     {(["hour", "minute"] as const).map((unit) => (
                       <View key={unit} style={styles.timeColumn}>
@@ -292,25 +359,6 @@ export default function DateTimeField({
                   </View>
                 </>
               )}
-              <View style={styles.actions}>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => setMode(null)}
-                  style={styles.cancel}
-                >
-                  <Text style={styles.cancelText}>{t("common.cancel")}</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => {
-                    onChange(new Date(draft));
-                    setMode(null);
-                  }}
-                  style={styles.confirm}
-                >
-                  <Text style={styles.confirmText}>{t("datetime.confirm")}</Text>
-                </Pressable>
-              </View>
             </ScrollView>
           </View>
         </View>
@@ -319,9 +367,30 @@ export default function DateTimeField({
   );
 }
 const styles = StyleSheet.create({
+  compactField: { alignItems: "center", gap: 8 },
+  compactLabel: {
+    width: 36,
+    flexShrink: 0,
+    fontFamily: Fonts.pretendardMedium,
+    fontSize: 14,
+    color: "#79817D",
+  },
+  compactTrigger: {
+    minHeight: 44,
+    paddingHorizontal: 12,
+    backgroundColor: "#F4F5F4",
+    borderRadius: 12,
+    gap: 4,
+  },
+  compactText: { fontSize: 13 },
+  disabled: { opacity: 0.5 },
   field: { flexDirection: "row", gap: 10 },
+  inputs: { flex: 1, minWidth: 0, flexDirection: "row", gap: 8 },
   trigger: {
     flex: 1,
+    flexBasis: 0,
+    width: 0,
+    minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -332,12 +401,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   triggerText: {
+    flexShrink: 1,
+    minWidth: 0,
     fontFamily: Fonts.pretendardMedium,
     fontSize: 14,
     color: "#222",
   },
   placeholder: { color: "#999" },
-  arrow: { color: "#888", fontSize: 18 },
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.42)",
@@ -350,68 +420,88 @@ const styles = StyleSheet.create({
     maxWidth: 380,
     maxHeight: "90%",
     backgroundColor: "white",
-    borderRadius: 26,
+    borderRadius: 20,
     overflow: "hidden",
   },
-  dialogContent: { padding: 22, gap: 16 },
+  dialogContent: { padding: 20, gap: 10 },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 8,
   },
-  eyebrow: {
-    fontSize: 12,
-    color: "#888",
-    fontFamily: Fonts.pretendardRegular,
-    marginBottom: 6,
+  closeAction: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
   },
-  title: { fontFamily: Fonts.pretendardSemiBold, fontSize: 22, color: "#111" },
-  close: {
-    width: 40,
-    height: 40,
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    flexShrink: 0,
+  },
+  confirmAction: {
+    minHeight: 44,
+    paddingHorizontal: 8,
+    justifyContent: "center",
+  },
+  confirmText: {
+    fontFamily: Fonts.pretendardSemiBold,
+    fontSize: 14,
+    color: Colors.primary,
+  },
+  pressed: { opacity: 0.6 },
+  month: {
+    fontFamily: Fonts.pretendardSemiBold,
+    fontSize: 18,
+    color: "#171C19",
+  },
+  monthControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    flexShrink: 1,
+  },
+  monthControl: {
+    width: 32,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+  },
+  nextArrow: { transform: [{ rotate: "180deg" }] },
+  weekdayCell: {
+    width: "14.285714%",
+    minHeight: 28,
     alignItems: "center",
     justifyContent: "center",
   },
-  closeText: { fontSize: 28, color: "#777" },
-  monthHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  month: { fontFamily: Fonts.pretendardSemiBold, fontSize: 16, color: "#222" },
-  nav: { fontSize: 28, color: "#555" },
   grid: { flexDirection: "row", flexWrap: "wrap" },
   cell: {
     width: "14.285714%",
-    minHeight: 40,
+    minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
   },
-  weekday: { fontFamily: Fonts.pretendardRegular, fontSize: 12, color: "#999" },
+  weekday: {
+    fontFamily: Fonts.pretendardRegular,
+    fontSize: 12,
+    color: "#929D96",
+  },
   day: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },
-  dayText: { fontSize: 14, color: "#333", fontFamily: Fonts.pretendardMedium },
+  dayText: { fontSize: 15, color: "#333", fontFamily: Fonts.pretendardMedium },
   sunday: { color: "#C06A6A" },
   selected: { backgroundColor: Colors.primary },
   selectedText: { color: "white" },
-  preview: {
-    padding: 16,
-    backgroundColor: "#F4F8F6",
-    borderRadius: 18,
-    alignItems: "center",
-    gap: 6,
-  },
-  previewText: {
-    fontFamily: Fonts.pretendardSemiBold,
-    fontSize: 36,
-    color: Colors.primary,
-  },
-  colon: { color: "#A0B9B0" },
   caption: {
     textAlign: "center",
     fontSize: 12,
@@ -431,31 +521,4 @@ const styles = StyleSheet.create({
   softSelected: { backgroundColor: Colors.softgreen },
   timeText: { fontFamily: Fonts.pretendardMedium, fontSize: 18, color: "#666" },
   greenText: { color: Colors.primary },
-  actions: { flexDirection: "row", gap: 10, marginTop: 8 },
-  cancel: {
-    flex: 1,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: "#F2F3F2",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cancelText: {
-    color: "#777",
-    fontFamily: Fonts.pretendardMedium,
-    fontSize: 14,
-  },
-  confirm: {
-    flex: 2,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: Colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  confirmText: {
-    color: "white",
-    fontFamily: Fonts.pretendardMedium,
-    fontSize: 14,
-  },
 });
