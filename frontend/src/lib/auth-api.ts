@@ -86,6 +86,10 @@ export async function request<T>(
 }
 
 export const authApi = {
+  sendPasswordResetCode: (email: string) => request<{ message: string }>("/auth/password-reset/send-code", { email }),
+  verifyPasswordResetCode: (email: string, code: string) => request<{ reset_token: string }>("/auth/password-reset/verify", { email, code }),
+  completePasswordReset: (email: string, reset_token: string, password: string, password_confirmation: string) =>
+    request<{ message: string }>("/auth/password-reset/complete", { email, reset_token, password, password_confirmation }),
   signOut: (refresh_token: string) =>
     request<{ message: string }>("/auth/logout", { refresh_token }),
   sendCode: (email: string) =>

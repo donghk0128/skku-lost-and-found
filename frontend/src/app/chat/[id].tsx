@@ -169,6 +169,8 @@ function ChatDetail({ id }: { id: string }) {
                       }
                     : current,
                 );
+                void chatApi.room(id).then(detail => { if (active) setRoom(detail); })
+                  .catch(error => { if (active) setError(error instanceof Error ? error.message : t("common.requestFailed")); });
               } else if (data.type === "error") setError(data.error.message);
             } catch {
               setError(t("common.requestFailed"));
@@ -389,7 +391,7 @@ function ChatDetail({ id }: { id: string }) {
             <View style={styles.headerAvatar} />
             <View style={styles.heading}>
               <Text style={styles.name}>
-                {room?.other_nickname ?? t("tabs.chat")}
+                {room?.other_withdrawn ? t("chat.withdrawnUser") : room?.other_nickname ?? t("tabs.chat")}
               </Text>
               {closed || !connected ? (
                 <Text style={styles.small}>
@@ -417,6 +419,7 @@ function ChatDetail({ id }: { id: string }) {
               key={room.post_id}
               postId={room.post_id}
               title={room.post_title}
+              deleted={room.post_deleted}
             />
           ) : null}
         </View>

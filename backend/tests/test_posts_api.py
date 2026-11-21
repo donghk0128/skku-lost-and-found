@@ -54,10 +54,15 @@ def api_client() -> Generator[tuple[TestClient, Engine], None, None]:
 
 def create_author(engine: Engine, email: str = "api-post-author@g.skku.edu") -> UUID:
     with Session(engine) as db:
+        nickname = "작성자"
+        suffix = 2
+        while db.scalar(select(User).where(User.nickname == nickname)) is not None:
+            nickname = f"작성자{suffix}"
+            suffix += 1
         author = User(
             email=email,
             password_hash="test-hash",
-            nickname="작성자",
+            nickname=nickname,
             email_verified_at=datetime.now(timezone.utc),
         )
         db.add(author)

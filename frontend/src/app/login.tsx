@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -21,6 +21,7 @@ import LanguageSelector from "@/components/language-selector";
 export default function Login() {
   const { t } = useLocale();
   const router = useRouter();
+  const { resetDone } = useLocalSearchParams<{ resetDone?: string }>();
   const insets = useSafeAreaInsets();
   const { signIn, initializationError } = useAuth();
   const passwordRef = useRef<TextInput>(null);
@@ -162,6 +163,7 @@ export default function Login() {
               <Text style={styles.error} accessibilityLiveRegion="polite">
                 {error || initializationError || " "}
               </Text>
+              {resetDone === "1" && <Text accessibilityLiveRegion="polite" style={{ color: Colors.primary }}>{t("reset.done")}</Text>}
             </View>
           </View>
 
@@ -181,14 +183,7 @@ export default function Login() {
             </Pressable>
 
             <View style={styles.links}>
-              {/* Disabled until these features are implemented. */}
-              <Pressable disabled style={styles.link}>
-                <Text style={styles.linkText}>{t("login.findId")}</Text>
-              </Pressable>
-
-              <View style={styles.divider} />
-
-              <Pressable disabled style={styles.link}>
+              <Pressable disabled={busy} style={styles.link} accessibilityRole="button" onPress={() => router.push("/password-reset")}>
                 <Text style={styles.linkText}>{t("login.findPassword")}</Text>
               </Pressable>
 

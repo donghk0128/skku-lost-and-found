@@ -31,16 +31,20 @@ function relativeTime(date: string, t: TranslateFn) {
   return t("board.daysAgo", { count: Math.floor(minutes / 1440) });
 }
 
-function PostRow({
+export function PostRow({
   post,
   category,
   rank,
   reasons,
+  showAuthor = true,
+  showType = false,
 }: {
   post: Post;
   category?: Category;
   rank?: number;
   reasons?: RecommendationReason[];
+  showAuthor?: boolean;
+  showType?: boolean;
 }) {
   const { t, categoryLabel } = useLocale();
   const { user } = useAuth();
@@ -85,6 +89,7 @@ function PostRow({
           {splitPostDescription(post.description).body}
         </Text>
         <View style={styles.meta}>
+          {showType ? <Text style={styles.badgeText}>{t(post.post_type === "LOST" ? "post.lostBadge" : "post.foundBadge")}</Text> : null}
           {category ? (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>
@@ -92,13 +97,12 @@ function PostRow({
               </Text>
             </View>
           ) : null}
-          <View style={styles.avatar} />
-          <Text numberOfLines={1} style={styles.author}>
-            {post.author_nickname ??
-              (post.author_id === user?.id
-                ? user.nickname
-                : t("common.postAuthor"))}
-          </Text>
+          {showAuthor ? <>
+            <View style={styles.avatar} />
+            <Text numberOfLines={1} style={styles.author}>
+              {post.author_nickname ?? (post.author_id === user?.id ? user.nickname : t("common.postAuthor"))}
+            </Text>
+          </> : null}
           <Text style={styles.time}>{relativeTime(post.created_at, t)}</Text>
         </View>
         {post.status === "COMPLETED" ? (

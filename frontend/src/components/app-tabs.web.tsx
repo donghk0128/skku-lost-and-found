@@ -29,6 +29,9 @@ export default function AppTabs() {
           <TabTrigger name="chat" href="/chat" asChild>
             <TabButton>{t("tabs.chat")}</TabButton>
           </TabTrigger>
+          <TabTrigger name="account" href="/account" asChild>
+            <TabButton>{t("tabs.account")}</TabButton>
+          </TabTrigger>
         </CustomTabList>
       </TabList>
     </Tabs>

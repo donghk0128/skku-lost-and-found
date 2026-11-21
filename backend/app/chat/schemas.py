@@ -41,7 +41,7 @@ class MessageResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     room_id: UUID
-    sender_id: UUID
+    sender_id: UUID | None
     sequence: int
     message_type: Literal["TEXT", "IMAGE"]
     content: str | None
@@ -55,11 +55,13 @@ class MessageResponse(BaseModel):
 class RoomResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
-    post_id: UUID
-    owner_id: UUID
-    requester_id: UUID
+    post_id: UUID | None
+    owner_id: UUID | None
+    requester_id: UUID | None
     post_title: str
     other_nickname: str
+    post_deleted: bool = False
+    other_withdrawn: bool = False
     status: Literal["ACTIVE", "CLOSED"]
     close_reason: Literal["RETURNED", "GENERAL", "POST_COMPLETED"] | None
     closed_at: datetime | None

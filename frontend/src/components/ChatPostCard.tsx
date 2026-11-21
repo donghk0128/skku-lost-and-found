@@ -30,6 +30,20 @@ type PostDetails = {
 };
 
 export default function ChatPostCard({
+  postId, title, deleted = false,
+}: { postId: string | null; title: string; deleted?: boolean }) {
+  if (deleted || postId === null) return <DeletedChatPost />;
+  return <AvailableChatPost postId={postId} title={title} />;
+}
+
+function DeletedChatPost() {
+  const { t } = useLocale();
+  return <View style={{ paddingHorizontal: 24, paddingVertical: 20 }}>
+    <Text style={styles.title}>{t("chat.deletedPost")}</Text>
+  </View>;
+}
+
+function AvailableChatPost({
   postId,
   title,
 }: {
@@ -130,6 +144,8 @@ export default function ChatPostCard({
   const metadata = [post?.location_text, eventTime]
     .filter(Boolean)
     .join("  ·  ");
+
+  if (unavailable) return <DeletedChatPost />;
 
   return (
     <View>

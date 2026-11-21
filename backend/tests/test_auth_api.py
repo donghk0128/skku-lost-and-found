@@ -66,6 +66,29 @@ def test_signup_login_and_session_restore(client: TestClient, monkeypatch: pytes
     assert client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {refreshed.json()['access_token']}"}).status_code == 200
 
 
+def test_password_reset_requires_own_email_code_and_signup_password_rules(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    codes: list[str] = []
+    monkeypatch.setattr(ConsoleEmailClient, "send_verification_code", lambda self, email, code: codes.append(code))
+    monkeypatch.setattr(EmailService, "_sender_for_configured_mode", staticmethod(lambda: ConsoleEmailClient()))
+    email = "recovery@skku.edu"
+    client.post("/api/v1/auth/email/send-code", json={"email": email})
+    client.post("/api/v1/auth/email/verify", json={"email": email, "code": codes[-1]})
+    signup = client.post("/api/v1/auth/signup", json={"email": email, "nickname": "복구테스터", "password": "Oldpassword1"})
+    assert signup.status_code == 201
+    assert client.post("/api/v1/auth/password-reset/send-code", json={"email": email}).status_code == 202
+    assert client.post("/api/v1/auth/password-reset/verify", json={"email": email, "code": "000000"}).status_code == 400
+    verified = client.post("/api/v1/auth/password-reset/verify", json={"email": email, "code": codes[-1]})
+    assert verified.status_code == 200
+    payload = {"email": email, "reset_token": verified.json()["reset_token"], "password": "abcdefgh", "password_confirmation": "abcdefgh"}
+    assert client.post("/api/v1/auth/password-reset/complete", json=payload).status_code == 422
+    payload["password"] = payload["password_confirmation"] = "Newpassword1"
+    assert client.post("/api/v1/auth/password-reset/complete", json=payload).status_code == 200
+    assert client.post("/api/v1/auth/password-reset/complete", json=payload).status_code == 400
+    assert client.post("/api/v1/auth/login", json={"email": email, "password": "Oldpassword1"}).status_code == 401
+    assert client.post("/api/v1/auth/login", json={"email": email, "password": "Newpassword1"}).status_code == 200
+    assert client.post("/api/v1/auth/refresh", json={"refresh_token": signup.json()["refresh_token"]}).status_code == 401
+
+
 @pytest.mark.parametrize("origin", ["http://localhost:8081", "http://127.0.0.1:8081"])
 def test_auth_browser_preflight(client: TestClient, origin: str) -> None:
     response = client.options("/api/v1/auth/login", headers={
