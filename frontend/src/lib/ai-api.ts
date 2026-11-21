@@ -58,7 +58,9 @@ export type AIChatResult = {
   draft: AIDraft | null;
   required_fields: AIRequiredFields;
   pending_field: PendingField;
-  collected_fields: Partial<Record<"item_name" | "location" | "event_time", string>>;
+  collected_fields: Partial<
+    Record<"item_name" | "location" | "event_time", string>
+  >;
   selected_location_ids: string[];
   images_analyzed: boolean;
 };
@@ -73,8 +75,11 @@ type AIChatBody = {
   draft?: AIDraft;
   required_fields?: AIRequiredFields;
   pending_field?: PendingField;
-  collected_fields?: Partial<Record<"item_name" | "location" | "event_time", string>>;
+  collected_fields?: Partial<
+    Record<"item_name" | "location" | "event_time", string>
+  >;
   selected_location_ids?: string[];
+  location_correction?: string;
   confirmed_location?: {
     text: string;
     latitude: number;
@@ -91,7 +96,7 @@ async function continueChatWithImages(
   form.append("payload", JSON.stringify(body));
   for (const image of images) {
     if (Platform.OS === "web") {
-      const file = image.file ?? await (await fetch(image.uri)).blob();
+      const file = image.file ?? (await (await fetch(image.uri)).blob());
       form.append("images", file, image.fileName ?? "photo.jpg");
     } else {
       form.append("images", new File(image.uri));
@@ -145,7 +150,14 @@ export const aiApi = {
     body: AIChatBody,
     token: string,
     images: AIImageAsset[] = [],
-  ) => images.length
-    ? continueChatWithImages(body, token, images)
-    : request<AIChatResult>("/ai/post-draft-chat", body, token, undefined, 130000),
+  ) =>
+    images.length
+      ? continueChatWithImages(body, token, images)
+      : request<AIChatResult>(
+          "/ai/post-draft-chat",
+          body,
+          token,
+          undefined,
+          130000,
+        ),
 };

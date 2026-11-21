@@ -1,21 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import GoogleMap from "@/components/GoogleMap.web";
 import { Colors, Fonts } from "@/constants/theme";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { pickLocation } from "@/lib/location-picker";
-import {
-  reverseGeocode,
-  type MapCoordinates,
-} from "@/lib/google-maps.web";
+import { reverseGeocode, type MapCoordinates } from "@/lib/google-maps.web";
+import ChevronLeftIcon from "@/assets/icons/chevron-left.svg";
 
 const CAMPUSES = {
   humanities: { latitude: 37.5882, longitude: 126.9933 },
@@ -24,9 +17,10 @@ const CAMPUSES = {
 
 export default function CreatePostMapWeb() {
   const { locale, t } = useLocale();
-  const { latitude, longitude } = useLocalSearchParams<{
+  const { latitude, longitude, requestId } = useLocalSearchParams<{
     latitude?: string;
     longitude?: string;
+    requestId?: string;
   }>();
   const initialPin = useMemo(() => {
     if (!latitude || !longitude) return null;
@@ -109,7 +103,7 @@ export default function CreatePostMapWeb() {
           onPress={() => router.back()}
           style={styles.back}
         >
-          <Text style={styles.backText}>‹</Text>
+          <ChevronLeftIcon width={24} height={24} color={"#000000"} />
         </Pressable>
         <Text style={styles.title}>{t("map.title")}</Text>
         <View style={styles.back} />
@@ -165,10 +159,14 @@ export default function CreatePostMapWeb() {
               addressLoading
             }
             onPress={() => {
-              if (!pin || !placeName || placeName === t("map.addressLoadFailed")) {
+              if (
+                !pin ||
+                !placeName ||
+                placeName === t("map.addressLoadFailed")
+              ) {
                 return;
               }
-              pickLocation({ address: placeName, ...pin });
+              pickLocation({ address: placeName, ...pin, requestId });
               router.back();
             }}
             style={[
@@ -220,7 +218,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   back: { width: 44, height: 44, justifyContent: "center" },
-  backText: { fontSize: 36, color: "#111" },
   title: {
     fontSize: 18,
     color: "#111",

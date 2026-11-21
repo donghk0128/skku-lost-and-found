@@ -1,5 +1,6 @@
 export type PickedLocation = {
   address: string;
+  requestId?: string;
   latitude: number;
   longitude: number;
 };

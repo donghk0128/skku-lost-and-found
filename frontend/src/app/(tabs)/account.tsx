@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 import { useRouter } from "expo-router";
-import { Modal, Pressable, Text, View } from "react-native";
-import { AccountButton, AccountError, AccountScreen, accountStyles as s } from "@/components/account-screen";
+import { Pressable, Text, View } from "react-native";
+import AppModal from "@/components/Modal";
+import { AccountScreen, accountStyles as s } from "@/components/account-screen";
 import { useAuth } from "@/providers/AuthProvider";
 import { useLocale } from "@/i18n/LocaleProvider";
 
@@ -44,15 +45,15 @@ export default function Account() {
     <Pressable accessibilityRole="button" style={s.row} onPress={() => router.push("/withdrawal")}>
       <Text style={[s.rowLabel, { color: "#A74747" }]}>{t("account.withdraw")}</Text><Text>›</Text>
     </Pressable>
-    <Modal transparent visible={confirmLogout} animationType="fade" onRequestClose={() => { if (!busy) setConfirmLogout(false); }}>
-      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", padding: 24 }}>
-        <View accessibilityViewIsModal style={[s.card, { maxWidth: 420, width: "100%", alignSelf: "center" }]}>
-          <Text style={s.label}>{t("account.logoutConfirm")}</Text>
-          <AccountError message={error} />
-          <AccountButton label={busy ? t("account.processing") : t("account.logout")} disabled={busy} onPress={() => void logout()} />
-          <AccountButton label={t("common.cancel")} secondary disabled={busy} onPress={() => { setConfirmLogout(false); setError(""); }} />
-        </View>
-      </View>
-    </Modal>
+    <AppModal
+      visible={confirmLogout}
+      title={t("account.logoutConfirm")}
+      description={t("account.logoutDescription")}
+      confirmLabel={busy ? t("account.processing") : t("account.logout")}
+      loading={busy}
+      errorMessage={error}
+      onConfirm={() => void logout()}
+      onClose={() => { setConfirmLogout(false); setError(""); }}
+    />
   </AccountScreen>;
 }

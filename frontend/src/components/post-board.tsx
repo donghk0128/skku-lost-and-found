@@ -7,17 +7,31 @@ import {
   StyleSheet,
   Text,
   View,
+  type ViewToken,
 } from "react-native";
+import ChevronDownIcon from "@/assets/icons/chevron-down.svg";
 import { BottomTabInset, Colors, Fonts } from "@/constants/theme";
-import { imageUrl, postsApi, type Category, type Post, type RecommendationReason } from "@/lib/posts-api";
-import { useFocusEffect, useRouter } from "expo-router";
+import {
+  imageUrl,
+  postsApi,
+  type Category,
+  type Post,
+  type RecommendationReason,
+} from "@/lib/posts-api";
+import { useRouter } from "expo-router";
 import { splitPostDescription } from "@/lib/post-description";
 import { useAuth } from "@/providers/AuthProvider";
 import { useLocale } from "@/i18n/LocaleProvider";
 import type { TranslateFn } from "@/i18n";
 import { readSession } from "@/lib/session-storage";
 
-type BoardItem = { post: Post; rank?: number; reasons?: RecommendationReason[] };
+const boardViewabilityConfig = { itemVisiblePercentThreshold: 1 };
+
+type BoardItem = {
+  post: Post;
+  rank?: number;
+  reasons?: RecommendationReason[];
+};
 
 function relativeTime(date: string, t: TranslateFn) {
   const minutes = Math.max(
@@ -81,7 +95,9 @@ export function PostRow({
       style={styles.row}
     >
       <View style={styles.copy}>
-        {rank !== undefined ? <Text style={styles.rank}>{t("board.rank", { rank })}</Text> : null}
+        {rank !== undefined ? (
+          <Text style={styles.rank}>{t("board.rank", { rank })}</Text>
+        ) : null}
         <Text numberOfLines={1} style={styles.title}>
           {post.title}
         </Text>
@@ -89,7 +105,15 @@ export function PostRow({
           {splitPostDescription(post.description).body}
         </Text>
         <View style={styles.meta}>
-          {showType ? <Text style={styles.badgeText}>{t(post.post_type === "LOST" ? "post.lostBadge" : "post.foundBadge")}</Text> : null}
+          {showType ? (
+            <Text style={styles.badgeText}>
+              {t(
+                post.post_type === "LOST"
+                  ? "post.lostBadge"
+                  : "post.foundBadge",
+              )}
+            </Text>
+          ) : null}
           {category ? (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>
@@ -97,12 +121,17 @@ export function PostRow({
               </Text>
             </View>
           ) : null}
-          {showAuthor ? <>
-            <View style={styles.avatar} />
-            <Text numberOfLines={1} style={styles.author}>
-              {post.author_nickname ?? (post.author_id === user?.id ? user.nickname : t("common.postAuthor"))}
-            </Text>
-          </> : null}
+          {showAuthor ? (
+            <>
+              <View style={styles.avatar} />
+              <Text numberOfLines={1} style={styles.author}>
+                {post.author_nickname ??
+                  (post.author_id === user?.id
+                    ? user.nickname
+                    : t("common.postAuthor"))}
+              </Text>
+            </>
+          ) : null}
           <Text style={styles.time}>{relativeTime(post.created_at, t)}</Text>
         </View>
         {post.status === "COMPLETED" ? (
@@ -111,7 +140,9 @@ export function PostRow({
         {reasons && reasons.length > 0 ? (
           <View style={styles.reasons}>
             {reasons.map((reason) => (
-              <Text key={reason} style={styles.reason}>{reasonLabels[reason]}</Text>
+              <Text key={reason} style={styles.reason}>
+                {reasonLabels[reason]}
+              </Text>
             ))}
           </View>
         ) : null}
@@ -143,6 +174,15 @@ export default function PostBoard({
 }) {
   const { locale, t } = useLocale();
   const { user } = useAuth();
+  const listRef = useRef<FlatList<BoardItem>>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken<BoardItem>[] }) => {
+      const firstIndex = viewableItems[0]?.index;
+      if (firstIndex != null) setShowScrollTop(firstIndex >= 3);
+    },
+    [],
+  );
   const [query, setQuery] = useState(search);
   const [posts, setPosts] = useState<BoardItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -188,15 +228,26 @@ export default function PostBoard({
           const session = await readSession();
           if (!session) throw new Error(t("common.loginRequired"));
           const ranked = await postsApi.rankedCandidates(
-            sourcePostId, query, categoryId, offset, session.access_token,
+            sourcePostId,
+            query,
+            categoryId,
+            offset,
+            session.access_token,
           );
           result = {
-            items: ranked.items.map(({ post, rank, reasons }) => ({ post, rank, reasons })),
+            items: ranked.items.map(({ post, rank, reasons }) => ({
+              post,
+              rank,
+              reasons,
+            })),
             total: ranked.total,
           };
         } else {
           const newest = await postsApi.list(type, query, offset, categoryId);
-          result = { items: newest.items.map((post) => ({ post })), total: newest.total };
+          result = {
+            items: newest.items.map((post) => ({ post })),
+            total: newest.total,
+          };
         }
         if (version !== requests.current.generation) return;
         setPosts((current) =>
@@ -206,9 +257,7 @@ export default function PostBoard({
       } catch (error) {
         if (version === requests.current.generation)
           setError(
-            error instanceof Error
-              ? error.message
-              : t("common.postLoadFailed"),
+            error instanceof Error ? error.message : t("common.postLoadFailed"),
           );
       } finally {
         if (version === requests.current.generation) {
@@ -219,83 +268,127 @@ export default function PostBoard({
     },
     [type, query, sortMode, categoryId, sourcePostId, t],
   );
-  useFocusEffect(
-    useCallback(() => {
-      const state = requests.current;
-      const timeout = setTimeout(() => {
-        setPosts([]);
-        setTotal(0);
-        void load(0);
-      }, 0);
-      return () => {
-        clearTimeout(timeout);
-        state.generation++;
-        state.busy = false;
-      };
-    }, [load, requests]),
-  );
+  useEffect(() => {
+    const state = requests.current;
+    const timeout = setTimeout(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      setShowScrollTop(false);
+      setPosts([]);
+      setTotal(0);
+      void load(0);
+    }, 0);
+    return () => {
+      clearTimeout(timeout);
+      state.generation++;
+      state.busy = false;
+    };
+  }, [load]);
   return (
-    <FlatList
-      data={posts}
-      extraData={locale}
-      keyExtractor={(item) => item.post.id}
-      renderItem={({ item }) => (
-        <PostRow
-          post={item.post}
-          rank={item.rank}
-          reasons={item.reasons}
-          category={categories.find(
-            (category) => category.id === item.post.category_id,
-          )}
-        />
-      )}
-      contentContainerStyle={styles.list}
-      keyboardShouldPersistTaps="handled"
-      refreshing={loading && posts.length > 0}
-      onRefresh={() => void load(0)}
-      onEndReached={() => {
-        if (!error && posts.length > 0 && posts.length < total)
-          void load(posts.length);
-      }}
-      onEndReachedThreshold={0.3}
-      ListEmptyComponent={
-        !loading && !error ? (
-          <Text style={styles.empty}>
-            {sortMode === "candidates" && !sourcePostId
-              ? user ? t("home.selectSourcePrompt") : t("common.loginRequired")
-              : query.trim()
-              ? t("board.searchEmpty")
-              : type === "LOST"
-                ? t("board.lostEmpty")
-                : t("board.foundEmpty")}
-          </Text>
-        ) : null
-      }
-      ListFooterComponent={
-        <View style={styles.feedback}>
-          {loading ? (
-            <ActivityIndicator color={Colors.primary} />
-          ) : error ? (
-            <>
-              <Text style={styles.error} accessibilityRole="alert">
-                {error}
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => void load(posts.length)}
-              >
-                <Text style={styles.retry}>{t("board.retry")}</Text>
-              </Pressable>
-            </>
-          ) : null}
-        </View>
-      }
-    />
+    <View style={styles.board}>
+      <FlatList
+        ref={listRef}
+        viewabilityConfig={boardViewabilityConfig}
+        onViewableItemsChanged={onViewableItemsChanged}
+        showsVerticalScrollIndicator={false}
+        data={posts}
+        extraData={locale}
+        keyExtractor={(item) => item.post.id}
+        renderItem={({ item }) => (
+          <PostRow
+            post={item.post}
+            rank={item.rank}
+            reasons={item.reasons}
+            category={categories.find(
+              (category) => category.id === item.post.category_id,
+            )}
+          />
+        )}
+        contentContainerStyle={styles.list}
+        keyboardShouldPersistTaps="handled"
+        refreshing={loading && posts.length > 0}
+        onRefresh={() => void load(0)}
+        onEndReached={() => {
+          if (!error && posts.length > 0 && posts.length < total)
+            void load(posts.length);
+        }}
+        onEndReachedThreshold={0.3}
+        ListEmptyComponent={
+          !loading && !error ? (
+            <Text style={styles.empty}>
+              {sortMode === "candidates" && !sourcePostId
+                ? user
+                  ? t("home.selectSourcePrompt")
+                  : t("common.loginRequired")
+                : query.trim()
+                  ? t("board.searchEmpty")
+                  : type === "LOST"
+                    ? t("board.lostEmpty")
+                    : t("board.foundEmpty")}
+            </Text>
+          ) : null
+        }
+        ListFooterComponent={
+          <View style={styles.feedback}>
+            {loading ? (
+              <ActivityIndicator color={Colors.primary} />
+            ) : error ? (
+              <>
+                <Text style={styles.error} accessibilityRole="alert">
+                  {error}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void load(posts.length)}
+                >
+                  <Text style={styles.retry}>{t("board.retry")}</Text>
+                </Pressable>
+              </>
+            ) : null}
+          </View>
+        }
+      />
+      {showScrollTop ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("board.scrollToTop")}
+          onPress={() =>
+            listRef.current?.scrollToOffset({ offset: 0, animated: true })
+          }
+          style={({ pressed }) => [
+            styles.scrollTop,
+            pressed && { opacity: 0.75 },
+          ]}
+        >
+          <View style={{ transform: [{ rotate: "180deg" }] }}>
+            <ChevronDownIcon width={18} height={18} color={Colors.primary} />
+          </View>
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  list: { flexGrow: 1, paddingBottom: BottomTabInset + 100 },
+  board: { flex: 1 },
+  scrollTop: {
+    position: "absolute",
+    top: 12,
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "white",
+    borderWidth: 1,
+    borderColor: "#E2EAE6",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  list: { flexGrow: 1, paddingBottom: BottomTabInset + 20 },
   row: {
     flexDirection: "row",
     alignItems: "center",

@@ -3,7 +3,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
   Image,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,11 +17,13 @@ import { imageUrl, postsApi, type Post } from "@/lib/posts-api";
 import { readSession, writeSession } from "@/lib/session-storage";
 import { authApi } from "@/lib/auth-api";
 import { chatApi } from "@/lib/chat-api";
+import AppModal from "@/components/Modal";
 import PostFavoriteButton from "@/components/post-favorite-button";
 import { splitPostDescription } from "@/lib/post-description";
 import { useAuth } from "@/providers/AuthProvider";
 import PostLocationMap from "@/components/PostLocationMap";
 import { useLocale } from "@/i18n/LocaleProvider";
+import ChevronLeftIcon from "@/assets/icons/chevron-left.svg";
 
 const formatDate = (value: string, locale: "en" | "ko") =>
   new Date(value).toLocaleString(locale === "en" ? "en-US" : "ko-KR", {
@@ -131,7 +132,9 @@ function PostDetail({ id }: { id: string }) {
       const room = await chatApi.create(id);
       router.push({ pathname: "/chat/[id]", params: { id: room.id } });
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : t("common.requestFailed"));
+      setActionError(
+        error instanceof Error ? error.message : t("common.requestFailed"),
+      );
     } finally {
       openingChatRef.current = false;
       setOpeningChat(false);
@@ -196,9 +199,7 @@ function PostDetail({ id }: { id: string }) {
       } catch (error) {
         if (active) {
           setError(
-            error instanceof Error
-              ? error.message
-              : t("common.postLoadFailed"),
+            error instanceof Error ? error.message : t("common.postLoadFailed"),
           );
           setLoading(false);
         }
@@ -224,7 +225,7 @@ function PostDetail({ id }: { id: string }) {
           style={styles.back}
           accessibilityLabel={t("common.back")}
         >
-          <Text style={styles.backText}>‹</Text>
+          <ChevronLeftIcon width={24} height={24} color={"#000000"} />
         </Pressable>
         <View style={styles.state}>
           {loading ? (
@@ -256,10 +257,7 @@ function PostDetail({ id }: { id: string }) {
         ]
       : null,
     post.location_text
-      ? [
-          lost ? t("post.lostPlace") : t("post.foundPlace"),
-          post.location_text,
-        ]
+      ? [lost ? t("post.lostPlace") : t("post.foundPlace"), post.location_text]
       : null,
   ].filter((item): item is string[] => item !== null);
   return (
@@ -275,7 +273,7 @@ function PostDetail({ id }: { id: string }) {
           accessibilityLabel={t("common.back")}
           style={styles.back}
         >
-          <Text style={styles.backText}>‹</Text>
+          <ChevronLeftIcon width={24} height={24} color={"#000000"} />
         </Pressable>
         <Text style={styles.headerTitle}>
           {lost ? t("post.lostDetail") : t("post.foundDetail")}
@@ -332,9 +330,7 @@ function PostDetail({ id }: { id: string }) {
         ) : null}
         {photoError ? (
           <Pressable onPress={retry} style={styles.photoFeedback}>
-            <Text style={styles.small}>
-              {t("common.imageLoadFailed")}
-            </Text>
+            <Text style={styles.small}>{t("common.imageLoadFailed")}</Text>
           </Pressable>
         ) : null}
         <View style={styles.body}>
@@ -360,14 +356,17 @@ function PostDetail({ id }: { id: string }) {
             </View>
           </View>
           <View style={styles.titleRow}>
-            <Text style={[styles.title, { flex: 1, minWidth: 0 }]}>{post.title}</Text>
-            {!isOwnPost ? <PostFavoriteButton key={id} postId={id} /> : null}
+            <Text style={[styles.title, { flex: 1, minWidth: 0 }]}>
+              {post.title}
+            </Text>
           </View>
           <View style={styles.authorRow}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
-                {(post.author_nickname ??
-                  (post.author_id === user?.id ? user.nickname : "·")).slice(0, 1)}
+                {(
+                  post.author_nickname ??
+                  (post.author_id === user?.id ? user.nickname : "·")
+                ).slice(0, 1)}
               </Text>
             </View>
             <View style={styles.authorCopy}>
@@ -406,7 +405,7 @@ function PostDetail({ id }: { id: string }) {
             />
           ) : null}
         </View>
-        {recommendations.length || recommendationError ? (
+        {/* {recommendations.length || recommendationError ? (
           <View style={styles.related}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>
@@ -432,29 +431,44 @@ function PostDetail({ id }: { id: string }) {
               </ScrollView>
             )}
           </View>
-        ) : null}
+        ) : null} */}
       </ScrollView>
       <SafeAreaView edges={["bottom"]} style={styles.chatBar}>
-        {actionError && !menu ? <Text accessibilityRole="alert" style={styles.confirmError}>{actionError}</Text> : null}
+        {actionError && !menu ? (
+          <Text accessibilityRole="alert" style={styles.confirmError}>
+            {actionError}
+          </Text>
+        ) : null}
         <View style={styles.chatBarContent}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("post.chat")}
-            accessibilityHint={isOwnPost ? t("post.ownPost") : undefined}
-            accessibilityState={{ disabled: isOwnPost || openingChat, busy: openingChat }}
-            disabled={isOwnPost || openingChat}
-            onPress={() => { void openChat(); }}
-            style={[styles.chatButton, isOwnPost && styles.chatButtonDisabled]}
-          >
-            <Text
+          <View style={styles.chatActions}>
+            {!isOwnPost ? <PostFavoriteButton key={id} postId={id} /> : null}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("post.chat")}
+              accessibilityHint={isOwnPost ? t("post.ownPost") : undefined}
+              accessibilityState={{
+                disabled: isOwnPost || openingChat,
+                busy: openingChat,
+              }}
+              disabled={isOwnPost || openingChat}
+              onPress={() => {
+                void openChat();
+              }}
               style={[
-                styles.chatButtonText,
-                isOwnPost && styles.chatButtonTextDisabled,
+                styles.chatButton,
+                isOwnPost && styles.chatButtonDisabled,
               ]}
             >
-              {t(openingChat ? "common.processing" : "post.chat")}
-            </Text>
-          </Pressable>
+              <Text
+                style={[
+                  styles.chatButtonText,
+                  isOwnPost && styles.chatButtonTextDisabled,
+                ]}
+              >
+                {t(openingChat ? "common.processing" : "post.chat")}
+              </Text>
+            </Pressable>
+          </View>
           {isOwnPost ? (
             <Text style={styles.chatHint}>{t("post.ownPost")}</Text>
           ) : null}
@@ -524,50 +538,17 @@ function PostDetail({ id }: { id: string }) {
           </View>
         </View>
       ) : null}
-      <Modal
+      <AppModal
         visible={menu === "delete"}
-        transparent
-        animationType="none"
-        onRequestClose={() => {
-          if (!deleting) setMenu(null);
-        }}
-      >
-        <View style={styles.menuOverlay}>
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            disabled={deleting}
-            onPress={() => setMenu(null)}
-            accessibilityLabel={t("post.close")}
-          />
-          <View style={styles.menuCard}>
-            <Text style={styles.confirmTitle}>{t("post.confirmDeleteTitle")}</Text>
-            <Text style={styles.confirmHint}>
-              {t("post.confirmDeleteMessage")}
-            </Text>
-            {actionError ? (
-              <Text style={styles.confirmError}>{actionError}</Text>
-            ) : null}
-            <View style={styles.confirmActions}>
-              <Pressable
-                disabled={deleting}
-                style={styles.menuItem}
-                onPress={() => void remove()}
-              >
-                <Text style={styles.deleteText}>
-                  {deleting ? t("post.deleting") : t("post.delete")}
-                </Text>
-              </Pressable>
-              <Pressable
-                disabled={deleting}
-                style={styles.menuItem}
-                onPress={() => setMenu(null)}
-              >
-                <Text style={styles.confirmHint}>{t("post.cancelDelete")}</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        title={t("post.confirmDeleteTitle")}
+        description={t("post.confirmDeleteMessage")}
+        confirmLabel={deleting ? t("post.deleting") : t("post.delete")}
+        cancelLabel={t("post.cancelDelete")}
+        loading={deleting}
+        errorMessage={actionError}
+        onConfirm={() => void remove()}
+        onClose={() => setMenu(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -580,19 +561,7 @@ const styles = StyleSheet.create({
     left: 0,
     zIndex: 100,
   },
-  confirmTitle: {
-    fontSize: 16,
-    fontFamily: Fonts.pretendardSemiBold,
-    color: "#222",
-  },
-  confirmHint: {
-    fontSize: 12,
-    lineHeight: 18,
-    fontFamily: Fonts.pretendardRegular,
-    color: "#777",
-  },
   confirmError: { fontSize: 12, lineHeight: 18, color: "#555" },
-  confirmActions: { flexDirection: "row", gap: 12 },
   popover: {
     position: "absolute",
     width: 144,
@@ -620,39 +589,6 @@ const styles = StyleSheet.create({
     color: "#222",
   },
   more: { fontSize: 30, color: "#333" },
-  menuOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "center",
-    padding: 28,
-  },
-  menuCard: {
-    width: "100%",
-    maxWidth: 320,
-    alignSelf: "center",
-    backgroundColor: "white",
-    borderRadius: 14,
-    padding: 18,
-    gap: 10,
-  },
-  menuItem: {
-    flex: 1,
-    minHeight: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    borderTopWidth: 1,
-    borderColor: "#F0F0F0",
-  },
-  menuText: {
-    color: Colors.primary,
-    fontFamily: Fonts.pretendardMedium,
-    fontSize: 16,
-  },
-  deleteText: {
-    color: "#222",
-    fontFamily: Fonts.pretendardMedium,
-    fontSize: 14,
-  },
   root: { flex: 1, backgroundColor: "#FFF" },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   scroll: { flex: 1 },
@@ -671,7 +607,9 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     gap: 8,
   },
+  chatActions: { flexDirection: "row", alignItems: "center", gap: 12 },
   chatButton: {
+    flex: 1,
     minHeight: 52,
     borderRadius: 14,
     paddingHorizontal: 20,
@@ -710,7 +648,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  backText: { color: "#222", fontSize: 34 },
   headerTitle: {
     fontFamily: Fonts.pretendardMedium,
     fontSize: 16,

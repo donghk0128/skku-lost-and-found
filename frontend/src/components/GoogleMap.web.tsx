@@ -10,9 +10,15 @@ import {
   type MapCoordinates,
 } from "@/lib/google-maps.web";
 
+export type MapMarkerPoint = MapCoordinates & { id: string; label: string; active?: boolean };
+
 type Props = {
   center: MapCoordinates;
   marker?: MapCoordinates | null;
+  markers?: MapMarkerPoint[];
+  fitMarkers?: boolean;
+  cameraRequest?: { center: MapCoordinates; key: number };
+  onMarkerPress?: (id: string) => void;
   interactive?: boolean;
   onMapPress?: (coordinates: MapCoordinates) => void;
   style?: StyleProp<ViewStyle>;
@@ -21,6 +27,10 @@ type Props = {
 export default function GoogleMap({
   center,
   marker = null,
+  markers,
+  fitMarkers = false,
+  cameraRequest,
+  onMarkerPress,
   interactive = false,
   onMapPress,
   style,
@@ -33,6 +43,7 @@ export default function GoogleMap({
   const markerPositionRef = useRef(marker);
   const onMapPressRef = useRef(onMapPress);
   const interactiveRef = useRef(interactive);
+  const [mapVersion, setMapVersion] = useState(0);
   const [loadError, setLoadError] = useState<"missing-key" | "load-failed" | null>(
     null,
   );
@@ -74,6 +85,7 @@ export default function GoogleMap({
             : undefined,
         });
         markerRef.current = currentMarker;
+        setMapVersion(version => version + 1);
         clickListener = map.addListener("click", (event) => {
           if (!interactiveRef.current || !event.latLng) return;
           onMapPressRef.current?.({
@@ -114,6 +126,34 @@ export default function GoogleMap({
         : null,
     );
   }, [marker]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const google = window.google;
+    if (!map || !google || !markers) return;
+    const rendered = markers.map(point => {
+      const pin = new google.maps.Marker({
+        map,
+        position: { lat: point.latitude, lng: point.longitude },
+        label: { text: point.label, color: "white", fontSize: "12px", fontWeight: "600" },
+        icon: { path: "M 0,-14 A 14,14 0 1 0 0,14 A 14,14 0 1 0 0,-14", fillColor: point.active ? "#00785D" : "#83988A", fillOpacity: 1, strokeColor: "white", strokeWeight: 2, scale: 1 },
+      });
+      const listener = pin.addListener("click", () => onMarkerPress?.(point.id));
+      return { pin, listener };
+    });
+    if (fitMarkers && markers.length > 1) {
+      const latitudes = markers.map(point => point.latitude);
+      const longitudes = markers.map(point => point.longitude);
+      map.fitBounds({ north: Math.max(...latitudes) + 0.0002, south: Math.min(...latitudes) - 0.0002, east: Math.max(...longitudes) + 0.0002, west: Math.min(...longitudes) - 0.0002 }, 32);
+    }
+    return () => rendered.forEach(({ pin, listener }) => { listener.remove(); pin.setMap(null); });
+  }, [markers, fitMarkers, onMarkerPress, mapVersion]);
+
+  useEffect(() => {
+    if (!cameraRequest || !mapRef.current) return;
+    mapRef.current.setCenter({ lat: cameraRequest.center.latitude, lng: cameraRequest.center.longitude });
+    mapRef.current.setZoom(15);
+  }, [cameraRequest, mapVersion]);
 
   return (
     <View style={[styles.container, style]}>
