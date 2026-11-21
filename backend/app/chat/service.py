@@ -4,7 +4,7 @@ from pathlib import Path
 from hashlib import sha256
 from uuid import UUID, uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.chat.model import ChatMessage, ChatMessageImage, ChatRoom, ChatRoomMember
@@ -56,23 +56,31 @@ class ChatService:
         if room is None or member is None or user_id not in (room.owner_id, room.requester_id):
             raise ApiError(404, "chat_room_not_found", "채팅방을 찾을 수 없습니다.")
         if lock:
-            lock_post(db, room.post_id)
+            # Withdrawal may remove the post while we wait. Re-read the room after
+            # the post lock instead of rejecting the surviving member's history.
+            if room.post_id is not None:
+                db.scalar(select(Post).where(Post.id == room.post_id).with_for_update())
             room = db.scalar(select(ChatRoom).where(ChatRoom.id == room_id).with_for_update().execution_options(populate_existing=True))
             db.refresh(member, with_for_update=True)
         return room, member
 
     @staticmethod
     def room_response(db: Session, room: ChatRoom, member: ChatRoomMember) -> RoomResponse:
+        post = db.get(Post, room.post_id) if room.post_id else None
+        other_id = room.requester_id if member.user_id == room.owner_id else room.owner_id
+        other = db.get(User, other_id) if other_id else None
+        post_deleted = post is None or post.deleted_at is not None
         latest = db.scalar(select(ChatMessage).where(ChatMessage.room_id == room.id).order_by(ChatMessage.sequence.desc()).limit(1))
         unread = db.scalar(select(func.count()).select_from(ChatMessage).where(
-            ChatMessage.room_id == room.id, ChatMessage.sender_id != member.user_id,
+            ChatMessage.room_id == room.id, or_(ChatMessage.sender_id.is_(None), ChatMessage.sender_id != member.user_id),
             ChatMessage.sequence > member.last_read_sequence,
         )) or 0
         return RoomResponse(
             **{name: getattr(room, name) for name in ("id", "post_id", "owner_id", "requester_id", "status", "close_reason", "closed_at", "created_at")},
             last_read_sequence=member.last_read_sequence, last_read_at=member.last_read_at,
-            post_title=db.get(Post, room.post_id).title,
-            other_nickname=db.get(User, room.requester_id if member.user_id == room.owner_id else room.owner_id).nickname,
+            post_title="삭제된 게시물입니다." if post_deleted else post.title,
+            post_deleted=post_deleted, other_withdrawn=other is None,
+            other_nickname="탈퇴한 사용자" if other is None else other.nickname,
             is_hidden=member.is_hidden, unread_count=unread,
             last_message=message_response(latest) if latest else None,
         )

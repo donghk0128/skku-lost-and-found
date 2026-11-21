@@ -16,6 +16,7 @@ class ChatRoom(Base):
     __table_args__ = (
         UniqueConstraint("post_id", "requester_id", name="uq_chat_rooms_post_requester"),
         CheckConstraint("owner_id <> requester_id", name="ck_chat_rooms_distinct_users"),
+        CheckConstraint("status = 'CLOSED' OR (post_id IS NOT NULL AND owner_id IS NOT NULL AND requester_id IS NOT NULL)", name="ck_chat_rooms_active_references"),
         CheckConstraint(
             "(status = 'ACTIVE' AND close_reason IS NULL AND closed_at IS NULL) OR "
             "(status = 'CLOSED' AND close_reason IS NOT NULL AND close_reason IN ('RETURNED', 'GENERAL', 'POST_COMPLETED') AND closed_at IS NOT NULL)",
@@ -24,9 +25,9 @@ class ChatRoom(Base):
         Index("ix_chat_rooms_post_status", "post_id", "status"),
     )
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    post_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("posts.id"), nullable=False)
-    owner_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id"), nullable=False)
-    requester_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id"), nullable=False)
+    post_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("posts.id", ondelete="SET NULL"), nullable=True)
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    requester_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     status: Mapped[str] = mapped_column(String(6), default="ACTIVE", server_default="ACTIVE", nullable=False)
     close_reason: Mapped[str | None] = mapped_column(String(14))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -40,7 +41,7 @@ class ChatRoomMember(Base):
         Index("ix_chat_room_members_user_hidden", "user_id", "is_hidden"),
     )
     room_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("chat_rooms.id"), primary_key=True)
-    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id"), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     last_read_sequence: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     last_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_hidden: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
@@ -61,7 +62,7 @@ class ChatMessage(Base):
     )
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     room_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("chat_rooms.id"), nullable=False)
-    sender_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id"), nullable=False)
+    sender_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     sequence: Mapped[int] = mapped_column(Integer, nullable=False)
     message_type: Mapped[str] = mapped_column(String(5), nullable=False)
     content: Mapped[str | None] = mapped_column(Text)

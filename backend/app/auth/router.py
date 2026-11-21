@@ -8,6 +8,9 @@ from app.auth.schemas import (
     EmailVerifyRequest,
     LoginRequest,
     MessageResponse,
+    PasswordResetComplete,
+    PasswordResetRequest,
+    PasswordResetVerified,
     RefreshRequest,
     SignUpRequest,
 )
@@ -15,6 +18,23 @@ from app.auth.service import AuthService
 from app.core.database import get_db
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@router.post("/password-reset/send-code", response_model=MessageResponse, status_code=202)
+def password_reset_send_code(request: EmailSendCodeRequest, db: Session = Depends(get_db)) -> MessageResponse:
+    AuthService().send_password_reset_code(db, request.email)
+    return MessageResponse(message="가입된 이메일이면 인증 코드를 전송했습니다.")
+
+
+@router.post("/password-reset/verify", response_model=PasswordResetVerified)
+def password_reset_verify(request: PasswordResetRequest, db: Session = Depends(get_db)) -> PasswordResetVerified:
+    return PasswordResetVerified(reset_token=AuthService().verify_password_reset_code(db, request.email, request.code))
+
+
+@router.post("/password-reset/complete", response_model=MessageResponse)
+def password_reset_complete(request: PasswordResetComplete, db: Session = Depends(get_db)) -> MessageResponse:
+    AuthService().complete_password_reset(db, request.email, request.reset_token, request.password, request.password_confirmation)
+    return MessageResponse(message="비밀번호가 변경되었습니다. 새 비밀번호로 로그인해 주세요.")
 
 
 @router.post("/email/send-code", response_model=MessageResponse, status_code=status.HTTP_202_ACCEPTED)

@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors, Fonts } from "@/constants/theme";
 import { ApiError, authApi } from "@/lib/auth-api";
+import { isValidSignupPassword } from "@/lib/password-validation";
 import { useAuth } from "@/providers/AuthProvider";
 import { useLocale } from "@/i18n/LocaleProvider";
 
@@ -100,14 +101,7 @@ export default function SignupScreen({ stage }: { stage: Stage }) {
     Array.from(nickname).length < 2 || Array.from(nickname).length > 10
       ? t("signup.invalidUsername")
       : "";
-  const passwordLength = Array.from(password).length;
-  const passwordError =
-    passwordLength < 8 ||
-    passwordLength > 20 ||
-    !/[A-Za-z]/.test(password) ||
-    !/[0-9]/.test(password)
-      ? t("signup.invalidPassword")
-      : "";
+  const passwordError = isValidSignupPassword(password) ? "" : t("signup.invalidPassword");
   const confirmationError = !confirmation
     ? t("signup.confirmPassword")
     : password !== confirmation

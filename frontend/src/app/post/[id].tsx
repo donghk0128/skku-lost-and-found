@@ -18,6 +18,7 @@ import { imageUrl, postsApi, type Post } from "@/lib/posts-api";
 import { readSession, writeSession } from "@/lib/session-storage";
 import { authApi } from "@/lib/auth-api";
 import { chatApi } from "@/lib/chat-api";
+import PostFavoriteButton from "@/components/post-favorite-button";
 import { splitPostDescription } from "@/lib/post-description";
 import { useAuth } from "@/providers/AuthProvider";
 import PostLocationMap from "@/components/PostLocationMap";
@@ -207,7 +208,7 @@ function PostDetail({ id }: { id: string }) {
     return () => {
       active = false;
     };
-  }, [id, attempt]);
+  }, [id, attempt, t]);
   const retry = () => {
     setError("");
     setPhotoError(false);
@@ -358,7 +359,10 @@ function PostDetail({ id }: { id: string }) {
               </Text>
             </View>
           </View>
-          <Text style={styles.title}>{post.title}</Text>
+          <View style={styles.titleRow}>
+            <Text style={[styles.title, { flex: 1, minWidth: 0 }]}>{post.title}</Text>
+            {!isOwnPost ? <PostFavoriteButton key={id} postId={id} /> : null}
+          </View>
           <View style={styles.authorRow}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
@@ -650,6 +654,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   root: { flex: 1, backgroundColor: "#FFF" },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   scroll: { flex: 1 },
   chatBar: {
     flexShrink: 0,

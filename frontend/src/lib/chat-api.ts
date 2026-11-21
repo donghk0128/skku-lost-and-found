@@ -7,14 +7,15 @@ import { t } from "@/i18n";
 
 export type ChatMessageImage = { id: string; position: number; content_type: string; image_url: string };
 export type ChatMessage = {
-  id: string; room_id: string; sender_id: string; sequence: number;
+  id: string; room_id: string; sender_id: string | null; sequence: number;
   message_type: "TEXT" | "IMAGE"; content: string | null;
   image_url: string | null; created_at: string;
   images: ChatMessageImage[]; client_message_id: string | null;
 };
 export type ChatRoom = {
-  id: string; post_id: string; owner_id: string; requester_id: string;
+  id: string; post_id: string | null; owner_id: string | null; requester_id: string | null;
   post_title: string; other_nickname: string;
+  post_deleted: boolean; other_withdrawn: boolean;
   status: "ACTIVE" | "CLOSED";
   close_reason: "RETURNED" | "GENERAL" | "POST_COMPLETED" | null;
   closed_at: string | null; is_hidden: boolean; unread_count: number;

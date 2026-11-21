@@ -298,7 +298,7 @@ export default function ChatList() {
             >
               <View style={styles.nameRow}>
                 <Text numberOfLines={1} style={styles.name}>
-                  {item.other_nickname}
+                  {item.other_withdrawn ? t("chat.withdrawnUser") : item.other_nickname}
                 </Text>
                 <Text style={styles.time}>
                   {relativeChatTime(item.last_message?.created_at, now, locale)}

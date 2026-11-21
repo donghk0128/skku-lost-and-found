@@ -13,6 +13,8 @@ type AuthContextValue = {
   loading: boolean;
   initializationError: string;
   signOut: () => Promise<void>;
+  clearAccount: () => Promise<void>;
+  updateUser: (user: User) => void;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, nickname: string, password: string) => Promise<void>;
 };
@@ -98,9 +100,14 @@ export default function AuthProvider({
     setUser(null);
   }
 
+  async function clearAccount() {
+    try { await writeSession(null); }
+    finally { setUser(null); setInitializationError(""); }
+  }
+
   return (
     <AuthContext.Provider
-      value={{ user, loading, initializationError, signIn, signUp, signOut }}
+      value={{ user, loading, initializationError, signIn, signUp, signOut, clearAccount, updateUser: setUser }}
     >
       {children}
     </AuthContext.Provider>

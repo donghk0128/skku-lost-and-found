@@ -25,9 +25,15 @@ function AuthContent() {
         <Stack.Screen name="settings" />
         <Stack.Screen name="post/[id]" />
         <Stack.Screen name="chat/[id]" />
+        <Stack.Screen name="profile-edit" />
+        <Stack.Screen name="password-change" />
+        <Stack.Screen name="my-posts" />
+        <Stack.Screen name="favorites" />
+        <Stack.Screen name="withdrawal" />
       </Stack.Protected>
       <Stack.Protected guard={!user}>
         <Stack.Screen name="login" />
+        <Stack.Screen name="password-reset" />
         <Stack.Screen name="signup" />
         <Stack.Screen name="signup-code" />
         <Stack.Screen name="signup-information" />

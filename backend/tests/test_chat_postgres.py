@@ -29,7 +29,7 @@ def pg_chat():
     user_ids, post_id = [], None
     try:
         with Session(engine) as db:
-            users = [User(email=f"chat-pg-{uuid4()}@skku.edu", password_hash="test", nickname="테스트", email_verified_at=now_utc()) for _ in range(3)]
+            users = [User(email=f"chat-pg-{uuid4()}@skku.edu", password_hash="test", nickname=f"테스트-{uuid4().hex[:12]}", email_verified_at=now_utc()) for _ in range(3)]
             db.add_all(users)
             db.flush()
             user_ids = [u.id for u in users]
