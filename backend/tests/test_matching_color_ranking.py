@@ -2,8 +2,10 @@
 
 import os
 from datetime import datetime, timezone
+from decimal import Decimal
 from uuid import uuid4
 
+import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
@@ -13,7 +15,7 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-that-is-long-enough")
 
 from app.matching.ranking import ALGORITHM_VERSION, rank_candidates
 from app.matching.model import RecommendationItem, RecommendationRun
-from app.matching.scoring import rule_signals
+from app.matching.scoring import LOCATION_WEIGHT, rule_signals, score_posts
 from app.matching.service import MatchingService
 from app.core.database import Base
 from app.posts.model import Post
@@ -37,7 +39,7 @@ def test_airpods_synonym_ranks_above_wrong_color_with_observed_semantic_scores()
 
     ranked = rank_candidates(source, [wrong_color, correct], {correct.id: 0.9470, wrong_color.id: 0.8768})
 
-    assert ALGORITHM_VERSION == "hybrid-v3"
+    assert ALGORITHM_VERSION == "hybrid-v4"
     assert [item.post.id for item in ranked] == [correct.id, wrong_color.id]
     assert not ranked[0].signals.color_conflict
     assert ranked[1].signals.color_conflict
@@ -63,7 +65,27 @@ def test_color_conflict_penalty_applies_without_embedding() -> None:
     ranked = rank_candidates(source, [candidate], {})[0]
 
     assert ranked.signals.color_conflict
-    assert ranked.score == max(0.0, ranked.signals.score - 0.25)
+    assert ranked.score == max(0.0, ranked.signals.ranking_score - 0.25)
+
+
+def test_missing_coordinates_reweight_available_rule_signals() -> None:
+    source = _post("FOUND", "검은 지갑 습득", "지갑", "학생증이 있습니다")
+    source.latitude = Decimal("37.293900")
+    source.longitude = Decimal("126.975100")
+    candidate = _post("LOST", "지갑 분실", "지갑", "학생증이 들어 있습니다")
+
+    signals = rule_signals(source, candidate)
+    assert signals.distance_km is None
+    assert signals.ranking_score == pytest.approx(signals.score / (1 - LOCATION_WEIGHT))
+    assert score_posts(source, candidate) == pytest.approx(signals.ranking_score)
+    ranked = rank_candidates(source, [candidate], {candidate.id: 0.8})[0]
+    assert ranked.score == pytest.approx(0.5 * signals.ranking_score + 0.5 * 0.8)
+
+    candidate.latitude = source.latitude
+    candidate.longitude = source.longitude
+    known_signals = rule_signals(source, candidate)
+    assert known_signals.distance_km == pytest.approx(0.0)
+    assert known_signals.ranking_score == pytest.approx(known_signals.score)
 
 
 def test_new_version_keeps_old_run_and_records_color_conflict(monkeypatch) -> None:
@@ -85,10 +107,10 @@ def test_new_version_keeps_old_run_and_records_color_conflict(monkeypatch) -> No
         ranked = rank_candidates(source, [candidate], {candidate.id: 0.9})
         monkeypatch.setattr("app.matching.service.ALGORITHM_VERSION", "hybrid-v2")
         old_id = MatchingService._record_run(db, source, [candidate], ranked, {"post_type": "LOST"})
-        monkeypatch.setattr("app.matching.service.ALGORITHM_VERSION", "hybrid-v3")
+        monkeypatch.setattr("app.matching.service.ALGORITHM_VERSION", "hybrid-v4")
         new_id = MatchingService._record_run(db, source, [candidate], ranked, {"post_type": "LOST"})
         assert old_id != new_id
         assert MatchingService._record_run(db, source, [candidate], ranked, {"post_type": "LOST"}) == new_id
-        assert [run.algorithm_version for run in db.scalars(select(RecommendationRun).order_by(RecommendationRun.algorithm_version))] == ["hybrid-v2", "hybrid-v3"]
+        assert [run.algorithm_version for run in db.scalars(select(RecommendationRun).order_by(RecommendationRun.algorithm_version))] == ["hybrid-v2", "hybrid-v4"]
         assert db.get(RecommendationItem, (new_id, candidate.id)).color_conflict
     engine.dispose()
