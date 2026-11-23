@@ -56,4 +56,4 @@ python -m scripts.seed_matching_benchmark --apply --lost-author-id <시험계정
 python -m scripts.evaluate_matching --labels evaluation/labels.csv --output evaluation/result.json
 ```
 
-평가 도구는 동일한 게시글·임베딩에 대해 `hybrid_v3`, `no_color`(색상 감점 없음), `no_color_low_text`(규칙 내 문자열 0.15→0.05, 최종 임베딩 0.50→0.55)의 전체·방향별 지표를 한 번에 계산합니다. 이 둘은 **오프라인 비교안**이며 서비스의 `hybrid-v3` 동작은 변경하지 않습니다. 지표를 본 뒤 서비스 적용 여부를 결정합니다. `result.json`에는 게시글 UUID 대신 E1 등의 평가 코드가 표시됩니다.
+평가 도구는 동일한 게시글·임베딩에 대해 `hybrid_v3`, `no_color`(색상 감점 없음), `no_color_low_text`(규칙 내 문자열 0.15→0.05, 최종 임베딩 0.50→0.55), `missing_geo_reweighted`(한쪽이라도 좌표가 없을 때 규칙 점수의 위치 30%를 제외하고 나머지를 재정규화)의 전체·방향별 지표를 한 번에 계산합니다. 이들은 **오프라인 비교안**이며 서비스의 `hybrid-v3` 동작은 변경하지 않습니다. 지표를 본 뒤 서비스 적용 여부를 결정합니다. `result.json`에는 게시글 UUID 대신 E1 등의 평가 코드가 표시됩니다.

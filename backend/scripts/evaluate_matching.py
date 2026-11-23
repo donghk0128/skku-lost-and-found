@@ -20,6 +20,7 @@ from app.matching.embedding import MODEL
 from app.matching.evaluation import ranking_metrics
 from app.matching.ranking import ALGORITHM_VERSION, COLOR_CONFLICT_PENALTY, RULE_WEIGHT, SEMANTIC_WEIGHT, rank_candidates
 from app.matching.repository import MatchingRepository
+from app.matching.scoring import LOCATION_WEIGHT
 from app.posts.model import Post
 
 
@@ -57,7 +58,9 @@ def evaluate(path: Path) -> dict:
     labels = load_labels(path)
     codes = load_codes(path)
     methods: dict[str, dict[UUID, list[UUID]]] = {
-        name: {} for name in ("rule", "semantic", "hybrid_v3", "no_color", "no_color_low_text")
+        name: {} for name in (
+            "rule", "semantic", "hybrid_v3", "no_color", "no_color_low_text", "missing_geo_reweighted"
+        )
     }
     positives: dict[UUID, set[UUID]] = {}
     source_types: dict[UUID, str] = {}
@@ -92,6 +95,16 @@ def evaluate(path: Path) -> dict:
                         RULE_WEIGHT * (item.signals.score - 0.10 * item.signals.text)
                         + (SEMANTIC_WEIGHT + 0.05) * item.semantic_score
                     ),
+                    # With no coordinate pair, distribute the unavailable location weight
+                    # across the available rule signals rather than treating it as a mismatch.
+                    "missing_geo_reweighted": (
+                        item.score if item.signals.distance_km is not None else max(
+                            0.0,
+                            RULE_WEIGHT * item.signals.score / (1 - LOCATION_WEIGHT)
+                            + SEMANTIC_WEIGHT * item.semantic_score
+                            - (COLOR_CONFLICT_PENALTY if item.signals.color_conflict else 0.0),
+                        )
+                    ),
                 }
                 for candidate_id, item in items.items()
             }
@@ -125,13 +138,15 @@ def evaluate(path: Path) -> dict:
                     "hybrid_score": round(item.score, 6),
                     "variant_scores": {
                         method: round(scores[candidate_id][method], 6)
-                        for method in ("no_color", "no_color_low_text")
+                        for method in ("no_color", "no_color_low_text", "missing_geo_reweighted")
                     },
                     "signals": {
                         "text": round(item.signals.text, 6),
                         "category": round(item.signals.category, 6),
                         "time": round(item.signals.time, 6),
                         "location": round(item.signals.location, 6),
+                        "distance_km": round(item.signals.distance_km, 6) if item.signals.distance_km is not None else None,
+                        "time_gap_hours": round(item.signals.time_gap_hours, 6) if item.signals.time_gap_hours is not None else None,
                         "color_conflict": item.signals.color_conflict,
                     },
                 })
@@ -150,6 +165,7 @@ def evaluate(path: Path) -> dict:
             "semantic_weight": SEMANTIC_WEIGHT,
             "color_conflict_penalty": COLOR_CONFLICT_PENALTY,
             "no_color_low_text": "rule text 0.05, category 0.25, time 0.30, location 0.30, rule multiplier 0.50, semantic 0.55, no color penalty",
+            "missing_geo_reweighted": "v3 except when either coordinate is missing: divide rule score by 0.70 before blending; retain color penalty",
         },
         "embedding_model": MODEL,
         "source_count": len(labels),
