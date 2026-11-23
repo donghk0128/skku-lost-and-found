@@ -88,7 +88,7 @@ class MatchingService:
                         candidate_post_id=item.post.id,
                         rank=index,
                         final_score=item.score,
-                        rule_score=item.signals.ranking_score,
+                        rule_score=item.signals.score,
                         semantic_score=item.semantic_score,
                         text_score=item.signals.text,
                         category_score=item.signals.category,

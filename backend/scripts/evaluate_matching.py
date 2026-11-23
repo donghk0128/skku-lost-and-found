@@ -41,28 +41,10 @@ def load_labels(path: Path) -> dict[UUID, dict[UUID, bool]]:
     return labels
 
 
-def load_codes(path: Path) -> dict[UUID, str]:
-    """Use optional benchmark codes in reports without exposing post UUIDs."""
-    codes = {}
-    with path.open(encoding="utf-8-sig", newline="") as stream:
-        for row in csv.DictReader(stream):
-            if row.get("source_code"):
-                codes[UUID(row["source_post_id"])] = row["source_code"]
-            if row.get("candidate_code"):
-                codes[UUID(row["candidate_post_id"])] = row["candidate_code"]
-    return codes
-
-
 def evaluate(path: Path) -> dict:
     labels = load_labels(path)
-    codes = load_codes(path)
-    methods: dict[str, dict[UUID, list[UUID]]] = {
-        name: {} for name in (
-            "rule", "semantic", "hybrid_v3", "no_color", "no_color_low_text", "missing_geo_reweighted"
-        )
-    }
+    methods: dict[str, dict[UUID, list[UUID]]] = {"rule": {}, "semantic": {}, "hybrid": {}}
     positives: dict[UUID, set[UUID]] = {}
-    source_types: dict[UUID, str] = {}
     pair_snapshots = []
     with Session(engine) as db:
         if db.get_bind().dialect.name != "postgresql":
@@ -79,78 +61,26 @@ def evaluate(path: Path) -> dict:
             if len(similarities) != len(candidate_labels):
                 raise ValueError(f"Missing compatible embeddings for source {source_id}")
             ranked = rank_candidates(source, candidates, similarities)
-            items = {item.post.id: item for item in ranked}
-            if any(item.semantic_score is None for item in ranked):
-                raise ValueError(f"Missing semantic score for source {source_id}")
-            scores = {
-                candidate_id: {
-                    "rule": item.signals.score,
-                    "semantic": item.semantic_score,
-                    "hybrid_v3": max(
-                        0.0,
-                        RULE_WEIGHT * item.signals.score + SEMANTIC_WEIGHT * item.semantic_score
-                        - (COLOR_CONFLICT_PENALTY if item.signals.color_conflict else 0.0),
-                    ),
-                    "no_color": RULE_WEIGHT * item.signals.score + SEMANTIC_WEIGHT * item.semantic_score,
-                    # Transfer 0.05 of total weight from lexical text to semantic similarity.
-                    # Rule text falls from 0.15 to 0.05; final semantic rises from 0.50 to 0.55.
-                    "no_color_low_text": (
-                        RULE_WEIGHT * (item.signals.score - 0.10 * item.signals.text)
-                        + (SEMANTIC_WEIGHT + 0.05) * item.semantic_score
-                    ),
-                    # Production v4 uses the reweighted score when coordinates are missing.
-                    "missing_geo_reweighted": item.score,
-                }
-                for candidate_id, item in items.items()
-            }
-            for method in methods:
-                methods[method][source_id] = sorted(
-                    items,
-                    key=lambda candidate_id: (
-                        scores[candidate_id][method],
-                        items[candidate_id].post.created_at,
-                        str(candidate_id),
-                    ),
-                    reverse=True,
-                )
-            ranks = {
-                method: {
-                    candidate_id: rank
-                    for rank, candidate_id in enumerate(methods[method][source_id], start=1)
-                }
-                for method in methods
-            }
-            for candidate_index, candidate_id in enumerate(candidate_labels, start=1):
-                item = items[candidate_id]
+            for candidate_index, item in enumerate(ranked, start=1):
                 pair_snapshots.append({
-                    "source": codes.get(source_id, f"S{source_index}"),
-                    "source_type": source.post_type,
-                    "candidate": codes.get(candidate_id, f"S{source_index}-C{candidate_index}"),
-                    "label": int(candidate_labels[candidate_id]),
-                    "ranks": {method: ranks[method][candidate_id] for method in methods},
+                    "source": f"S{source_index}",
+                    "candidate": f"S{source_index}-C{candidate_index}",
+                    "label": int(candidate_labels[item.post.id]),
                     "rule_score": round(item.signals.score, 6),
                     "semantic_score": round(item.semantic_score, 6),
-                    "hybrid_score": round(scores[candidate_id]["hybrid_v3"], 6),
-                    "variant_scores": {
-                        method: round(scores[candidate_id][method], 6)
-                        for method in ("no_color", "no_color_low_text", "missing_geo_reweighted")
-                    },
+                    "hybrid_score": round(item.score, 6),
                     "signals": {
                         "text": round(item.signals.text, 6),
                         "category": round(item.signals.category, 6),
                         "time": round(item.signals.time, 6),
                         "location": round(item.signals.location, 6),
-                        "distance_km": round(item.signals.distance_km, 6) if item.signals.distance_km is not None else None,
-                        "time_gap_hours": round(item.signals.time_gap_hours, 6) if item.signals.time_gap_hours is not None else None,
                         "color_conflict": item.signals.color_conflict,
                     },
                 })
+            methods["hybrid"][source_id] = [item.post.id for item in ranked]
+            methods["rule"][source_id] = [item.post.id for item in sorted(ranked, key=lambda item: (item.signals.score, item.post.created_at, str(item.post.id)), reverse=True)]
+            methods["semantic"][source_id] = [item.post.id for item in sorted(ranked, key=lambda item: (item.semantic_score, item.post.created_at, str(item.post.id)), reverse=True)]
             positives[source_id] = {candidate_id for candidate_id, is_match in candidate_labels.items() if is_match}
-            source_types[source_id] = source.post_type
-    directions = {
-        "LOST_TO_FOUND": {source_id for source_id, post_type in source_types.items() if post_type == "LOST"},
-        "FOUND_TO_LOST": {source_id for source_id, post_type in source_types.items() if post_type == "FOUND"},
-    }
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "algorithm_version": ALGORITHM_VERSION,
@@ -159,24 +89,11 @@ def evaluate(path: Path) -> dict:
             "rule_weight": RULE_WEIGHT,
             "semantic_weight": SEMANTIC_WEIGHT,
             "color_conflict_penalty": COLOR_CONFLICT_PENALTY,
-            "no_color_low_text": "rule text 0.05, category 0.25, time 0.30, location 0.30, rule multiplier 0.50, semantic 0.55, no color penalty",
-            "missing_geo_reweighted": "v3 except when either coordinate is missing: divide rule score by 0.70 before blending; retain color penalty",
         },
         "embedding_model": MODEL,
         "source_count": len(labels),
         "labeled_pair_count": sum(map(len, labels.values())),
-        "sources_with_fewer_than_6_candidates": sum(len(pairs) < 6 for pairs in labels.values()),
         "metrics": {method: ranking_metrics(rankings, positives) for method, rankings in methods.items()},
-        "metrics_by_direction": {
-            direction: {
-                method: ranking_metrics(
-                    {source_id: ranking for source_id, ranking in rankings.items() if source_id in source_ids},
-                    positives,
-                )
-                for method, rankings in methods.items()
-            }
-            for direction, source_ids in directions.items() if source_ids
-        },
         "pairs": pair_snapshots,
     }
 
@@ -189,7 +106,7 @@ def main() -> None:
     result = evaluate(args.labels)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps({key: value for key, value in result.items() if key != "pairs"}, ensure_ascii=False, indent=2))
+    print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
