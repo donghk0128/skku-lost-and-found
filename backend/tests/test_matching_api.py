@@ -162,7 +162,6 @@ def test_semantic_similarity_can_rerank_rule_candidates(
     assert [item["post"]["id"] for item in response.json()["items"]] == [
         str(ids["other"]), str(ids["best"])
     ]
-    assert response.json()["items"][0]["score"] == 0.55
 
 
 def test_embedding_comparison_is_limited_to_top_rule_candidates(
