@@ -20,7 +20,6 @@ from app.matching.embedding import MODEL
 from app.matching.evaluation import ranking_metrics
 from app.matching.ranking import ALGORITHM_VERSION, COLOR_CONFLICT_PENALTY, RULE_WEIGHT, SEMANTIC_WEIGHT, rank_candidates
 from app.matching.repository import MatchingRepository
-from app.matching.scoring import LOCATION_WEIGHT
 from app.posts.model import Post
 
 
@@ -87,7 +86,11 @@ def evaluate(path: Path) -> dict:
                 candidate_id: {
                     "rule": item.signals.score,
                     "semantic": item.semantic_score,
-                    "hybrid_v3": item.score,
+                    "hybrid_v3": max(
+                        0.0,
+                        RULE_WEIGHT * item.signals.score + SEMANTIC_WEIGHT * item.semantic_score
+                        - (COLOR_CONFLICT_PENALTY if item.signals.color_conflict else 0.0),
+                    ),
                     "no_color": RULE_WEIGHT * item.signals.score + SEMANTIC_WEIGHT * item.semantic_score,
                     # Transfer 0.05 of total weight from lexical text to semantic similarity.
                     # Rule text falls from 0.15 to 0.05; final semantic rises from 0.50 to 0.55.
@@ -95,16 +98,8 @@ def evaluate(path: Path) -> dict:
                         RULE_WEIGHT * (item.signals.score - 0.10 * item.signals.text)
                         + (SEMANTIC_WEIGHT + 0.05) * item.semantic_score
                     ),
-                    # With no coordinate pair, distribute the unavailable location weight
-                    # across the available rule signals rather than treating it as a mismatch.
-                    "missing_geo_reweighted": (
-                        item.score if item.signals.distance_km is not None else max(
-                            0.0,
-                            RULE_WEIGHT * item.signals.score / (1 - LOCATION_WEIGHT)
-                            + SEMANTIC_WEIGHT * item.semantic_score
-                            - (COLOR_CONFLICT_PENALTY if item.signals.color_conflict else 0.0),
-                        )
-                    ),
+                    # Production v4 uses the reweighted score when coordinates are missing.
+                    "missing_geo_reweighted": item.score,
                 }
                 for candidate_id, item in items.items()
             }
@@ -135,7 +130,7 @@ def evaluate(path: Path) -> dict:
                     "ranks": {method: ranks[method][candidate_id] for method in methods},
                     "rule_score": round(item.signals.score, 6),
                     "semantic_score": round(item.semantic_score, 6),
-                    "hybrid_score": round(item.score, 6),
+                    "hybrid_score": round(scores[candidate_id]["hybrid_v3"], 6),
                     "variant_scores": {
                         method: round(scores[candidate_id][method], 6)
                         for method in ("no_color", "no_color_low_text", "missing_geo_reweighted")

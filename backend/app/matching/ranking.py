@@ -6,7 +6,7 @@ from uuid import UUID
 from app.matching.scoring import RuleSignals, rule_signals
 from app.posts.model import Post
 
-ALGORITHM_VERSION = "hybrid-v3"
+ALGORITHM_VERSION = "hybrid-v4"
 RULE_WEIGHT = 0.5
 SEMANTIC_WEIGHT = 0.5
 COLOR_CONFLICT_PENALTY = 0.25
@@ -28,7 +28,7 @@ def rank_candidates(
     for candidate in candidates:
         signals = rule_signals(source, candidate)
         semantic = similarities.get(candidate.id)
-        blended = signals.score if semantic is None else RULE_WEIGHT * signals.score + SEMANTIC_WEIGHT * semantic
+        blended = signals.ranking_score if semantic is None else RULE_WEIGHT * signals.ranking_score + SEMANTIC_WEIGHT * semantic
         score = max(0.0, blended - (COLOR_CONFLICT_PENALTY if signals.color_conflict else 0.0))
         reasons = []
         if signals.distance_km is not None and signals.distance_km <= 0.5:
