@@ -51,6 +51,13 @@ class RuleSignals:
             + LOCATION_WEIGHT * self.location
         )
 
+    @property
+    def ranking_score(self) -> float:
+        """Do not count an unavailable coordinate pair as evidence of distance."""
+        if self.distance_km is None:
+            return self.score / (1 - LOCATION_WEIGHT)
+        return self.score
+
 
 def _compact(text: str) -> str:
     normalized = unicodedata.normalize("NFKC", text).casefold()
@@ -147,4 +154,4 @@ def rule_signals(source: Post, candidate: Post) -> RuleSignals:
 
 def score_posts(source: Post, candidate: Post) -> float:
     """Return a ranking score in [0, 1], not a match probability."""
-    return rule_signals(source, candidate).score
+    return rule_signals(source, candidate).ranking_score

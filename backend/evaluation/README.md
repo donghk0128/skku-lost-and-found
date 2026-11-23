@@ -40,4 +40,20 @@ EC2 배포 Compose를 쓰는 경우에는 서버의 저장소 루트에서 아�
 docker compose -f compose.deploy.yaml run --rm -v "$(pwd)/backend/evaluation:/app/evaluation" backend python -m scripts.evaluate_matching --labels /app/evaluation/labels.csv --output /app/evaluation/result.json
 ```
 
-평가 도구는 DB를 읽기만 하며 Gemini 호출이나 게시글 수정은 하지 않습니다. 모든 비교 글에 호환되는 벡터가 있어야 세 방식의 지표를 공정하게 비교할 수 있습니다. 출력에는 실제 게시글 ID를 넣지 않고 익명 코드, 정답 여부, 개별 점수와 집계 지표를 남깁니다. 이 파일을 개발 DB와 별도로 보관하면 가중치 변경 전후를 다시 비교할 수 있습니다. `labels.csv`는 실제 게시글 ID가 들어 있으므로 Git에 올리지 않습니다. 포트폴리오에는 익명화한 입력 예시와 지표·해석을 함께 보관합니다.
+평가 도구는 DB를 읽기만 하며 Gemini 호출이나 게시글 수정은 하지 않습니다. 모든 비교 글에 호환되는 벡터가 있어야 각 방식의 지표를 공정하게 비교할 수 있습니다. 출력에는 실제 게시글 ID를 넣지 않고 익명 코드, 정답 여부, 개별 점수와 집계 지표를 남깁니다. 이 파일을 개발 DB와 별도로 보관하면 가중치 변경 전후를 다시 비교할 수 있습니다. `labels.csv`는 실제 게시글 ID가 들어 있으므로 Git에 올리지 않습니다. 포트폴리오에는 익명화한 입력 예시와 지표·해석을 함께 보관합니다.
+
+## 고정 양방향 벤치마크 v1
+
+[`benchmark_v1.json`](benchmark_v1.json)은 정답 12쌍, 게시글 24개를 정의합니다. 분실→습득 12질의와 습득→분실 12질의에서 각 질의는 반대 유형 12개를 모두 비교합니다(총 288쌍). 각 질의의 정답은 정확히 하나입니다. 물품명 동의어, 같은 카테고리의 다른 물건, 유사한 색·특징, 같은 건물의 다른 층, 좌표 누락을 포함합니다. 좌표는 **실제 건물 위치를 측량한 값이 아닌 통제된 시험점**입니다. 이 데이터와 결과를 실제 서비스 정확도 주장에 그대로 사용하지 않습니다.
+
+`scripts.seed_matching_benchmark`는 기본적으로 데이터 검증만 합니다. `--apply`를 지정했을 때만 개발 PostgreSQL에 진행 중인 글을 만들고 Gemini 임베딩을 생성합니다. 기존 시험 계정 UUID를 `--lost-author-id`로 전달하고, 필요하면 `--found-author-id`를 따로 전달합니다. 운영 DB에는 실행하지 마세요. 서버의 백엔드 환경에 `DATABASE_URL`과 `GEMINI_API_KEY`가 있어야 합니다. 글 ID는 데이터셋과 코드에서 결정되므로 재실행 시 같은 글을 재사용하고, 일부만 있으면 중단합니다. 등록이 끝나면 Git에서 제외되는 `labels.csv`를 자동 생성합니다.
+
+백엔드 디렉터리에서 실행하는 명령:
+
+```sh
+python -m scripts.seed_matching_benchmark
+python -m scripts.seed_matching_benchmark --apply --lost-author-id <시험계정UUID>
+python -m scripts.evaluate_matching --labels evaluation/labels.csv --output evaluation/result.json
+```
+
+평가 도구는 동일한 게시글·임베딩에 대해 `hybrid_v3`, `no_color`(색상 감점 없음), `no_color_low_text`(규칙 내 문자열 0.15→0.05, 최종 임베딩 0.50→0.55), `missing_geo_reweighted`(한쪽이라도 좌표가 없을 때 규칙 점수의 위치 30%를 제외하고 나머지를 재정규화)의 전체·방향별 지표를 한 번에 계산합니다. 마지막 방식은 이 브랜치의 `hybrid-v4` 코드와 같습니다. **기존 EC2 API는 계속 v3**이며, 이 브랜치를 배포하기 전까지 서비스 동작은 바뀌지 않습니다. `result.json`에는 게시글 UUID 대신 E1 등의 평가 코드가 표시됩니다.

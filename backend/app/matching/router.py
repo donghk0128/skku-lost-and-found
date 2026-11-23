@@ -39,7 +39,7 @@ def list_ranked_candidates(
                 post=PostResponse.model_validate(item.post),
                 rank=offset + index,
                 score=round(item.score, 4),
-                rule_score=round(item.signals.score, 4),
+                rule_score=round(item.signals.ranking_score, 4),
                 semantic_score=round(item.semantic_score, 4) if item.semantic_score is not None else None,
                 reasons=item.reasons,
             )
