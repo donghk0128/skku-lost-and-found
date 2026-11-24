@@ -18,7 +18,7 @@ from app.auth.service import get_current_user
 from app.core.database import Base, get_db
 from app.main import app
 from app.matching.model import RecommendationItem, RecommendationRun
-from app.posts.model import Category, Post
+from app.posts.model import Category, Post, PostLocation
 from app.users.model import User
 
 
@@ -119,6 +119,41 @@ def test_changed_candidate_creates_new_run(client_and_engine) -> None:
         db.commit()
     second = client.get(url).json()["run_id"]
     assert second != first
+
+
+def test_secondary_pin_drives_reason_recorded_distance_and_new_run(client_and_engine) -> None:
+    client, engine, _, posts = client_and_engine
+    with Session(engine) as db:
+        candidate = db.get(Post, posts["best"].id)
+        candidate.locations.append(PostLocation(position=0, latitude=37.5, longitude=127.5))
+        candidate.latitude, candidate.longitude = 37.5, 127.5
+        db.commit()
+
+    path = f"/api/v1/posts/{posts['source'].id}"
+    updated = client.patch(path, json={"locations": [
+        {"location_text": "좌표 없는 대표 장소"},
+        {"latitude": 37.5, "longitude": 127.5},
+    ]})
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["latitude"] is None
+    first = client.get(path + "/ranked-candidates").json()
+    best = next(item for item in first["items"] if item["post"]["id"] == str(posts["best"].id))
+    assert "NEARBY_LOCATION" in best["reasons"]
+    with Session(engine) as db:
+        recorded = db.get(RecommendationItem, (UUID(first["run_id"]), posts["best"].id))
+        assert recorded.distance_km == pytest.approx(0.0)
+        assert recorded.location_score == pytest.approx(1.0)
+        assert "NEARBY_LOCATION" in recorded.reasons
+
+    changed = client.patch(path, json={"locations": [
+        {"location_text": "좌표 없는 대표 장소"},
+        {"latitude": 38.0, "longitude": 128.0},
+    ]})
+    assert changed.status_code == 200, changed.text
+    second = client.get(path + "/ranked-candidates").json()
+    assert second["run_id"] != first["run_id"]
+    best_after = next(item for item in second["items"] if item["post"]["id"] == str(posts["best"].id))
+    assert "NEARBY_LOCATION" not in best_after["reasons"]
 
 
 def test_home_ranking_scores_all_filtered_candidates(client_and_engine, monkeypatch: pytest.MonkeyPatch) -> None:
