@@ -9,6 +9,7 @@ import pytest
 from app.matching.ranking import rank_candidates
 from app.matching.scoring import LOCATION_WEIGHT, rule_signals
 from app.posts.model import Post, PostLocation
+from app.users.model import User  # noqa: F401 - register Post.author relationship
 
 
 def post(kind: str, locations: list[tuple[str | None, float | None, float | None]]) -> Post:
