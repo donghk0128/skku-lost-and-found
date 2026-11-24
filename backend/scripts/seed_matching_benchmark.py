@@ -89,7 +89,7 @@ def write_labels(data: dict, path: Path) -> None:
 
 
 def seed(data: dict, lost_author_id: UUID, found_author_id: UUID) -> None:
-    from sqlalchemy import select
+    from sqlalchemy import inspect, select
     from sqlalchemy.orm import Session
 
     from app.core.config import get_settings
@@ -106,6 +106,9 @@ def seed(data: dict, lost_author_id: UUID, found_author_id: UUID) -> None:
     with Session(engine) as db:
         if db.get_bind().dialect.name != "postgresql":
             raise ValueError("Benchmark seeding requires the development PostgreSQL DB")
+        if any("locations" in pair[kind] for pair in data["pairs"] for kind in ("lost", "found")):
+            if not inspect(db.connection()).has_table("post_locations"):
+                raise ValueError("post_locations is missing; apply the 0013_post_locations migration before seeding")
         for author_id in {lost_author_id, found_author_id}:
             if db.get(User, author_id) is None:
                 raise ValueError(f"Test author does not exist: {author_id}")
