@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "707745224295",
+    "project_id": "skku-lost-and-found",
+    "storage_bucket": "skku-lost-and-found.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:707745224295:android:17ac270d282c1a4323e6c2",
+        "android_client_info": {
+          "package_name": "com.jessi026.frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCfNWNVvFEVIcMzCAaVrkKwi65Rq_2ddeM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

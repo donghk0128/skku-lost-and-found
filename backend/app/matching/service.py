@@ -16,6 +16,7 @@ from app.matching.repository import MatchingRepository
 from app.matching.scoring import score_posts
 from app.posts.model import Post
 from app.posts.service import PostService
+from app.posts.filters import PostFilterConditions
 
 
 MAX_SEMANTIC_CANDIDATES = 50
@@ -31,6 +32,7 @@ class MatchingService:
         search: str | None,
         limit: int,
         offset: int,
+        conditions: PostFilterConditions | None = None,
     ) -> tuple[Post, list[RankedCandidate], int, UUID]:
         source = PostService.get_visible_by_id(db, post_id)
         if source.author_id != user_id:
@@ -41,10 +43,11 @@ class MatchingService:
             search = search.strip()
             if not search:
                 raise ApiError(422, "invalid_search_query", "검색어를 입력해 주세요.")
-        candidates = MatchingRepository.list_candidates(db, source, category_id, search)
+        conditions = conditions or PostFilterConditions(category_id=category_id, q=search)
+        candidates = MatchingRepository.list_candidates(db, source, category_id, search, conditions)
         similarities = MatchingRepository.cosine_similarities(db, source, [post.id for post in candidates])
         ranked = rank_candidates(source, candidates, similarities)
-        filters = {"post_type": "FOUND" if source.post_type == "LOST" else "LOST", "category_id": category_id, "q": search}
+        filters = {"post_type": "FOUND" if source.post_type == "LOST" else "LOST", **conditions.model_dump(mode="json")}
         run_id = MatchingService._record_run(db, source, candidates, ranked, filters)
         return source, ranked[offset : offset + limit], len(ranked), run_id
 

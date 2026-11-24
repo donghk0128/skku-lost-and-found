@@ -202,7 +202,7 @@ def test_list_posts_filters_paginates_and_hides_deleted(api_client: tuple[TestCl
     assert client.get("/api/v1/posts?offset=-1").status_code == 422
 
 
-def test_search_matches_spacing_across_fields_and_combines_filters(api_client: tuple[TestClient, Engine]) -> None:
+def test_search_preserves_phrase_spacing_and_combines_filters(api_client: tuple[TestClient, Engine]) -> None:
     client, engine = api_client
     author_id = create_author(engine)
     headers = {"Authorization": f"Bearer {create_access_token(author_id)}"}
@@ -234,16 +234,18 @@ def test_search_matches_spacing_across_fields_and_combines_filters(api_client: t
 
     compact = client.get("/api/v1/posts", params={"q": "무선이어폰"})
     assert compact.status_code == 200
-    assert compact.json()["total"] == 4
+    assert compact.json()["total"] == 1
 
     combined = client.get("/api/v1/posts", params={"q": "무선이어폰", "post_type": "FOUND", "category_id": 1, "limit": 1})
     assert combined.status_code == 200
-    assert combined.json()["total"] == 2
+    assert combined.json()["total"] == 1
     assert [item["id"] for item in combined.json()["items"]] == [post_ids[1]]
 
     across_fields = client.get("/api/v1/posts", params={"q": "검정 에어팟프로"})
     assert across_fields.status_code == 200
-    assert [item["id"] for item in across_fields.json()["items"]] == [post_ids[0]]
+    assert across_fields.json()["items"] == []
+    phrase = client.get("/api/v1/posts", params={"q": "에어팟 프로"})
+    assert [item["id"] for item in phrase.json()["items"]] == [post_ids[0]]
     assert client.get("/api/v1/posts", params={"q": "airpods"}).json()["total"] == 1
     assert client.get("/api/v1/posts", params={"q": "   "}).status_code == 422
     assert client.get("/api/v1/posts", params={"q": "%"}).json()["total"] == 0

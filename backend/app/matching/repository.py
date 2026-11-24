@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.matching.model import PostEmbedding
 from app.posts.model import Post
-from app.posts.repository import PostRepository
+from app.posts.filters import PostFilterConditions, post_filter_expressions
 
 
 class MatchingRepository:
@@ -35,7 +35,8 @@ class MatchingRepository:
 
     @staticmethod
     def list_candidates(
-        db: Session, source: Post, category_id: int | None = None, search: str | None = None
+        db: Session, source: Post, category_id: int | None = None, search: str | None = None,
+        conditions: PostFilterConditions | None = None,
     ) -> list[Post]:
         opposite_type = "FOUND" if source.post_type == "LOST" else "LOST"
         filters = [
@@ -43,10 +44,7 @@ class MatchingRepository:
             Post.status == "OPEN",
             Post.deleted_at.is_(None),
         ]
-        if category_id is not None:
-            filters.append(Post.category_id == category_id)
-        if search is not None:
-            filters.extend(PostRepository.search_filters(search))
+        filters.extend(post_filter_expressions(conditions or PostFilterConditions(category_id=category_id, q=search)))
         statement = select(Post).where(*filters)
         return list(db.scalars(statement).all())
 

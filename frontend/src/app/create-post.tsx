@@ -50,6 +50,8 @@ import ChevronLeftIcon from "@/assets/icons/chevron-left.svg";
 
 import {
   parseLocationEntries,
+  locationEntriesFromPost,
+  locationEntriesToPayload,
   type LocationEntry,
 } from "@/lib/location-entries";
 
@@ -134,6 +136,7 @@ export default function CreatePostScreen() {
     scrollRef.current?.scrollTo({ y: 0, animated: false });
   }, [step]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [maxLocations, setMaxLocations] = useState<number | null>(null);
   const [categoryError, setCategoryError] = useState("");
   const [category, setCategory] = useState<Category | null>(null);
   const [categoryOpen, setCategoryOpen] = useState(false);
@@ -266,6 +269,10 @@ export default function CreatePostScreen() {
 
   useEffect(() => {
     let active = true;
+    // The server remains authoritative if this optional policy lookup fails.
+    void postsApi.limits().then((limits) => {
+      if (active) setMaxLocations(limits.max_locations);
+    }).catch(() => {});
     postsApi
       .categories()
       .then((items) => {
@@ -310,16 +317,10 @@ export default function CreatePostScreen() {
         setFeatures(content.features);
         setTitle(post.title);
         setDescription(content.body);
-        setPlace(post.location_text ?? "");
-        setPicked(
-          post.latitude !== null && post.longitude !== null
-            ? {
-                address: post.location_text ?? "",
-                latitude: post.latitude,
-                longitude: post.longitude,
-              }
-            : null,
-        );
+        const locations = locationEntriesFromPost(post);
+        setPlace(locations[0]?.text ?? "");
+        setPicked(locations[0]?.pin ?? null);
+        setAdditionalLocations(locations.slice(1));
         setStart(post.event_start_at ? new Date(post.event_start_at) : null);
         setEnd(post.event_end_at ? new Date(post.event_end_at) : null);
         setExistingPhotos(images.map((image) => imageUrl(image.content_url)));
@@ -372,9 +373,8 @@ export default function CreatePostScreen() {
   const removeLocation = (id: string) => {
     if (id === "primary") {
       const [next, ...rest] = additionalLocations;
-      if (!next) return;
-      setPlace(next.text);
-      setPicked(next.pin);
+      setPlace(next?.text ?? "");
+      setPicked(next?.pin ?? null);
       setAdditionalLocations(rest);
     } else
       setAdditionalLocations((current) =>
@@ -444,6 +444,13 @@ export default function CreatePostScreen() {
   const submit = async () => {
     if (pending.current) return;
     setError("");
+    const locations = locationEntriesToPayload([
+      { id: "primary", text: place, pin: picked }, ...additionalLocations,
+    ]);
+    if (maxLocations !== null && locations.length > maxLocations) {
+      setError(t("createPost.locationLimit", { count: maxLocations }));
+      return;
+    }
     if (step === 1) {
       if (!category) {
         setError(t("createPost.selectCategory"));
@@ -489,23 +496,15 @@ export default function CreatePostScreen() {
           title: title.trim(),
           description: joinPostDescription(description, features),
           category_id: category?.id ?? null,
-          location_text: place.trim() || null,
+          locations,
           event_start_at: start?.toISOString() ?? null,
           event_end_at: end?.toISOString() ?? null,
         };
-        const coordinates = picked
-          ? {
-              latitude: Number(picked.latitude.toFixed(6)),
-              longitude: Number(picked.longitude.toFixed(6)),
-            }
-          : {};
         const post = editId
           ? await postsApi.update(
               editId,
               {
                 ...commonBody,
-                ...coordinates,
-                ...(!picked ? { latitude: null, longitude: null } : {}),
               },
               session.access_token,
             )
@@ -518,10 +517,8 @@ export default function CreatePostScreen() {
                 post_type: postType,
                 ...commonBody,
                 category_id: commonBody.category_id ?? undefined,
-                location_text: commonBody.location_text ?? undefined,
                 event_start_at: commonBody.event_start_at ?? undefined,
                 event_end_at: commonBody.event_end_at ?? undefined,
-                ...coordinates,
               },
               session.access_token,
             );
@@ -812,7 +809,7 @@ export default function CreatePostScreen() {
                           )}
                         </Text>
                       </Pressable>
-                      {additionalLocations.length > 0 ? (
+                      {additionalLocations.length > 0 || Boolean(row.text || row.pin) ? (
                         <Pressable
                           accessibilityRole="button"
                           accessibilityLabel={t("createPost.removeLocation", {

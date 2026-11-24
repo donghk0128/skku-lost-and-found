@@ -12,6 +12,7 @@ from app.core.config import get_settings
 from app.matching.router import router as matching_router
 from app.posts.router import categories_router, router as posts_router
 from app.users.router import router as users_router
+from app.users.keyword_conditions import router as keyword_conditions_router
 
 app = FastAPI(title="찾자 API", version="0.1.0", openapi_url="/api/v1/openapi.json", docs_url="/docs")
 app.add_middleware(
@@ -47,6 +48,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(ai_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
+app.include_router(keyword_conditions_router, prefix="/api/v1")
 app.include_router(posts_router, prefix="/api/v1")
 app.include_router(matching_router, prefix="/api/v1")
 app.include_router(categories_router, prefix="/api/v1")

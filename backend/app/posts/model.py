@@ -59,6 +59,10 @@ class Post(Base):
     location_text: Mapped[str | None] = mapped_column(String(255), nullable=True)
     latitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6), nullable=True)
     longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6), nullable=True)
+    locations: Mapped[list["PostLocation"]] = relationship(
+        back_populates="post", cascade="all, delete-orphan", lazy="selectin",
+        order_by="PostLocation.position",
+    )
     event_start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     event_end_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(12), nullable=False, default="OPEN", server_default="OPEN")
@@ -70,6 +74,36 @@ class Post(Base):
     @property
     def author_nickname(self) -> str:
         return self.author.nickname
+
+
+class PostLocation(Base):
+    __tablename__ = "post_locations"
+    __table_args__ = (
+        CheckConstraint("position >= 0", name="ck_post_locations_position"),
+        CheckConstraint(
+            "(latitude IS NULL AND longitude IS NULL) OR (latitude IS NOT NULL AND longitude IS NOT NULL)",
+            name="ck_post_locations_coordinates_together",
+        ),
+        CheckConstraint("latitude BETWEEN -90 AND 90", name="ck_post_locations_latitude_range"),
+        CheckConstraint("longitude BETWEEN -180 AND 180", name="ck_post_locations_longitude_range"),
+        CheckConstraint(
+            "location_text IS NULL OR length(trim(location_text)) > 0",
+            name="ck_post_locations_text_not_blank",
+        ),
+        CheckConstraint(
+            "location_text IS NOT NULL OR latitude IS NOT NULL",
+            name="ck_post_locations_not_empty",
+        ),
+    )
+
+    post_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("posts.id", ondelete="CASCADE"), primary_key=True,
+    )
+    position: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
+    location_text: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    latitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6), nullable=True)
+    longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6), nullable=True)
+    post: Mapped["Post"] = relationship(back_populates="locations")
 
 
 class PostImage(Base):

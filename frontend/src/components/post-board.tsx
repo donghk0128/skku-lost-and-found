@@ -10,6 +10,7 @@ import {
   type ViewToken,
 } from "react-native";
 import ChevronDownIcon from "@/assets/icons/chevron-down.svg";
+import type { PostFilters } from "@/lib/post-filters";
 import { BottomTabInset, Colors, Fonts } from "@/constants/theme";
 import {
   imageUrl,
@@ -161,15 +162,13 @@ export function PostRow({
 
 export default function PostBoard({
   type,
-  search,
+  filters,
   sortMode,
-  categoryId,
   sourcePostId,
 }: {
   type: "LOST" | "FOUND";
-  search: string;
+  filters: PostFilters;
   sortMode: "newest" | "candidates";
-  categoryId: number | null;
   sourcePostId: string | null;
 }) {
   const { locale, t } = useLocale();
@@ -183,7 +182,7 @@ export default function PostBoard({
     },
     [],
   );
-  const [query, setQuery] = useState(search);
+  const [query, setQuery] = useState(filters);
   const [posts, setPosts] = useState<BoardItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [total, setTotal] = useState(0);
@@ -191,9 +190,9 @@ export default function PostBoard({
   const [error, setError] = useState("");
   const requests = useRef({ generation: 0, busy: false });
   useEffect(() => {
-    const timeout = setTimeout(() => setQuery(search), 300);
+    const timeout = setTimeout(() => setQuery(filters), 300);
     return () => clearTimeout(timeout);
-  }, [search]);
+  }, [filters]);
   useEffect(() => {
     let active = true;
     postsApi
@@ -230,7 +229,6 @@ export default function PostBoard({
           const ranked = await postsApi.rankedCandidates(
             sourcePostId,
             query,
-            categoryId,
             offset,
             session.access_token,
           );
@@ -243,7 +241,7 @@ export default function PostBoard({
             total: ranked.total,
           };
         } else {
-          const newest = await postsApi.list(type, query, offset, categoryId);
+          const newest = await postsApi.list(type, query, offset);
           result = {
             items: newest.items.map((post) => ({ post })),
             total: newest.total,
@@ -266,7 +264,7 @@ export default function PostBoard({
         }
       }
     },
-    [type, query, sortMode, categoryId, sourcePostId, t],
+    [type, query, sortMode, sourcePostId, t],
   );
   useEffect(() => {
     const state = requests.current;
@@ -319,7 +317,7 @@ export default function PostBoard({
                 ? user
                   ? t("home.selectSourcePrompt")
                   : t("common.loginRequired")
-                : query.trim()
+                : query.q?.trim()
                   ? t("board.searchEmpty")
                   : type === "LOST"
                     ? t("board.lostEmpty")

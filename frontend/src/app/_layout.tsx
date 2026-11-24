@@ -29,6 +29,7 @@ function AuthContent() {
         <Stack.Screen name="password-change" />
         <Stack.Screen name="my-posts" />
         <Stack.Screen name="favorites" />
+        <Stack.Screen name="keyword-conditions" />
         <Stack.Screen name="withdrawal" />
       </Stack.Protected>
       <Stack.Protected guard={!user}>

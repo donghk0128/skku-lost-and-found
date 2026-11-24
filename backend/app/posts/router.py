@@ -9,8 +9,10 @@ from sqlalchemy.orm import Session
 from app.auth.service import get_current_user
 from app.core.database import get_db
 from app.matching.repository import MatchingRepository
+from app.posts.constants import MAX_POST_LOCATIONS
+from app.posts.filters import PostFilterConditions, read_post_filters
 from app.posts.model import Category, Post, PostImage
-from app.posts.schemas import CategoryResponse, PostCreateRequest, PostImageResponse, PostListResponse, PostResponse, PostStatus, PostStatusUpdateRequest, PostType, PostUpdateRequest
+from app.posts.schemas import CategoryResponse, PostCreateRequest, PostImageResponse, PostLimitsResponse, PostListResponse, PostResponse, PostStatus, PostStatusUpdateRequest, PostType, PostUpdateRequest
 from app.posts.service import PostService
 from app.users.model import User
 
@@ -47,14 +49,13 @@ def create_ai_assisted_post(
 @router.get("", response_model=PostListResponse)
 def list_posts(
     post_type: PostType | None = None,
-    category_id: int | None = Query(default=None, ge=1),
     status: PostStatus | None = None,
-    q: str | None = Query(default=None, max_length=100),
+    conditions: PostFilterConditions = Depends(read_post_filters),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> PostListResponse:
-    posts, total = PostService.list_visible(db, post_type, category_id, status, q, limit, offset)
+    posts, total = PostService.list_visible(db, post_type, conditions.category_id, status, conditions.q, limit, offset, conditions)
     return PostListResponse(items=posts, total=total, limit=limit, offset=offset)
 
 
@@ -68,6 +69,11 @@ def list_my_open_posts(
 ) -> PostListResponse:
     posts = MatchingRepository.list_owned_open(db, current_user.id, post_type)
     return PostListResponse(items=posts[offset : offset + limit], total=len(posts), limit=limit, offset=offset)
+
+
+@router.get("/limits", response_model=PostLimitsResponse)
+def get_post_limits() -> PostLimitsResponse:
+    return PostLimitsResponse(max_locations=MAX_POST_LOCATIONS)
 
 
 @router.get("/{post_id}", response_model=PostResponse)
