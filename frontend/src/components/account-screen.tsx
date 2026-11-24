@@ -5,7 +5,9 @@ import {
   Text, TextInput, View, type TextInputProps,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors, Fonts } from "@/constants/theme";
+import { Colors, Fonts, MaxContentWidth } from "@/constants/theme";
+import ChevronLeftIcon from "@/assets/icons/chevron-left.svg";
+import { tabHeaderStyles } from "@/components/tab-header-styles";
 import { useLocale } from "@/i18n/LocaleProvider";
 
 export function AccountScreen({ title, children, footer, busy = false, tab = false, scroll = true }: {
@@ -16,15 +18,33 @@ export function AccountScreen({ title, children, footer, busy = false, tab = fal
   const insets = useSafeAreaInsets();
   return (
     <KeyboardAvoidingView style={s.root} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-      <View style={[s.header, { paddingTop: insets.top + (tab && Platform.OS === "web" ? 84 : 16) }]}>
-        {!tab && <Pressable accessibilityRole="button" accessibilityLabel={t("common.back")} disabled={busy}
-          onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/account")}>
-          <Text style={s.back}>‹</Text>
-        </Pressable>}
-        <Text style={s.title}>{title}</Text>
+      <View style={{ paddingTop: insets.top }}>
+        {tab ? (
+          <View style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
+            <View style={tabHeaderStyles.container}>
+              <View style={tabHeaderStyles.row}>
+                <Text accessibilityRole="header" style={s.tabTitle}>{title}</Text>
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View style={[s.header, { paddingLeft: insets.left + 18, paddingRight: insets.right + 18 }]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("common.back")}
+              disabled={busy}
+              style={s.back}
+              onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/account")}
+            >
+              <ChevronLeftIcon width={24} height={24} color="#000000" />
+            </Pressable>
+            <Text accessibilityRole="header" numberOfLines={1} style={s.headerTitle}>{title}</Text>
+            <View style={s.back} />
+          </View>
+        )}
       </View>
       {scroll
-        ? <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[s.content, { paddingBottom: tab ? 120 : 28 }]}>{children}</ScrollView>
+        ? <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[s.content, tab && s.tabContent, { paddingBottom: tab ? 120 : 28 }]}>{children}</ScrollView>
         : <View style={[s.content, { flex: 1, minHeight: 0, paddingBottom: 0 }]}>{children}</View>}
       {footer ? <View style={[s.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>{footer}</View> : null}
     </KeyboardAvoidingView>
@@ -54,10 +74,12 @@ export function AccountError({ message }: { message: string }) {
 
 export const accountStyles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#FFFFFF" },
-  header: { padding: 24, flexDirection: "row", alignItems: "center", gap: 16, width: "100%", maxWidth: 680, alignSelf: "center" },
-  back: { fontSize: 36, color: "#243A30", minWidth: 32 },
-  title: { fontSize: 25, fontFamily: Fonts.pretendardBold, color: "#20372B", flexShrink: 1 },
+  header: { minHeight: 64, flexDirection: "row", alignItems: "center", gap: 8 },
+  back: { width: 44, height: 44, justifyContent: "center" },
+  headerTitle: { flex: 1, textAlign: "center", fontSize: 17, fontFamily: Fonts.pretendardSemiBold, color: "#111" },
+  tabTitle: { fontSize: 28, lineHeight: 32, fontFamily: Fonts.pretendardSemiBold, color: "#111" },
   content: { padding: 24, paddingTop: 16, gap: 20, width: "100%", maxWidth: 680, alignSelf: "center" },
+  tabContent: { maxWidth: MaxContentWidth, paddingTop: 28 },
   footer: { borderTopWidth: 1, borderColor: "#E8EDE9", padding: 20, gap: 10, width: "100%", maxWidth: 680, alignSelf: "center", backgroundColor: "#FFFFFF" },
   button: { minHeight: 52, padding: 14, borderRadius: 14, backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center" },
   secondary: { backgroundColor: "#EDF3EF" },

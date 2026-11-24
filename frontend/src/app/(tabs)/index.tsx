@@ -1,3 +1,4 @@
+import { tabHeaderStyles } from "@/components/tab-header-styles";
 import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -129,9 +130,9 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
-        <View style={styles.content}>
+        <View style={[tabHeaderStyles.container, styles.content]}>
           {/* Header */}
-          <View style={styles.header}>
+          <View style={[tabHeaderStyles.row, styles.header]}>
             <ThemedText type="title" style={styles.logo}>
               SKKU Finder
             </ThemedText>
@@ -404,17 +405,10 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: "center",
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-  },
+  content: { flex: 1 },
 
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: 16,
-    paddingBottom: 30,
+    marginBottom: 30,
   },
   logo: {
     color: "#111111",

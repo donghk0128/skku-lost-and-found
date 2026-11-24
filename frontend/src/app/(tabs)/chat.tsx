@@ -1,3 +1,4 @@
+import { tabHeaderStyles } from "@/components/tab-header-styles";
 import { useCallback, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import {
@@ -123,8 +124,8 @@ export default function ChatList() {
   const visibleRooms = oldestFirst ? [...filtered].reverse() : filtered;
   return (
     <SafeAreaView style={styles.root} edges={["top", "left", "right"]}>
-      <View style={styles.content}>
-        <View style={styles.header}>
+      <View style={[tabHeaderStyles.container, styles.content]}>
+        <View style={[tabHeaderStyles.row, styles.header]}>
           <Text style={styles.title}>{t("tabs.chat")}</Text>
           <Pressable
             accessibilityRole="button"
@@ -417,27 +418,14 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.pretendardMedium,
   },
   root: { flex: 1, backgroundColor: Colors.background },
-  content: {
-    flex: 1,
-    width: "100%",
-    maxWidth: 720,
-    alignSelf: "center",
-    paddingHorizontal: 32,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: 24,
-    paddingBottom: 28,
-  },
-  title: { fontFamily: Fonts.pretendardSemiBold, fontSize: 28, color: "#111" },
+  content: { flex: 1 },
+  header: { marginBottom: 28 },
+  title: { fontFamily: Fonts.pretendardSemiBold, fontSize: 28, lineHeight: 32, color: "#111" },
   iconButton: {
     width: 44,
     height: 44,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: -8,
   },
   search: {
     minHeight: 42,
