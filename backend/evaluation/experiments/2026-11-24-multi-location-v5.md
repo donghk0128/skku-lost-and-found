@@ -2,7 +2,7 @@
 
 - **작성:** 2026-11-24 KST
 - **기준:** `develop`의 hybrid-v4 및 복수 장소 저장 기능 (`bfada58`)
-- **상태:** 코드 변경과 통제 사례 검증 단계. 개발 DB의 오프라인 지표와 배포 API 결과는 아직 측정하지 않음.
+- **상태:** 관련 테스트 20개 통과. 개발 DB의 오프라인 지표와 배포 API 결과는 아직 측정하지 않음.
 
 ## 문제와 결정
 
@@ -34,6 +34,25 @@ v4 실행 기록과 구분한다. 게시글의 두 번째 이후 장소만 수�
 | 텍스트만, 가까운 핀 | 가까운 핀 | 첫 장소에 좌표가 없어도 거리 계산 |
 | 텍스트만 | 가까운 핀 | 거리 미상, v4 결측 처리 유지 |
 | 관계 행 없는 구형 글의 대표 핀 | 구형 글의 대표 핀 | 기존 단일 좌표 계산 유지 |
+
+2026-11-24에 EC2의 별도 Docker 일회성 컨테이너에서 브랜치 `20f9111`의
+`backend/app`, `scripts`, `tests`, `evaluation`을 읽기 전용으로 연결했다. 개발 DB에
+접속하지 않도록 `DATABASE_URL=sqlite+pysqlite:///:memory:`와 빈 `GEMINI_API_KEY`를
+설정하고 다음 관련 테스트를 실행했다.
+
+```text
+test_matching_multi_location.py
+test_matching_color_ranking.py
+test_ranked_candidates_api.py
+test_matching_api.py
+test_matching_benchmark.py
+20 passed, 1 warning in 3.15s
+```
+
+경고는 `passlib`이 Python 3.13에서 제거 예정인 `crypt`를 사용한다는 안내다.
+테스트에는 두 번째 핀으로 바뀐 거리·근거리 근거·실행 기록과, 보조 장소만 수정했을 때
+새 실행 ID가 생성되는 API 경로가 포함된다. 전체 백엔드 테스트나 실제 PostgreSQL
+환경의 API 검증은 이 결과에 포함되지 않는다.
 
 평가 스크립트에는 대표 좌표만 사용하는 v4 점수와 복수 장소의 v5 점수를 함께
 출력하도록 했다. 기존 `benchmark_v1.json`은 변경하지 않는다. 이 평가셋의 글은
