@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.skkku.finder",
+      "bundleIdentifier": "com.skku.finder",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }

@@ -1,5 +1,6 @@
 import { useFonts } from "expo-font";
-import { DarkTheme, DefaultTheme, ThemeProvider, Stack } from "expo-router";
+import { DarkTheme, DefaultTheme, ThemeProvider, Stack, router, useRootNavigationState } from "expo-router";
+import { useEffect } from "react";
 import * as SplashScreen from "expo-splash-screen";
 import { useColorScheme } from "react-native";
 
@@ -7,11 +8,17 @@ import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import { Fonts } from "@/constants/theme";
 import AuthProvider, { useAuth } from "@/providers/AuthProvider";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
+import { observePush } from "@/lib/push-client";
 
 SplashScreen.preventAutoHideAsync();
 
 function AuthContent() {
   const { user, loading } = useAuth();
+  const navigation = useRootNavigationState();
+  useEffect(() => {
+    if (loading || !user || !navigation?.key) return;
+    return observePush(user.id, id => router.push({ pathname: "/post/[id]", params: { id } }));
+  }, [user, loading, navigation?.key]);
 
   if (loading) return null;
 

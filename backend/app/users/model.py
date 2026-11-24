@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, JSON, SmallInteger, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, JSON, SmallInteger, String, Text, UniqueConstraint, false, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
@@ -74,6 +74,8 @@ class KeywordCondition(Base):
     post_type: Mapped[str] = mapped_column(String(5), nullable=False)
     version: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1, server_default="1")
     conditions: Mapped[dict] = mapped_column(JSON, nullable=False)
+    notification_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=false())
+    notification_enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=now_utc, server_default=func.now())
 
 

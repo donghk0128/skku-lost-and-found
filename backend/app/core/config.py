@@ -2,6 +2,7 @@ from functools import lru_cache
 from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
 
 
 class Settings(BaseSettings):
@@ -14,6 +15,12 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 14
     post_image_dir: str = "post_images"
     cors_allowed_origins: list[str] = ["http://localhost:8081", "http://127.0.0.1:8081"]
+    push_enabled: bool = False
+    firebase_credentials_path: str = ""
+    firebase_project_id: str = ""
+    push_poll_seconds: float = Field(default=5, ge=1, le=60)
+    push_max_attempts: int = Field(default=6, ge=1, le=20)
+    push_ttl_seconds: int = Field(default=86400, ge=60, le=2419200)
 
     email_delivery_mode: str = "smtp"
     smtp_host: str = ""

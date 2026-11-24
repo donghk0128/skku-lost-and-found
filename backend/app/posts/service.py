@@ -16,6 +16,7 @@ from app.posts.filters import PostFilterConditions
 from app.posts.schemas import CreationMethod, PostCreateRequest, PostLocationRequest, PostStatus, PostType, PostUpdateRequest
 from app.posts.storage import get_post_image_storage
 from app.users.model import User
+from app.notifications.service import enqueue_post_notifications
 
 
 class PostService:
@@ -103,6 +104,7 @@ class PostService:
         PostRepository.create(db, post)
         db.flush()
         sync_post_embedding(db, post)
+        enqueue_post_notifications(db, post)
         PostService._commit(db)
         db.refresh(post)
         return post

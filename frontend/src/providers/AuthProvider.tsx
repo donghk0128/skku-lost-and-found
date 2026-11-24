@@ -7,6 +7,7 @@ import {
 } from "@/lib/auth-api";
 import { readSession, writeSession } from "@/lib/session-storage";
 import { t } from "@/i18n";
+import { clearPush } from "@/lib/push-client";
 
 type AuthContextValue = {
   user: User | null;
@@ -69,6 +70,7 @@ export default function AuthProvider({
   }, []);
 
   async function acceptSession(response: AuthResponse) {
+    await clearPush().catch(() => undefined);
     await writeSession({
       access_token: response.access_token,
       refresh_token: response.refresh_token,
@@ -95,13 +97,14 @@ export default function AuthProvider({
         if (!(error instanceof ApiError) || error.status !== 401) throw error;
       }
     }
+    await clearPush().catch(() => undefined);
     await writeSession(null);
     setInitializationError("");
     setUser(null);
   }
 
   async function clearAccount() {
-    try { await writeSession(null); }
+    try { await clearPush().catch(() => undefined); await writeSession(null); }
     finally { setUser(null); setInitializationError(""); }
   }
 
