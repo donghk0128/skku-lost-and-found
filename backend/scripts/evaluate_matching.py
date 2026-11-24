@@ -218,7 +218,29 @@ def main() -> None:
     result = evaluate(args.labels)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps({key: value for key, value in result.items() if key != "pairs"}, ensure_ascii=False, indent=2))
+    rank_changes = [
+        {
+            "source_type": row["source_type"], "source": row["source"],
+            "positive": row["candidate"],
+            "v4_rank": row["ranks"]["missing_geo_reweighted"],
+            "v5_rank": row["ranks"]["hybrid_v5"],
+        }
+        for row in result["pairs"]
+        if row["label"] and row["ranks"]["missing_geo_reweighted"] != row["ranks"]["hybrid_v5"]
+    ]
+    summary = {
+        "output": str(args.output),
+        "source_count": result["source_count"],
+        "labeled_pair_count": result["labeled_pair_count"],
+        "label_file_sha256": result["label_file_sha256"],
+        "metrics": {name: result["metrics"][name] for name in ("missing_geo_reweighted", "hybrid_v5")},
+        "metrics_by_direction": {
+            direction: {name: metrics[name] for name in ("missing_geo_reweighted", "hybrid_v5")}
+            for direction, metrics in result["metrics_by_direction"].items()
+        },
+        "positive_rank_changes": rank_changes,
+    }
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

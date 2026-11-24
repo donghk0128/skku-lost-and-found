@@ -21,6 +21,24 @@ def post_id(dataset_name: str, code: str, kind: str) -> UUID:
     return uuid5(NAMESPACE_URL, f"skku-finder/{dataset_name}/{code}/{kind}")
 
 
+def locations_for(data: dict, entry: dict) -> list[dict]:
+    """Return ordered locations; the original benchmark has one legacy anchor."""
+    if "locations" in entry:
+        return entry["locations"]
+    if entry.get("location_text") is None and entry.get("anchor") is None:
+        return []
+    return [{"location_text": entry.get("location_text"), "anchor": entry.get("anchor")}]
+
+
+def location_values(data: dict, location: dict) -> tuple[str | None, Decimal | None, Decimal | None]:
+    anchor = data["anchors"].get(location.get("anchor")) if location.get("anchor") else None
+    return (
+        location.get("location_text"),
+        Decimal(str(anchor[0])) if anchor else None,
+        Decimal(str(anchor[1])) if anchor else None,
+    )
+
+
 def load_dataset(path: Path) -> dict:
     data = json.loads(path.read_text(encoding="utf-8"))
     pairs = data["pairs"]
@@ -33,9 +51,15 @@ def load_dataset(path: Path) -> dict:
             entry = pair[kind]
             if not entry["title"].strip() or not entry["description"].strip():
                 raise ValueError(f"Missing text in {pair['code']}/{kind}")
-            anchor = entry["anchor"]
-            if anchor is not None and anchor not in data["anchors"]:
-                raise ValueError(f"Unknown anchor in {pair['code']}/{kind}")
+            locations = locations_for(data, entry)
+            if not locations or len(locations) > 10:
+                raise ValueError(f"Expected 1-10 locations in {pair['code']}/{kind}")
+            for location in locations:
+                anchor = location.get("anchor")
+                if anchor is not None and anchor not in data["anchors"]:
+                    raise ValueError(f"Unknown anchor in {pair['code']}/{kind}")
+                if not location.get("location_text") and anchor is None:
+                    raise ValueError(f"Empty location in {pair['code']}/{kind}")
             start = datetime.fromisoformat(entry["event_start_at"])
             end = datetime.fromisoformat(entry["event_end_at"])
             if start.tzinfo is None or end.tzinfo is None or start > end:
@@ -72,7 +96,7 @@ def seed(data: dict, lost_author_id: UUID, found_author_id: UUID) -> None:
     from app.core.database import engine
     from app.matching.embedding import sync_post_embedding
     from app.matching.model import PostEmbedding
-    from app.posts.model import Category, Post
+    from app.posts.model import Category, Post, PostLocation
     from app.users.model import User
 
     expected = {
@@ -98,7 +122,8 @@ def seed(data: dict, lost_author_id: UUID, found_author_id: UUID) -> None:
                 for kind in ("lost", "found"):
                     post = next(post for post in existing_posts if post.id == post_id(data["name"], pair["code"], kind))
                     entry = pair[kind]
-                    anchor = data["anchors"].get(entry["anchor"]) if entry["anchor"] else None
+                    locations = locations_for(data, entry)
+                    first = location_values(data, locations[0])
                     if (
                         post.author_id, post.post_type, post.title, post.description, post.item_name,
                         post.category_id, post.location_text, post.latitude, post.longitude,
@@ -107,14 +132,20 @@ def seed(data: dict, lost_author_id: UUID, found_author_id: UUID) -> None:
                     ) != (
                         lost_author_id if kind == "lost" else found_author_id,
                         kind.upper(), entry["title"], entry["description"], None,
-                        categories[pair["category_code"]], entry["location_text"],
-                        Decimal(str(anchor[0])) if anchor else None,
-                        Decimal(str(anchor[1])) if anchor else None,
+                        categories[pair["category_code"]], *first,
                         datetime.fromisoformat(entry["event_start_at"]),
                         datetime.fromisoformat(entry["event_end_at"]),
                         "OPEN", "MANUAL", None,
                     ):
                         raise ValueError(f"Benchmark post changed: {pair['code']}/{kind}")
+                    if "locations" in entry:
+                        expected_locations = [location_values(data, location) for location in locations]
+                        actual_locations = [
+                            (location.location_text, location.latitude, location.longitude)
+                            for location in post.locations
+                        ]
+                        if actual_locations != expected_locations:
+                            raise ValueError(f"Benchmark locations changed: {pair['code']}/{kind}")
             if set(db.scalars(select(PostEmbedding.post_id).where(PostEmbedding.post_id.in_(expected))).all()) != expected:
                 raise ValueError("Benchmark posts exist but some embeddings are missing")
             print(f"Reusing {len(expected)} existing benchmark posts; no DB changes")
@@ -124,7 +155,8 @@ def seed(data: dict, lost_author_id: UUID, found_author_id: UUID) -> None:
         for pair in data["pairs"]:
             for kind, author_id in (("lost", lost_author_id), ("found", found_author_id)):
                 entry = pair[kind]
-                anchor = data["anchors"].get(entry["anchor"]) if entry["anchor"] else None
+                locations = locations_for(data, entry)
+                first = location_values(data, locations[0])
                 post = Post(
                     id=post_id(data["name"], pair["code"], kind),
                     author_id=author_id,
@@ -133,14 +165,23 @@ def seed(data: dict, lost_author_id: UUID, found_author_id: UUID) -> None:
                     description=entry["description"],
                     item_name=None,
                     category_id=categories[pair["category_code"]],
-                    location_text=entry["location_text"],
-                    latitude=Decimal(str(anchor[0])) if anchor else None,
-                    longitude=Decimal(str(anchor[1])) if anchor else None,
+                    location_text=first[0],
+                    latitude=first[1],
+                    longitude=first[2],
                     event_start_at=datetime.fromisoformat(entry["event_start_at"]),
                     event_end_at=datetime.fromisoformat(entry["event_end_at"]),
                     status="OPEN",
                     creation_method="MANUAL",
                 )
+                if "locations" in entry:
+                    post.locations = [
+                        PostLocation(
+                            position=position, location_text=values[0],
+                            latitude=values[1], longitude=values[2],
+                        )
+                        for position, location in enumerate(locations)
+                        for values in [location_values(data, location)]
+                    ]
                 db.add(post)
                 db.flush()
                 if not sync_post_embedding(db, post):

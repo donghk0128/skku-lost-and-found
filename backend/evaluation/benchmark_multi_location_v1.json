@@ -1,0 +1,54 @@
+{
+  "name": "matching-multi-location-v1",
+  "note": "Controlled synthetic posts for multi-location ranking. Coordinates are test points, not surveyed building positions. Each same-code LOST/FOUND pair is one labeled match.",
+  "anchors": {
+    "LIBRARY": [37.293900, 126.975100],
+    "STUDENT_CENTER": [37.293400, 126.974500],
+    "ENGINEERING_1": [37.294300, 126.976500],
+    "ENGINEERING_2": [37.294800, 126.976000],
+    "DORM": [37.289000, 126.977000],
+    "GATE": [37.297000, 126.972000]
+  },
+  "pairs": [
+    {
+      "code": "W1", "category_code": "WALLET",
+      "lost": {"title": "주황 지퍼 카드지갑 분실", "description": "검은 카드지갑에 주황색 지퍼가 달려 있고 학생증이 들어 있습니다.", "locations": [{"location_text": "학생회관 입구", "anchor": "STUDENT_CENTER"}, {"location_text": "삼성학술정보관 1층", "anchor": "LIBRARY"}], "event_start_at": "2026-11-20T13:00:00+09:00", "event_end_at": "2026-11-20T14:00:00+09:00"},
+      "found": {"title": "주황 지퍼가 달린 카드지갑 습득", "description": "검은색 카드 케이스에 학생증이 한 장 들어 있습니다.", "locations": [{"location_text": "삼성학술정보관 1층", "anchor": "LIBRARY"}], "event_start_at": "2026-11-20T13:40:00+09:00", "event_end_at": "2026-11-20T14:10:00+09:00"}
+    },
+    {
+      "code": "W2", "category_code": "WALLET",
+      "lost": {"title": "노란 지퍼 카드지갑 잃어버렸어요", "description": "검은 카드 케이스에 노란색 지퍼가 있고 교통카드가 있습니다.", "locations": [{"location_text": "학생회관 2층", "anchor": "STUDENT_CENTER"}], "event_start_at": "2026-11-20T13:10:00+09:00", "event_end_at": "2026-11-20T14:10:00+09:00"},
+      "found": {"title": "노란 지퍼가 있는 검은 카드지갑", "description": "작은 지갑 안에 교통카드가 한 장 있습니다.", "locations": [{"location_text": "학생회관 1층", "anchor": "STUDENT_CENTER"}, {"location_text": "삼성학술정보관 입구", "anchor": "LIBRARY"}], "event_start_at": "2026-11-20T13:45:00+09:00", "event_end_at": "2026-11-20T14:20:00+09:00"}
+    },
+    {
+      "code": "E1", "category_code": "ELECTRONICS",
+      "lost": {"title": "빨간 끈 USB 분실", "description": "검은색 USB 메모리에 빨간 손목 끈이 묶여 있습니다.", "locations": [{"location_text": "제2공학관 근처", "anchor": null}, {"location_text": "제1공학관 로비", "anchor": "ENGINEERING_1"}], "event_start_at": "2026-11-20T13:00:00+09:00", "event_end_at": "2026-11-20T14:00:00+09:00"},
+      "found": {"title": "검은 USB를 주웠습니다", "description": "작은 USB에 빨간색 끈이 달려 있습니다.", "locations": [{"location_text": "제1공학관 로비", "anchor": "ENGINEERING_1"}], "event_start_at": "2026-11-20T13:35:00+09:00", "event_end_at": "2026-11-20T14:05:00+09:00"}
+    },
+    {
+      "code": "E2", "category_code": "ELECTRONICS",
+      "lost": {"title": "파란 끈 USB를 잃어버렸습니다", "description": "검은 USB 메모리에 파란 고리가 묶여 있습니다.", "locations": [{"location_text": "제2공학관 1층", "anchor": "ENGINEERING_2"}], "event_start_at": "2026-11-20T13:10:00+09:00", "event_end_at": "2026-11-20T14:10:00+09:00"},
+      "found": {"title": "파란 고리가 달린 USB 습득", "description": "검은색 USB이고 파란색 끈이 붙어 있습니다.", "locations": [{"location_text": "제2공학관 1층", "anchor": "ENGINEERING_2"}, {"location_text": "제1공학관 연결 통로", "anchor": "ENGINEERING_1"}], "event_start_at": "2026-11-20T13:40:00+09:00", "event_end_at": "2026-11-20T14:15:00+09:00"}
+    },
+    {
+      "code": "K1", "category_code": "KEY",
+      "lost": {"title": "별 장식 열쇠 분실", "description": "은색 열쇠 두 개가 별 모양 키링에 달려 있습니다.", "locations": [{"location_text": "기숙사 앞", "anchor": "DORM"}, {"location_text": "정문 버스 정류장", "anchor": "GATE"}], "event_start_at": "2026-11-20T13:00:00+09:00", "event_end_at": "2026-11-20T14:00:00+09:00"},
+      "found": {"title": "별 키링에 달린 열쇠 두 개", "description": "은색 열쇠 꾸러미를 주웠고 별 모양 장식이 있습니다.", "locations": [{"location_text": "정문 근처", "anchor": "GATE"}], "event_start_at": "2026-11-20T13:45:00+09:00", "event_end_at": "2026-11-20T14:15:00+09:00"}
+    },
+    {
+      "code": "K2", "category_code": "KEY",
+      "lost": {"title": "달 장식 열쇠 잃어버림", "description": "은색 열쇠 세 개에 달 모양 키링이 붙어 있습니다.", "locations": [{"location_text": "기숙사 앞", "anchor": "DORM"}], "event_start_at": "2026-11-20T13:10:00+09:00", "event_end_at": "2026-11-20T14:10:00+09:00"},
+      "found": {"title": "달 키링 열쇠 세 개 습득", "description": "은색 열쇠에 작은 달 장식이 있습니다.", "locations": [{"location_text": "기숙사 출입구", "anchor": "DORM"}, {"location_text": "정문 근처", "anchor": "GATE"}], "event_start_at": "2026-11-20T13:50:00+09:00", "event_end_at": "2026-11-20T14:20:00+09:00"}
+    },
+    {
+      "code": "O1", "category_code": "OTHER",
+      "lost": {"title": "초록 밴드 회색 접이식 우산", "description": "작은 회색 우산을 잃어버렸고 손잡이에 초록색 고무 밴드가 있습니다.", "locations": [{"location_text": "학생회관", "anchor": "STUDENT_CENTER"}, {"location_text": "삼성학술정보관", "anchor": "LIBRARY"}], "event_start_at": "2026-11-20T13:00:00+09:00", "event_end_at": "2026-11-20T14:00:00+09:00"},
+      "found": {"title": "회색 작은 우산 습득", "description": "접이식 우산이며 초록 고무 밴드가 손잡이에 있습니다.", "locations": [{"location_text": "삼성학술정보관 1층", "anchor": "LIBRARY"}], "event_start_at": "2026-11-20T13:40:00+09:00", "event_end_at": "2026-11-20T14:10:00+09:00"}
+    },
+    {
+      "code": "O2", "category_code": "OTHER",
+      "lost": {"title": "나무 손잡이 회색 장우산 분실", "description": "길이가 긴 회색 우산이고 굽은 나무 손잡이입니다.", "locations": [{"location_text": "학생회관", "anchor": "STUDENT_CENTER"}], "event_start_at": "2026-11-20T13:10:00+09:00", "event_end_at": "2026-11-20T14:10:00+09:00"},
+      "found": {"title": "회색 긴 우산 주웠어요", "description": "나무 손잡이가 굽어 있는 장우산입니다.", "locations": [{"location_text": "학생회관 입구", "anchor": "STUDENT_CENTER"}, {"location_text": "삼성학술정보관", "anchor": "LIBRARY"}], "event_start_at": "2026-11-20T13:45:00+09:00", "event_end_at": "2026-11-20T14:15:00+09:00"}
+    }
+  ]
+}

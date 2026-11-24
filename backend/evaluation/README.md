@@ -63,3 +63,29 @@ python -m scripts.evaluate_matching --labels evaluation/labels.csv --output eval
 가상으로 적용합니다. DB·Gemini 호출 없이 v4와 v5의 순위 변화를 살피는
 반사실 스트레스 테스트이며, 실제 복수 장소 게시글에 대한 성능 지표는 아닙니다.
 실행 방법과 해석은 [`2026-11-24 실험 기록`](experiments/2026-11-24-multi-location-v5.md)에 남깁니다.
+
+## 복수 장소 평가셋 v1
+
+[`benchmark_multi_location_v1.json`](benchmark_multi_location_v1.json)은 새 정답
+8쌍과 게시글 16개를 정의합니다. 각 글은 반대 유형 후보 8개와 비교하므로
+분실→습득과 습득→분실을 합쳐 128개 라벨이 생깁니다. `locations`는 순서가
+있는 가능한 장소 목록이며 `anchor`가 있는 장소만 좌표 핀입니다. 첫 장소가
+텍스트만 있어도 뒤 장소의 좌표가 v5에 들어가는 사례를 포함합니다. 좌표는
+통제된 시험점이며 실제 건물 측량값이 아닙니다.
+
+등록 전에는 아래 명령으로 파일만 검증합니다. 등록은 개발 DB에서만 실행하며,
+기존 평가셋의 `labels.csv`와 덮어쓰지 않도록 별도 라벨·결과 파일을 사용합니다.
+새 글 16개의 임베딩 생성에 Gemini 호출이 필요합니다. 서버 실행 절차는 별도
+작업 디렉터리의 최신 브랜치 파일을 연결한 일회성 컨테이너를 기준으로 합니다.
+
+```sh
+python -m scripts.seed_matching_benchmark --dataset evaluation/benchmark_multi_location_v1.json --labels evaluation/multi_location_labels.csv
+python -m scripts.seed_matching_benchmark --dataset evaluation/benchmark_multi_location_v1.json --labels evaluation/multi_location_labels.csv --apply --lost-author-id <시험계정UUID>
+python -m scripts.evaluate_matching --labels evaluation/multi_location_labels.csv --output evaluation/multi_location_result.json
+```
+
+평가 명령은 DB를 읽기만 합니다. 화면에는 v4(`missing_geo_reweighted`)와
+v5(`hybrid_v5`)의 전체·방향별 지표와 정답 순위 변화를 짧게 표시하고, 다른
+방식과 각 비교 쌍의 상세 점수는 결과 JSON 파일에 보관합니다. 실행 전 가설과
+해석 기준은 [`2026-11-24 실험 기록`](experiments/2026-11-24-multi-location-v5.md)에
+정리했습니다.
