@@ -162,7 +162,29 @@ def main() -> None:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    summary = {
+        "output": str(args.output),
+        "source_count": result["source_count"],
+        "scenarios": [
+            {
+                "code": case["code"],
+                "v4": case["metrics"]["v4"],
+                "v5": case["metrics"]["v5"],
+                "positive_rank_or_top_changed_queries": len(case["changed_queries"]),
+                "score_changed_pairs": case["score_changed_pairs"],
+            }
+            for case in result["results"]
+        ],
+        "input_sha256": result["input_sha256"],
+    }
+    if "single_extra_pin_sweep" in result:
+        sweep = result["single_extra_pin_sweep"]
+        summary["single_extra_pin_sweep"] = {
+            key: sweep[key]
+            for key in ("case_count", "baseline", "mrr_improved_cases",
+                        "mrr_worsened_cases", "ranking_changed_cases")
+        }
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
