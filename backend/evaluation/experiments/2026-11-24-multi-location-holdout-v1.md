@@ -127,3 +127,27 @@ v5에서 정답이 1위가 아닌 10질의는 **모두 정답이 2위**였다. 1
 새 알고리즘 탐색보다 회귀 테스트와 실제 API 경로 확인을 진행하고, 실제
 반환 완료 쌍이 쌓이면 별도 현실 데이터로 평가하는 것이다. PR은 팀과
 합의하기 전까지 만들지 않는다.
+
+## 최종 관련 회귀 검증
+
+EC2의 별도 일회성 컨테이너에서 작업 브랜치 `7ab3558`의 앱·스크립트·테스트·
+평가 파일·Alembic 파일을 읽기 전용으로 연결했다. SQLite 메모리 DB와 빈 Gemini
+키를 사용해 다음 파일의 테스트를 실행했다.
+
+```text
+test_matching_multi_location.py
+test_matching_color_ranking.py
+test_ranked_candidates_api.py
+test_matching_api.py
+test_matching_benchmark.py
+test_post_locations_api.py
+test_post_locations_migration.py
+42 passed, 1 warning in 4.67s
+```
+
+경고는 `passlib`의 Python `crypt` 폐기 안내이며 테스트 실패가 아니다. 이
+결과는 복수 장소 저장·API·매칭과 고정 평가 데이터의 관련 동작을 확인한다.
+실제 PostgreSQL을 통한 전체 서비스 API 경로와 실제 사용자 데이터의 추천
+정확도는 이 테스트의 범위 밖이다. 새 16쌍 평가의 Recall@1은 22/32이고
+나머지 정답은 모두 2위였으므로, 포트폴리오에서는 **관련 테스트 통과**와
+**합성 평가셋 순위 결과**를 구분해 기술한다.
