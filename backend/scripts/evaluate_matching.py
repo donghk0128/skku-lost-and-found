@@ -23,6 +23,7 @@ from app.matching.ranking import ALGORITHM_VERSION, COLOR_CONFLICT_PENALTY, RULE
 from app.matching.repository import MatchingRepository
 from app.matching.scoring import LOCATION_WEIGHT, RuleSignals, _haversine_km
 from app.posts.model import Post
+from app.users.model import User  # noqa: F401 - register Post.author relationship
 
 
 def load_labels(path: Path) -> dict[UUID, dict[UUID, bool]]:
