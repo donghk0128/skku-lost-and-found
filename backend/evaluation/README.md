@@ -89,3 +89,16 @@ v5(`hybrid_v5`)의 전체·방향별 지표와 정답 순위 변화를 짧게 �
 방식과 각 비교 쌍의 상세 점수는 결과 JSON 파일에 보관합니다. 실행 전 가설과
 해석 기준은 [`2026-11-24 실험 기록`](experiments/2026-11-24-multi-location-v5.md)에
 정리했습니다.
+
+## 복수 장소 추가 검증셋
+
+[`benchmark_multi_location_holdout_v1.json`](benchmark_multi_location_holdout_v1.json)은
+첫 8쌍 결과를 본 뒤 별도로 작성한 16쌍·32개 글의 고정 평가셋입니다. 각
+질의는 반대 유형 후보 16개와 비교해 총 512개 라벨 관계가 생깁니다. 단일
+장소, 텍스트만 있는 첫 장소, 좌표가 전혀 없는 글, 세 가능한 장소를 포함합니다.
+위치 점수의 이점뿐 아니라 여러 핀이 오답을 끌어올리는지도 검사합니다. 입력
+해시와 평가 전 판단 기준은
+[`추가 검증 계획`](experiments/2026-11-24-multi-location-holdout-v1.md)에 기록했습니다.
+기존 평가셋과 라벨·결과 파일을 섞지 않도록
+`multi_location_holdout_labels.csv`와 `multi_location_holdout_result.json`을
+사용합니다. 두 파일은 Git에서 제외됩니다.
