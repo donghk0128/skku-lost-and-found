@@ -57,3 +57,9 @@ python -m scripts.evaluate_matching --labels evaluation/labels.csv --output eval
 ```
 
 평가 도구는 동일한 게시글·임베딩에 대해 `hybrid_v3`, `no_color`(색상 감점 없음), `no_color_low_text`(문자열 축소와 임베딩 가중치 증가), `missing_geo_reweighted`(v4: 대표 좌표가 없으면 위치 가중치 제외), `hybrid_v5`(복수 장소 중 최소 거리)의 전체·방향별 지표를 계산합니다. v3·v4 비교 점수는 대표 좌표 기준으로 재구성하므로 복수 장소를 가진 글에서도 v5와 비교할 수 있습니다. 기존 고정 벤치마크 v1에는 복수 장소가 없어 v4와 v5의 차이를 측정할 수 없습니다. `result.json`에는 게시글 UUID 대신 E1 등의 평가 코드가 표시됩니다.
+
+`scripts.evaluate_location_scenarios`는 기존 `result.json`의 임베딩 점수와 정답표를
+재사용해 [`location_scenarios_v1.json`](location_scenarios_v1.json)의 추가 핀을
+가상으로 적용합니다. DB·Gemini 호출 없이 v4와 v5의 순위 변화를 살피는
+반사실 스트레스 테스트이며, 실제 복수 장소 게시글에 대한 성능 지표는 아닙니다.
+실행 방법과 해석은 [`2026-11-24 실험 기록`](experiments/2026-11-24-multi-location-v5.md)에 남깁니다.

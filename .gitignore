@@ -27,3 +27,4 @@ local.properties
 *.sqlite
 backend/evaluation/labels.csv
 backend/evaluation/result.json
+backend/evaluation/location_scenarios_result.json
