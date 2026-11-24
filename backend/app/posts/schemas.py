@@ -8,6 +8,8 @@ from uuid import UUID
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 from pydantic_core import PydanticCustomError
 
+from app.posts.constants import MAX_POST_LOCATIONS
+
 
 PostType = Literal["LOST", "FOUND"]
 PostStatus = Literal["OPEN", "COMPLETED"]
@@ -28,7 +30,30 @@ def validate_location_and_time(
         raise PydanticCustomError("event_time_order", "발생 시작 시각이 끝 시각보다 늦을 수 없습니다.")
 
 
-class PostCreateRequest(BaseModel):
+class PostLocationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    location_text: str | None = Field(default=None, min_length=1, max_length=255)
+    latitude: Decimal | None = Field(default=None, ge=-90, le=90, max_digits=9, decimal_places=6)
+    longitude: Decimal | None = Field(default=None, ge=-180, le=180, max_digits=9, decimal_places=6)
+
+    @model_validator(mode="after")
+    def validate_location(self) -> Self:
+        validate_location_and_time(self.latitude, self.longitude, None, None)
+        if self.location_text is None and self.latitude is None:
+            raise PydanticCustomError("location_empty", "장소 설명 또는 좌표를 입력해 주세요.")
+        return self
+
+
+def validate_location_input(fields: set[str]) -> None:
+    if "locations" in fields and fields & {"location_text", "latitude", "longitude"}:
+        raise PydanticCustomError(
+            "location_input_conflict", "locations와 기존 단일 장소 필드를 동시에 입력할 수 없습니다.",
+        )
+
+
+class PostCreateFields(BaseModel):
+    """Legacy post fields also used by the unchanged AI draft contract."""
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     post_type: PostType
@@ -53,6 +78,15 @@ class PostCreateRequest(BaseModel):
         return self
 
 
+class PostCreateRequest(PostCreateFields):
+    locations: list[PostLocationRequest] = Field(default_factory=list, max_length=MAX_POST_LOCATIONS)
+
+    @model_validator(mode="after")
+    def validate_location_source(self) -> Self:
+        validate_location_input(self.model_fields_set)
+        return self
+
+
 class PostUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -63,11 +97,13 @@ class PostUpdateRequest(BaseModel):
     location_text: str | None = Field(default=None, min_length=1, max_length=255)
     latitude: Decimal | None = Field(default=None, ge=-90, le=90, max_digits=9, decimal_places=6)
     longitude: Decimal | None = Field(default=None, ge=-180, le=180, max_digits=9, decimal_places=6)
+    locations: list[PostLocationRequest] = Field(default_factory=list, max_length=MAX_POST_LOCATIONS)
     event_start_at: AwareDatetime | None = None
     event_end_at: AwareDatetime | None = None
 
     @model_validator(mode="after")
     def require_changes(self) -> Self:
+        validate_location_input(self.model_fields_set)
         if not self.model_fields_set:
             raise PydanticCustomError("post_update_empty", "수정할 필드를 하나 이상 입력해 주세요.")
         if any(getattr(self, field) is None for field in {"title", "description"} & self.model_fields_set):
@@ -90,6 +126,15 @@ class PostStatusUpdateRequest(BaseModel):
     status: Literal["COMPLETED"]
 
 
+class PostLocationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    position: int
+    location_text: str | None
+    latitude: float | None
+    longitude: float | None
+
+
 class PostResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -104,6 +149,7 @@ class PostResponse(BaseModel):
     location_text: str | None
     latitude: float | None
     longitude: float | None
+    locations: list[PostLocationResponse]
     event_start_at: datetime | None
     event_end_at: datetime | None
     status: PostStatus
@@ -117,6 +163,10 @@ class PostListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class PostLimitsResponse(BaseModel):
+    max_locations: int
 
 
 class CategoryResponse(BaseModel):

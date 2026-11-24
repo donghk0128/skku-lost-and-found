@@ -10,9 +10,10 @@ from app.chat.model import ChatRoom
 from app.chat.service import close_post_rooms, lock_post
 from app.core.errors import ApiError
 from app.matching.embedding import sync_post_embedding
-from app.posts.model import Category, Post, PostImage, now_utc
+from app.posts.model import Category, Post, PostImage, PostLocation, now_utc
 from app.posts.repository import PostRepository
-from app.posts.schemas import CreationMethod, PostCreateRequest, PostStatus, PostType, PostUpdateRequest
+from app.posts.filters import PostFilterConditions
+from app.posts.schemas import CreationMethod, PostCreateRequest, PostLocationRequest, PostStatus, PostType, PostUpdateRequest
 from app.posts.storage import get_post_image_storage
 from app.users.model import User
 
@@ -93,6 +94,12 @@ class PostService:
             event_end_at=request.event_end_at,
             creation_method=creation_method,
         )
+        locations = request.locations if "locations" in request.model_fields_set else (
+            [PostLocationRequest(
+                location_text=request.location_text, latitude=request.latitude, longitude=request.longitude,
+            )] if request.location_text is not None or request.latitude is not None else []
+        )
+        PostService._replace_locations(post, locations)
         PostRepository.create(db, post)
         db.flush()
         sync_post_embedding(db, post)
@@ -116,12 +123,13 @@ class PostService:
         search: str | None,
         limit: int,
         offset: int,
+        conditions: PostFilterConditions | None = None,
     ) -> tuple[list[Post], int]:
         if search is not None:
             search = search.strip()
             if not search:
                 raise ApiError(422, "invalid_search_query", "검색어를 입력해 주세요.")
-        return PostRepository.list_visible(db, post_type, category_id, post_status, search, limit, offset)
+        return PostRepository.list_visible(db, post_type, category_id, post_status, search, limit, offset, conditions)
 
     @staticmethod
     def list_categories(db: Session) -> list[Category]:
@@ -129,14 +137,47 @@ class PostService:
 
     @staticmethod
     def update(db: Session, post_id: UUID, request: PostUpdateRequest, author: User) -> Post:
+        lock_post(db, post_id)
         post = PostService._get_owned_post(db, post_id, author)
         if "category_id" in request.model_fields_set:
             PostService._require_category(db, request.category_id)
-        PostRepository.update_details(post, request.model_dump(exclude_unset=True))
+        changes = request.model_dump(exclude_unset=True)
+        changes.pop("locations", None)
+        PostRepository.update_details(post, changes)
+        if "locations" in request.model_fields_set:
+            PostService._replace_locations(post, request.locations)
+        elif request.model_fields_set & {"location_text", "latitude", "longitude"}:
+            # Legacy clients edit only the representative; preserve other locations.
+            locations = [PostLocationRequest(
+                location_text=row.location_text, latitude=row.latitude, longitude=row.longitude,
+            ) for row in post.locations[1:]]
+            if post.location_text is not None or post.latitude is not None:
+                locations.insert(0, PostLocationRequest(
+                    location_text=post.location_text, latitude=post.latitude, longitude=post.longitude,
+                ))
+            PostService._replace_locations(post, locations)
         sync_post_embedding(db, post)
         PostService._commit(db)
         db.refresh(post)
         return post
+
+    @staticmethod
+    def _replace_locations(post: Post, locations: list[PostLocationRequest]) -> None:
+        # Update by position to avoid delete/insert collisions on the composite key.
+        for position, location in enumerate(locations):
+            if position == len(post.locations):
+                post.locations.append(PostLocation(position=position))
+            row = post.locations[position]
+            row.location_text = location.location_text
+            row.latitude = location.latitude
+            row.longitude = location.longitude
+        del post.locations[len(locations):]
+        primary = locations[0] if locations else None
+        post.location_text = primary.location_text if primary else None
+        post.latitude = primary.latitude if primary else None
+        post.longitude = primary.longitude if primary else None
+        # Changing only a secondary location must still advance the post version.
+        post.updated_at = now_utc()
 
     @staticmethod
     def complete(db: Session, post_id: UUID, author: User) -> Post:

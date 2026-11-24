@@ -29,9 +29,8 @@ export default function Account() {
     <Pressable accessibilityRole="button" style={s.row} onPress={() => router.push("/profile-edit")}>
       <Text style={s.rowLabel}>{t("account.editProfile")}</Text><Text>›</Text>
     </Pressable>
-    <Pressable accessibilityRole="button" accessibilityState={{ disabled: true }} disabled style={s.row}>
-      <Text style={[s.rowLabel, { color: "#87928C" }]}>{t("account.keywords")}</Text>
-      <Text style={s.placeholder}>{t("account.comingSoon")}</Text>
+    <Pressable accessibilityRole="button" onPress={() => router.push("/keyword-conditions")} style={s.row}>
+      <Text style={s.rowLabel}>{t("account.keywords")}</Text><Text>›</Text>
     </Pressable>
     <Pressable accessibilityRole="button" style={s.row} onPress={() => router.push("/my-posts")}>
       <Text style={s.rowLabel}>{t("account.myPosts")}</Text><Text>›</Text>

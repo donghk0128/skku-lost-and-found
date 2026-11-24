@@ -11,6 +11,7 @@ from app.matching.ranking import ALGORITHM_VERSION
 from app.matching.schemas import RankedCandidateItem, RankedCandidateListResponse, RecommendationItem, RecommendationListResponse
 from app.matching.service import MatchingService
 from app.posts.schemas import PostResponse
+from app.posts.filters import PostFilterConditions, read_post_filters
 from app.users.model import User
 
 
@@ -20,15 +21,14 @@ router = APIRouter(prefix="/posts", tags=["matching"])
 @router.get("/{post_id}/ranked-candidates", response_model=RankedCandidateListResponse)
 def list_ranked_candidates(
     post_id: UUID,
-    category_id: int | None = Query(default=None, ge=1),
-    q: str | None = Query(default=None, max_length=100),
+    conditions: PostFilterConditions = Depends(read_post_filters),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> RankedCandidateListResponse:
     source, ranked, total, run_id = MatchingService.ranked_candidates(
-        db, post_id, current_user.id, category_id, q, limit, offset
+        db, post_id, current_user.id, conditions.category_id, conditions.q, limit, offset, conditions
     )
     return RankedCandidateListResponse(
         source_post_id=source.id,

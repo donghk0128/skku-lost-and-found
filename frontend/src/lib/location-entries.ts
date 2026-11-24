@@ -2,6 +2,42 @@ import type { PickedLocation } from "@/lib/location-picker";
 
 export type LocationEntry = { id: string; text: string; pin: PickedLocation | null };
 
+export type PostLocationInput = {
+  location_text: string | null;
+  latitude: number | null;
+  longitude: number | null;
+};
+
+/** Empty UI placeholders are not locations; preserve every other row in order. */
+export function locationEntriesToPayload(entries: LocationEntry[]): PostLocationInput[] {
+  return entries.filter(row => row.text.trim() || row.pin).map(row => ({
+    location_text: row.text.trim() || null,
+    latitude: row.pin ? Number(row.pin.latitude.toFixed(6)) : null,
+    longitude: row.pin ? Number(row.pin.longitude.toFixed(6)) : null,
+  }));
+}
+
+/** An empty array is authoritative; fall back only for a legacy API response. */
+export function locationEntriesFromPost(post: {
+  locations?: PostLocationInput[];
+  location_text: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}): LocationEntry[] {
+  const locations = post.locations ?? (
+    post.location_text !== null || post.latitude !== null ? [post] : []
+  );
+  return locations.map((location, index) => ({
+    id: `saved-location-${index}`,
+    text: location.location_text ?? "",
+    pin: location.latitude !== null && location.longitude !== null ? {
+      address: location.location_text ?? "",
+      latitude: location.latitude,
+      longitude: location.longitude,
+    } : null,
+  }));
+}
+
 /** Commas and newlines are optional shortcuts; candidate alternatives are not split. */
 export function locationEntriesFromText(text: string): LocationEntry[] {
   const names = [...new Set(text.split(/[,，\n]+/).map(name => name.trim()).filter(Boolean))];

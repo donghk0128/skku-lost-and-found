@@ -6,7 +6,7 @@ from typing import Literal, Self
 
 from app.ai.core.schemas import TimePrecision
 from app.ai.core.vision_schemas import MergedImageAttributes
-from app.posts.schemas import PostCreateRequest
+from app.posts.schemas import PostCreateFields
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 from pydantic_core import PydanticCustomError
@@ -74,7 +74,7 @@ class AIDraftCreateRequest(BaseModel):
         return self
 
 
-class AIDraftResponse(PostCreateRequest):
+class AIDraftResponse(PostCreateFields):
     """Manual post-create fields plus AI review metadata."""
 
     category_id: int = Field(ge=1)

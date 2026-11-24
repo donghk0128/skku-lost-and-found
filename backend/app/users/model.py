@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, JSON, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
@@ -58,6 +58,22 @@ class FavoritePost(Base):
 
     user_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id"), primary_key=True)
     post_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("posts.id"), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=now_utc, server_default=func.now())
+
+
+class KeywordCondition(Base):
+    """An account-owned snapshot of a search, independent of push permissions."""
+    __tablename__ = "keyword_conditions"
+    __table_args__ = (
+        CheckConstraint("post_type IN ('LOST', 'FOUND')", name="ck_keyword_conditions_post_type"),
+        CheckConstraint("version = 1", name="ck_keyword_conditions_version"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    post_type: Mapped[str] = mapped_column(String(5), nullable=False)
+    version: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1, server_default="1")
+    conditions: Mapped[dict] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=now_utc, server_default=func.now())
 
 

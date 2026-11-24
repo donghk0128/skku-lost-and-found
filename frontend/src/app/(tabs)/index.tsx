@@ -18,6 +18,8 @@ import {
   MaxContentWidth,
 } from "@/constants/theme";
 import PostBoard from "@/components/post-board";
+import PostFilterDialog from "@/components/post-filter-dialog";
+import { emptyPostFilters, hasPostFilters } from "@/lib/post-filters";
 import CreatePostButton from "@/components/create-post-button";
 import SettingIcon from "@/assets/icons/setting.svg";
 import { useLocale } from "@/i18n/LocaleProvider";
@@ -30,7 +32,7 @@ type BoardTab = "lost" | "found";
 type SortMode = "newest" | "candidates";
 
 export default function HomeScreen() {
-  const { t, categoryLabel } = useLocale();
+  const { t } = useLocale();
   const { user } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams<{ board?: string; refresh?: string }>();
@@ -45,9 +47,8 @@ export default function HomeScreen() {
         : "lost"
       : selectedTab.tab;
   const [visitedBoards, setVisitedBoards] = useState<BoardTab[]>([]);
-  const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState(emptyPostFilters);
   const [sortMode, setSortMode] = useState<SortMode>("newest");
-  const [categoryId, setCategoryId] = useState<number | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [sources, setSources] = useState<Post[]>([]);
   const [selectedSourceIds, setSelectedSourceIds] = useState<
@@ -231,7 +232,7 @@ export default function HomeScreen() {
               accessibilityLabel={t("home.filter")}
               style={({ pressed }) => [
                 styles.toolButton,
-                categoryId !== null && styles.activeToolButton,
+                hasPostFilters(filters) && styles.activeToolButton,
                 pressed && styles.pressed,
               ]}
             >
@@ -259,8 +260,9 @@ export default function HomeScreen() {
                 style={styles.searchInput}
                 placeholder={t("home.searchPlaceholder")}
                 placeholderTextColor="#9A9DA3"
-                value={search}
-                onChangeText={setSearch}
+                value={filters.q ?? ""}
+                onChangeText={q => setFilters(current => ({ ...current, q }))}
+                maxLength={100}
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="search"
@@ -271,46 +273,10 @@ export default function HomeScreen() {
           </View>
 
           {filterOpen ? (
-            <View style={styles.choicePanel}>
-              <ThemedText type="small" style={styles.panelTitle}>
-                {t("home.categoryFilter")}
-              </ThemedText>
-              <View style={styles.filterOptions}>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => {
-                    setCategoryId(null);
-                    setFilterOpen(false);
-                  }}
-                  style={[
-                    styles.choiceChip,
-                    categoryId === null && styles.selectedChoice,
-                  ]}
-                >
-                  <ThemedText type="small">
-                    {t("home.allCategories")}
-                  </ThemedText>
-                </Pressable>
-                {categories.map((category) => (
-                  <Pressable
-                    key={category.id}
-                    accessibilityRole="button"
-                    onPress={() => {
-                      setCategoryId(category.id);
-                      setFilterOpen(false);
-                    }}
-                    style={[
-                      styles.choiceChip,
-                      categoryId === category.id && styles.selectedChoice,
-                    ]}
-                  >
-                    <ThemedText type="small">
-                      {categoryLabel(category.code, category.name)}
-                    </ThemedText>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
+            <PostFilterDialog initial={filters} categories={categories}
+              postType={activeTab === "lost" ? "LOST" : "FOUND"}
+              onApply={next => { setFilters(next); setFilterOpen(false); }}
+              onClose={() => setFilterOpen(false)} />
           ) : null}
 
           {sortMode === "candidates" ? (
@@ -411,9 +377,8 @@ export default function HomeScreen() {
                 >
                   <PostBoard
                     type={tab === "lost" ? "LOST" : "FOUND"}
-                    search={search}
+                    filters={filters}
                     sortMode={sortMode}
-                    categoryId={categoryId}
                     sourcePostId={selectedSourceIds[tab]}
                   />
                 </View>

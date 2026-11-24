@@ -3,27 +3,17 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.posts.model import Category, Post, PostImage
+from app.posts.filters import PostFilterConditions, post_filter_expressions
 
 
 class PostRepository:
-    SEARCH_WHITESPACE = (" ", "\t", "\n", "\r", "\u00a0")
-
     @staticmethod
     def search_filters(search: str) -> list:
-        search_fields = []
-        for field in (Post.title, Post.description, Post.item_name):
-            compact = func.coalesce(field, "")
-            for whitespace in PostRepository.SEARCH_WHITESPACE:
-                compact = func.replace(compact, whitespace, "")
-            search_fields.append(func.lower(compact))
-        return [
-            or_(*(field.contains(term.lower(), autoescape=True) for field in search_fields))
-            for term in search.split()
-        ]
+        return post_filter_expressions(PostFilterConditions(q=search))
 
     @staticmethod
     def add_image(db: Session, image: PostImage) -> None:
@@ -89,16 +79,14 @@ class PostRepository:
         search: str | None,
         limit: int,
         offset: int,
+        conditions: PostFilterConditions | None = None,
     ) -> tuple[list[Post], int]:
         filters = [Post.deleted_at.is_(None)]
         if post_type is not None:
             filters.append(Post.post_type == post_type)
-        if category_id is not None:
-            filters.append(Post.category_id == category_id)
         if post_status is not None:
             filters.append(Post.status == post_status)
-        if search is not None:
-            filters.extend(PostRepository.search_filters(search))
+        filters.extend(post_filter_expressions(conditions or PostFilterConditions(category_id=category_id, q=search)))
 
         total = db.scalar(select(func.count()).select_from(Post).where(*filters)) or 0
         statement = (

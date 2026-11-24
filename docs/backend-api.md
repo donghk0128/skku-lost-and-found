@@ -90,7 +90,20 @@
 
 - 게시글 생성에는 `post_type`(`LOST` 또는 `FOUND`), `title`, `description`이 필요합니다.
 - 선택 값: `item_name`, `category_id`, `location_text`, 좌표, 발생 시각 범위
-- 목록 조회: `post_type`, `category_id`, `status`, `q`, `limit`(기본 20), `offset`(기본 0)을 사용할 수 있습니다. `q`는 제목·설명·물건명에서 공백 차이를 무시하고 검색합니다.
+- 복수 장소는 `locations: [{"location_text": "학생회관", "latitude": 37.588, "longitude": 126.993}]`로
+  전달합니다. 일반/AI 작성 공통으로 0~20개를 순서대로 저장하며, 각 항목에는 장소 설명 또는
+  좌표 한 쌍이 필요합니다. 생성·상세·목록 응답은 `position`(0부터 시작)을 포함한 전체
+  `locations`를 반환합니다. PATCH에서 배열은 전체 교체, `[]`는 모두 삭제, 생략은 유지입니다.
+  `locations: null`이나 기존 최상위 장소·좌표 필드와의 동시 입력은 `422`입니다.
+  기존 단일 위치 요청은 호환되며 첫 번째 위치만 수정하고 나머지는 보존합니다.
+  최상위 장소·좌표는 첫 번째 위치를 반영하며, 현재 매칭은 이 대표 좌표만 사용합니다.
+  배포 전 `0014_post_location_limit_policy`까지 migration이 필요합니다. 직접 작성 화면은 전체 배열을
+  전송·복원하고, 상세 지도는 첫 번째 위치를 표시합니다. AI 대화의 복수 위치 확정은 별도입니다.
+  개수 제한은 `backend/app/posts/constants.py`의 `MAX_POST_LOCATIONS`에서 관리하며
+  `GET /posts/limits`의 `max_locations`로 조회합니다. 상한 변경에 DB migration은 필요하지 않습니다.
+  상세 계약은 `backend/app/posts/README.md`를 참고하세요.
+- 목록 조회: `post_type`, `category_id`, `status`, `q`, `limit`(기본 20), `offset`(기본 0)을 사용할 수 있습니다. `q`는 공백을 포함한 문구 하나로, 제목·설명·물건명 중 한 곳에 포함되어야 합니다. 영문 대소문자는 구분하지 않습니다.
+- 추가 조건은 반복 쿼리 `title_terms`, `content_terms`, `location_terms`(종류당 최대 20개)와 날짜·시각 하나인 `event_at`입니다. 종류 간 AND, 같은 종류 안 OR입니다. 장소는 모든 저장 위치의 원문 텍스트를 비교하고, 발생 시각은 시작·종료 경계까지 포함합니다. 생략한 조건은 검사하지 않습니다. 후보순에도 점수 계산·페이지네이션 전에 동일하게 적용합니다.
 - 완료 표시 요청 본문은 `{"status": "COMPLETED"}`입니다. 완료된 글은 조회할 수 있지만 `OPEN`으로 되돌릴 수는 없습니다.
 - 수정·완료 표시·삭제는 본인이 작성한 게시글만 가능합니다.
 - 추천은 요청할 때마다 계산하며 기본 상위 5개를 반환합니다(`limit`: 1~20). 점수는 순위를 위한 임시 값이고 동일 물건일 확률이 아닙니다. 완료·삭제된 글은 후보에서 제외합니다.
@@ -147,6 +160,13 @@
 인증 누락은 `401`, 남의 기준 글은 `403`, 없는·삭제된 기준 글은 `404`, 완료된 기준 글·빈 검색어는 `422`입니다. 검색·필터에 맞는 후보가 없으면 `200`과 빈 `items`, `total: 0`을 반환합니다. 최신순에는 기존 `GET /posts`를 사용합니다. 새 글·수정·완료·삭제로 조회 대상이 바뀌면 후보순 첫 페이지부터 다시 요청해야 합니다.
 
 백엔드 배포 시 `0009_record_color_conflict`까지 Alembic 마이그레이션을 적용해야 새 API가 실행 기록을 저장할 수 있습니다. DB의 `recommendation_items.color_conflict`는 색상 충돌 감점 여부를 기록합니다. v2 기록은 그대로 보존되고 새 조회는 v3 실행으로 저장됩니다. 이 브랜치의 프론트 홈 화면은 후보순 API에 연결되어 있습니다. 배포 후에는 `/docs`에서 로그인 토큰으로 두 API를 호출하거나, 같은 API 주소를 바라보는 Expo 앱에서 확인할 수 있습니다.
+
+## 저장한 키워드 조건
+
+- `POST /users/me/keyword-conditions`: 인증된 계정에 `{ "post_type": "FOUND", "conditions": { "q": "검정 에어팟", "category_id": 1, "title_terms": ["혹시", "저기"], "content_terms": [], "location_terms": ["디도", "학생회관"], "event_at": null } }` 형식으로 조건 묶음을 저장합니다. 입력하지 않는 조건은 생략할 수 있습니다.
+- `GET /users/me/keyword-conditions?limit=20&offset=0`: 본인이 저장한 조건만 최신순으로 반환합니다. 응답은 `items`, `total`, `limit`, `offset`이며 각 항목은 `id`, `post_type`, `version: 1`, `conditions`, `created_at`을 포함합니다.
+- 조건은 저장 당시의 독립된 스냅샷입니다. 정렬 방식과 후보순 기준 게시물은 저장하지 않습니다. 빈 조건, 알 수 없는 필드와 존재하지 않는 카테고리는 `422`입니다. 인증 누락은 `401`입니다.
+- `0015_keyword_conditions` migration이 필요합니다. 계정 실제 삭제 시 함께 정리됩니다. 조건 저장·조회만 제공하며 푸시 전송이나 알림 권한 변경은 수행하지 않습니다.
 
 ## 게시글 사진
 

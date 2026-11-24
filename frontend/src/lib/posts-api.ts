@@ -3,6 +3,8 @@ import { File } from "expo-file-system";
 import type { ImagePickerAsset } from "expo-image-picker";
 import { baseUrl, request, ApiError } from "@/lib/auth-api";
 import { t } from "@/i18n";
+import type { PostLocationInput } from "@/lib/location-entries";
+import { postFiltersQuery, type PostFilters } from "@/lib/post-filters";
 
 export type Post = {
   id: string;
@@ -19,6 +21,7 @@ export type Post = {
   location_text: string | null;
   latitude: number | null;
   longitude: number | null;
+  locations?: (PostLocationInput & { position: number })[];
   event_start_at: string | null;
   event_end_at: string | null;
 };
@@ -51,18 +54,21 @@ export type CreatePost = {
   event_end_at?: string;
   latitude?: number;
   longitude?: number;
+  locations?: PostLocationInput[];
 };
 export type UpdatePost = {
   title: string;
   description: string;
   category_id: number | null;
-  location_text: string | null;
+  location_text?: string | null;
   event_start_at: string | null;
   event_end_at: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  locations?: PostLocationInput[];
 };
 export const postsApi = {
+  limits: () => request<{ max_locations: number }>("/posts/limits"),
   update: (id: string, body: UpdatePost, token: string) =>
     request<Post>(`/posts/${id}`, body, token, "PATCH"),
   delete: (id: string, token: string) =>
@@ -101,17 +107,13 @@ export const postsApi = {
   },
   list: (
     type: "LOST" | "FOUND",
-    search: string,
+    filters: PostFilters,
     offset: number,
-    categoryId: number | null = null,
   ) => {
-    const query = new URLSearchParams({
-      post_type: type,
-      limit: "20",
-      offset: String(offset),
-    });
-    if (search.trim()) query.set("q", search.trim());
-    if (categoryId !== null) query.set("category_id", String(categoryId));
+    const query = postFiltersQuery(filters);
+    query.set("post_type", type);
+    query.set("limit", "20");
+    query.set("offset", String(offset));
     return request<{ items: Post[]; total: number }>(`/posts?${query}`);
   },
   mine: (type: "LOST" | "FOUND", token: string) =>
@@ -122,14 +124,13 @@ export const postsApi = {
     ),
   rankedCandidates: (
     sourcePostId: string,
-    search: string,
-    categoryId: number | null,
+    filters: PostFilters,
     offset: number,
     token: string,
   ) => {
-    const query = new URLSearchParams({ limit: "20", offset: String(offset) });
-    if (search.trim()) query.set("q", search.trim());
-    if (categoryId !== null) query.set("category_id", String(categoryId));
+    const query = postFiltersQuery(filters);
+    query.set("limit", "20");
+    query.set("offset", String(offset));
     return request<{
       source_post_id: string;
       run_id: string;
