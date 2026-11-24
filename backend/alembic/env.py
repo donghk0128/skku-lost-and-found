@@ -9,6 +9,7 @@ from app.chat import model as chat_model  # noqa: F401 - registers chat models
 from app.matching import model as matching_model  # noqa: F401 - registers embeddings
 from app.posts import model as posts_model  # noqa: F401 - registers post models
 from app.users import model  # noqa: F401 - registers all authentication models
+from app.notifications import model as notifications_model  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", get_settings().database_url)

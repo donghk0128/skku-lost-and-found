@@ -20,6 +20,26 @@ services:
       retries: 3
       start_period: 30s
 
+  push-worker:
+    profiles: [push]
+    build:
+      context: ./backend
+    image: skku-finder-api:local
+    env_file:
+      - path: ./backend/.env
+        required: true
+    environment:
+      FIREBASE_CREDENTIALS_PATH: /run/firebase/firebase-admin.json
+    volumes:
+      - type: bind
+        source: ./.deps/firebase-admin.json
+        target: /run/firebase/firebase-admin.json
+        read_only: true
+        bind:
+          create_host_path: false
+    command: python -m app.notifications.worker
+    restart: unless-stopped
+
   caddy:
     image: caddy:2
     environment:

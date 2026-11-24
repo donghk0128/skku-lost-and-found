@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:707745224295:android:17ac270d282c1a4323e6c2",
+        "mobilesdk_app_id": "1:707745224295:android:7b067639fd6c0a5523e6c2",
         "android_client_info": {
-          "package_name": "com.jessi026.frontend"
+          "package_name": "com.skku.finder"
         }
       },
       "oauth_client": [],

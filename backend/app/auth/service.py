@@ -9,7 +9,7 @@ import jwt
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.auth.repository import AuthRepository
@@ -29,6 +29,7 @@ from app.email.protocols import VerificationCodeSender
 from app.email.service import EmailService
 from app.users.model import EmailVerification, PasswordReset, User, UserSession
 from app.users.repository import UserRepository
+from app.notifications.model import PushDevice
 
 bearer_scheme = HTTPBearer(auto_error=False)
 MAX_VERIFICATION_ATTEMPTS = 5
@@ -150,6 +151,7 @@ class AuthService:
         if user is None or reset is None or reset.verified_at is None or reset.token_hash != sha256(token.encode()).hexdigest() or not _is_after_or_equal_now(reset.expires_at):
             raise ApiError(400, "invalid_reset_token", "인증이 만료되었습니다. 다시 인증해 주세요.")
         user.password_hash = hash_secret(password)
+        db.execute(update(PushDevice).where(PushDevice.user_id == user.id).values(enabled=False))
         for session in db.scalars(select(UserSession).where(UserSession.user_id == user.id, UserSession.revoked_at.is_(None))):
             session.revoked_at = utc_now()
         db.delete(reset)
@@ -215,6 +217,7 @@ class AuthService:
         session = AuthRepository.get_session(db, UUID(payload["sid"]))
         if session is not None and session.revoked_at is None and verify_secret(refresh_token, session.refresh_token_hash):
             session.revoked_at = utc_now()
+            db.execute(update(PushDevice).where(PushDevice.session_id == session.id).values(enabled=False))
             db.commit()
 
     @staticmethod

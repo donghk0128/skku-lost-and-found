@@ -13,6 +13,31 @@ services:
       timeout: 3s
       retries: 10
 
+  push-worker:
+    profiles: [push]
+    build:
+      context: ./backend
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://skku:local-dev-only@db:5432/skku_lost_and_found
+      JWT_SECRET_KEY: local-dev-secret-only-not-for-production
+      FIREBASE_CREDENTIALS_PATH: /run/firebase/firebase-admin.json
+    volumes:
+      - ./backend/app:/app/app:ro
+      - type: bind
+        source: ./.deps/firebase-admin.json
+        target: /run/firebase/firebase-admin.json
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python -m app.notifications.worker
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend

@@ -1,13 +1,12 @@
 import * as Notifications from "expo-notifications";
-import * as SecureStore from "expo-secure-store";
 import { useEffect, useRef, useState } from "react";
 import { Alert, AppState, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { ProfileMenuIcon, profileMenuStyles as styles } from "@/components/profile-menu";
 import { Colors } from "@/constants/theme";
 import { useLocale } from "@/i18n/LocaleProvider";
-
-const preferenceKey = "lost-found-notifications";
+import { notificationsEnabledOnDevice, onNotificationPreferenceChange, writeNotificationPreference } from "@/lib/notification-preference";
+import { syncPush } from "@/lib/push-client";
 
 function allowsNotifications(permission: Notifications.NotificationPermissionsStatus) {
   return (
@@ -33,11 +32,11 @@ export default function NotificationPreferenceRow() {
       const version = ++refreshVersion.current;
       try {
         const [value, permission] = await Promise.all([
-          SecureStore.getItemAsync(preferenceKey),
+          notificationsEnabledOnDevice(),
           Notifications.getPermissionsAsync(),
         ]);
         if (active && version === refreshVersion.current) {
-          setEnabled(value === "on" && allowsNotifications(permission));
+          setEnabled(value && allowsNotifications(permission));
         }
       } catch {
         // Keep the last known value and allow the user to try again.
@@ -47,11 +46,13 @@ export default function NotificationPreferenceRow() {
     }
 
     void refresh();
+    const unsubscribe = onNotificationPreferenceChange(() => { void refresh(); });
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") void refresh();
     });
     return () => {
       active = false;
+      unsubscribe();
       subscription.remove();
     };
   }, []);
@@ -95,8 +96,9 @@ export default function NotificationPreferenceRow() {
         }
       }
 
-      await SecureStore.setItemAsync(preferenceKey, next ? "on" : "off");
+      await writeNotificationPreference(next);
       setEnabled(next);
+      await syncPush();
     } catch {
       Alert.alert(t("account.notifications"), t("account.notificationSaveFailed"));
     } finally {
