@@ -1,6 +1,7 @@
 {
   "name": "multi-location-stress-v1",
   "note": "Counterfactual extra pins on the fixed benchmark posts. These are deliberately chosen stress cases, not independent real-world validation.",
+  "sweep_single_extra_pin": true,
   "scenarios": [
     {
       "code": "secondary_positive_W3",

@@ -51,6 +51,7 @@ def evaluate(snapshot: dict, dataset: dict, scenario_data: dict) -> dict:
             raise ValueError(f"Unknown post or anchor in {scenario['code']}")
         grouped: dict[str, list[dict]] = defaultdict(list)
         positives: dict[str, set[str]] = {}
+        score_changes = []
         for row in snapshot["pairs"]:
             source_kind = "lost" if row["source_type"] == "LOST" else "found"
             candidate_kind = "found" if source_kind == "lost" else "lost"
@@ -61,6 +62,12 @@ def evaluate(snapshot: dict, dataset: dict, scenario_data: dict) -> dict:
             recorded_v4 = row.get("variant_scores", {}).get("missing_geo_reweighted")
             if recorded_v4 is not None and abs(recorded_v4 - v4_score) > 0.00001:
                 raise ValueError(f"Snapshot v4 score differs for {source_key}/{candidate_key}")
+            if abs(v5_score - v4_score) >= 0.001:
+                score_changes.append({
+                    "source": source_key, "candidate": candidate_key, "label": row["label"],
+                    "v4_score": round(v4_score, 4), "v5_score": round(v5_score, 4),
+                    "delta": round(v5_score - v4_score, 4),
+                })
             grouped[source_key].append({
                 "candidate": candidate_key,
                 "label": row["label"],
@@ -100,11 +107,40 @@ def evaluate(snapshot: dict, dataset: dict, scenario_data: dict) -> dict:
                 for direction, prefix in (("LOST_TO_FOUND", "lost:"), ("FOUND_TO_LOST", "found:"))
             },
             "changed_queries": changes,
+            "score_changed_pairs": len(score_changes),
+            "largest_score_changes": sorted(score_changes, key=lambda item: abs(item["delta"]), reverse=True)[:5],
         })
-    return {"generated_at": datetime.now(timezone.utc).isoformat(),
+    report = {"generated_at": datetime.now(timezone.utc).isoformat(),
             "source_algorithm_version": snapshot["algorithm_version"],
             "scenario_set": scenario_data["name"], "source_count": len(positives),
             "results": results}
+    if scenario_data.get("sweep_single_extra_pin"):
+        sweep = []
+        for key in sorted(posts):
+            for anchor in sorted(anchors):
+                if anchor == posts[key]["anchor"]:
+                    continue
+                case = evaluate(snapshot, dataset, {"name": "single-pin-sweep", "scenarios": [{
+                    "code": f"{key}+{anchor}", "hypothesis": "Systematic single extra pin",
+                    "extra_pins": {key: [anchor]},
+                }]})["results"][0]
+                sweep.append(case)
+        baseline = sweep[0]["metrics"]["v4"]
+        improved = [case for case in sweep if case["metrics"]["v5"]["mrr"] > baseline["mrr"]]
+        worsened = [case for case in sweep if case["metrics"]["v5"]["mrr"] < baseline["mrr"]]
+        changed = [case for case in sweep if case["changed_queries"]]
+        report["single_extra_pin_sweep"] = {
+            "case_count": len(sweep), "baseline": baseline,
+            "mrr_improved_cases": len(improved), "mrr_worsened_cases": len(worsened),
+            "ranking_changed_cases": len(changed),
+            "largest_effects": sorted(
+                sweep, key=lambda case: (
+                    abs(case["metrics"]["v5"]["mrr"] - baseline["mrr"]),
+                    max((abs(item["delta"]) for item in case["largest_score_changes"]), default=0.0),
+                ), reverse=True,
+            )[:10],
+        }
+    return report
 
 
 def main() -> None:
