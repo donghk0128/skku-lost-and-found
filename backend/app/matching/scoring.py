@@ -93,16 +93,24 @@ def _color_conflict(source: Post, candidate: Post) -> bool:
     )
 
 
-def _distance_km(source: Post, candidate: Post) -> float | None:
-    if (
-        source.latitude is None
-        or source.longitude is None
-        or candidate.latitude is None
-        or candidate.longitude is None
-    ):
-        return None
-    source_lat, source_lon = radians(float(source.latitude)), radians(float(source.longitude))
-    candidate_lat, candidate_lon = radians(float(candidate.latitude)), radians(float(candidate.longitude))
+def _coordinates(post: Post) -> list[tuple[float, float]]:
+    # The scalar columns mirror the first location for older clients. Use them only
+    # when a post has no location rows (e.g. a legacy post or an in-memory test).
+    locations = post.locations
+    if locations:
+        return [
+            (float(location.latitude), float(location.longitude))
+            for location in locations
+            if location.latitude is not None and location.longitude is not None
+        ]
+    if post.latitude is not None and post.longitude is not None:
+        return [(float(post.latitude), float(post.longitude))]
+    return []
+
+
+def _haversine_km(source: tuple[float, float], candidate: tuple[float, float]) -> float:
+    source_lat, source_lon = radians(source[0]), radians(source[1])
+    candidate_lat, candidate_lon = radians(candidate[0]), radians(candidate[1])
     latitude_difference = candidate_lat - source_lat
     longitude_difference = candidate_lon - source_lon
     arc = (
@@ -110,6 +118,17 @@ def _distance_km(source: Post, candidate: Post) -> float | None:
         + cos(source_lat) * cos(candidate_lat) * sin(longitude_difference / 2) ** 2
     )
     return 6371.0088 * 2 * asin(min(1.0, sqrt(arc)))
+
+
+def _distance_km(source: Post, candidate: Post) -> float | None:
+    source_coordinates, candidate_coordinates = _coordinates(source), _coordinates(candidate)
+    if not source_coordinates or not candidate_coordinates:
+        return None
+    return min(
+        _haversine_km(source_point, candidate_point)
+        for source_point in source_coordinates
+        for candidate_point in candidate_coordinates
+    )
 
 
 def _time_gap_hours(source: Post, candidate: Post) -> float | None:

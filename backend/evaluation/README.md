@@ -56,4 +56,52 @@ python -m scripts.seed_matching_benchmark --apply --lost-author-id <시험계정
 python -m scripts.evaluate_matching --labels evaluation/labels.csv --output evaluation/result.json
 ```
 
-평가 도구는 동일한 게시글·임베딩에 대해 `hybrid_v3`, `no_color`(색상 감점 없음), `no_color_low_text`(규칙 내 문자열 0.15→0.05, 최종 임베딩 0.50→0.55), `missing_geo_reweighted`(한쪽이라도 좌표가 없을 때 규칙 점수의 위치 30%를 제외하고 나머지를 재정규화)의 전체·방향별 지표를 한 번에 계산합니다. 마지막 방식은 이 브랜치의 `hybrid-v4` 코드와 같습니다. **기존 EC2 API는 계속 v3**이며, 이 브랜치를 배포하기 전까지 서비스 동작은 바뀌지 않습니다. `result.json`에는 게시글 UUID 대신 E1 등의 평가 코드가 표시됩니다.
+평가 도구는 동일한 게시글·임베딩에 대해 `hybrid_v3`, `no_color`(색상 감점 없음), `no_color_low_text`(문자열 축소와 임베딩 가중치 증가), `missing_geo_reweighted`(v4: 대표 좌표가 없으면 위치 가중치 제외), `hybrid_v5`(복수 장소 중 최소 거리)의 전체·방향별 지표를 계산합니다. v3·v4 비교 점수는 대표 좌표 기준으로 재구성하므로 복수 장소를 가진 글에서도 v5와 비교할 수 있습니다. 기존 고정 벤치마크 v1에는 복수 장소가 없어 v4와 v5의 차이를 측정할 수 없습니다. `result.json`에는 게시글 UUID 대신 E1 등의 평가 코드가 표시됩니다.
+
+`scripts.evaluate_location_scenarios`는 기존 `result.json`의 임베딩 점수와 정답표를
+재사용해 [`location_scenarios_v1.json`](location_scenarios_v1.json)의 추가 핀을
+가상으로 적용합니다. DB·Gemini 호출 없이 v4와 v5의 순위 변화를 살피는
+반사실 스트레스 테스트이며, 실제 복수 장소 게시글에 대한 성능 지표는 아닙니다.
+실행 방법과 해석은 [`2026-11-24 실험 기록`](experiments/2026-11-24-multi-location-v5.md)에 남깁니다.
+
+## 복수 장소 평가셋 v1
+
+[`benchmark_multi_location_v1.json`](benchmark_multi_location_v1.json)은 새 정답
+8쌍과 게시글 16개를 정의합니다. 각 글은 반대 유형 후보 8개와 비교하므로
+분실→습득과 습득→분실을 합쳐 128개 라벨이 생깁니다. `locations`는 순서가
+있는 가능한 장소 목록이며 `anchor`가 있는 장소만 좌표 핀입니다. 첫 장소가
+텍스트만 있어도 뒤 장소의 좌표가 v5에 들어가는 사례를 포함합니다. 좌표는
+통제된 시험점이며 실제 건물 측량값이 아닙니다.
+
+등록 전에는 아래 명령으로 파일만 검증합니다. 등록은 개발 DB에서만 실행하며,
+기존 평가셋의 `labels.csv`와 덮어쓰지 않도록 별도 라벨·결과 파일을 사용합니다.
+새 글 16개의 임베딩 생성에 Gemini 호출이 필요합니다. 서버 실행 절차는 별도
+작업 디렉터리의 최신 브랜치 파일을 연결한 일회성 컨테이너를 기준으로 합니다.
+
+```sh
+python -m scripts.seed_matching_benchmark --dataset evaluation/benchmark_multi_location_v1.json --labels evaluation/multi_location_labels.csv
+python -m scripts.seed_matching_benchmark --dataset evaluation/benchmark_multi_location_v1.json --labels evaluation/multi_location_labels.csv --apply --lost-author-id <시험계정UUID>
+python -m scripts.evaluate_matching --labels evaluation/multi_location_labels.csv --output evaluation/multi_location_result.json
+```
+
+평가 명령은 DB를 읽기만 합니다. 화면에는 v4(`missing_geo_reweighted`)와
+v5(`hybrid_v5`)의 전체·방향별 지표와 정답 순위 변화를 짧게 표시하고, 다른
+방식과 각 비교 쌍의 상세 점수는 결과 JSON 파일에 보관합니다. 실행 전 가설과
+해석 기준은 [`2026-11-24 실험 기록`](experiments/2026-11-24-multi-location-v5.md)에
+정리했습니다.
+
+## 복수 장소 추가 검증셋
+
+[`benchmark_multi_location_holdout_v1.json`](benchmark_multi_location_holdout_v1.json)은
+첫 8쌍 결과를 본 뒤 별도로 작성한 16쌍·32개 글의 고정 평가셋입니다. 각
+질의는 반대 유형 후보 16개와 비교해 총 512개 라벨 관계가 생깁니다. 단일
+장소, 텍스트만 있는 첫 장소, 좌표가 전혀 없는 글, 세 가능한 장소를 포함합니다.
+위치 점수의 이점뿐 아니라 여러 핀이 오답을 끌어올리는지도 검사합니다. 입력
+해시와 평가 전 판단 기준은
+[`추가 검증 계획`](experiments/2026-11-24-multi-location-holdout-v1.md)에 기록했습니다.
+기존 평가셋과 라벨·결과 파일을 섞지 않도록
+`multi_location_holdout_labels.csv`와 `multi_location_holdout_result.json`을
+사용합니다. 두 파일은 Git에서 제외됩니다.
+이번 합성 평가에서는 v4의 정답 1위가 21/32, v5가 22/32였고 정답은 모두
+2위 이내였습니다. 개선 2건과 악화 1건의 이유 및 42개 회귀 테스트 결과는
+위 실험 기록에 남겼습니다. 실제 사용자 글의 성능 수치로 해석하지 않습니다.

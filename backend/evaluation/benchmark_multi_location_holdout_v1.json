@@ -1,0 +1,96 @@
+{
+  "name": "matching-multi-location-holdout-v1",
+  "note": "Frozen synthetic holdout for paired v4/v5 evaluation. Same-code LOST/FOUND posts refer to the same item. Coordinates are controlled test points, not surveyed campus positions.",
+  "anchors": {
+    "LIBRARY": [37.293900, 126.975100],
+    "STUDENT_CENTER": [37.293400, 126.974500],
+    "ENGINEERING_1": [37.294300, 126.976500],
+    "ENGINEERING_2": [37.294800, 126.976000],
+    "GATE": [37.297000, 126.972000],
+    "DORM": [37.289000, 126.977000],
+    "SPORTS": [37.290500, 126.972500],
+    "AUDITORIUM": [37.296000, 126.979000]
+  },
+  "pairs": [
+    {
+      "code": "W1", "category_code": "WALLET",
+      "lost": {"title": "남색 카드지갑을 찾습니다", "description": "흰색 실로 가장자리를 꿰맨 작은 지갑입니다. 학생증이 들어 있었어요.", "locations": [{"location_text": "학생회관 1층", "anchor": "STUDENT_CENTER"}], "event_start_at": "2026-11-21T12:00:00+09:00", "event_end_at": "2026-11-21T13:00:00+09:00"},
+      "found": {"title": "학생회관 카드지갑 습득", "description": "남색 카드 케이스이고 흰 박음질이 있습니다. 학생증 한 장이 들어 있습니다.", "locations": [{"location_text": "학생회관 입구", "anchor": "STUDENT_CENTER"}], "event_start_at": "2026-11-21T12:40:00+09:00", "event_end_at": "2026-11-21T13:10:00+09:00"}
+    },
+    {
+      "code": "W2", "category_code": "WALLET",
+      "lost": {"title": "남색 카드 케이스 분실했어요", "description": "빨간 박음질이 있는 카드지갑이고 교통카드가 들어 있습니다. 도서관에도 들렀습니다.", "locations": [{"location_text": "학생회관", "anchor": "STUDENT_CENTER"}, {"location_text": "삼성학술정보관 1층", "anchor": "LIBRARY"}], "event_start_at": "2026-11-21T12:10:00+09:00", "event_end_at": "2026-11-21T13:10:00+09:00"},
+      "found": {"title": "빨간 실 장식 카드지갑", "description": "남색 작은 지갑에 교통카드가 한 장 있습니다.", "locations": [{"location_text": "삼성학술정보관 출입구", "anchor": "LIBRARY"}], "event_start_at": "2026-11-21T12:50:00+09:00", "event_end_at": "2026-11-21T13:20:00+09:00"}
+    },
+    {
+      "code": "W3", "category_code": "WALLET",
+      "lost": {"title": "갈색 동전지갑 잃어버림", "description": "동그란 동전지갑에 작은 방울 장식이 달려 있습니다. 기숙사에서 정문 쪽으로 갔습니다.", "locations": [{"location_text": "기숙사 근처", "anchor": null}, {"location_text": "정문 버스 정류장", "anchor": "GATE"}], "event_start_at": "2026-11-21T12:20:00+09:00", "event_end_at": "2026-11-21T13:20:00+09:00"},
+      "found": {"title": "방울 달린 작은 지갑 주웠어요", "description": "갈색 동전 케이스에 금속 방울이 있습니다.", "locations": [{"location_text": "정문 근처", "anchor": null}], "event_start_at": "2026-11-21T13:00:00+09:00", "event_end_at": "2026-11-21T13:30:00+09:00"}
+    },
+    {
+      "code": "W4", "category_code": "WALLET",
+      "lost": {"title": "갈색 동전 파우치 분실", "description": "지퍼에 작은 나무 구슬이 매달려 있습니다. 기숙사와 정문, 체육관을 들렀어요.", "locations": [{"location_text": "기숙사 입구", "anchor": "DORM"}, {"location_text": "정문", "anchor": "GATE"}, {"location_text": "체육관 앞", "anchor": "SPORTS"}], "event_start_at": "2026-11-21T12:25:00+09:00", "event_end_at": "2026-11-21T13:25:00+09:00"},
+      "found": {"title": "나무 구슬 달린 동전지갑", "description": "갈색 지퍼 파우치입니다. 안에는 동전 몇 개가 있습니다.", "locations": [{"location_text": "체육관 로비", "anchor": "SPORTS"}, {"location_text": "기숙사 앞", "anchor": "DORM"}], "event_start_at": "2026-11-21T13:05:00+09:00", "event_end_at": "2026-11-21T13:35:00+09:00"}
+    },
+    {
+      "code": "E1", "category_code": "ELECTRONICS",
+      "lost": {"title": "검은 충전기 분실", "description": "선 끝에 파란 테이프를 감아 놓은 휴대폰 충전기입니다.", "locations": [{"location_text": "제1공학관 2층", "anchor": "ENGINEERING_1"}], "event_start_at": "2026-11-21T15:00:00+09:00", "event_end_at": "2026-11-21T16:00:00+09:00"},
+      "found": {"title": "파란 테이프 충전선 주웠습니다", "description": "검은색 휴대폰 충전 케이블이고 끝에 파란 테이프가 붙어 있습니다.", "locations": [{"location_text": "제1공학관 강의실 앞", "anchor": "ENGINEERING_1"}], "event_start_at": "2026-11-21T15:35:00+09:00", "event_end_at": "2026-11-21T16:05:00+09:00"}
+    },
+    {
+      "code": "E2", "category_code": "ELECTRONICS",
+      "lost": {"title": "휴대폰 충전선 찾습니다", "description": "검은 케이블 끝에 빨간 테이프를 붙였습니다. 공학관 두 곳을 오갔어요.", "locations": [{"location_text": "제1공학관", "anchor": "ENGINEERING_1"}, {"location_text": "제2공학관 1층", "anchor": "ENGINEERING_2"}], "event_start_at": "2026-11-21T15:10:00+09:00", "event_end_at": "2026-11-21T16:10:00+09:00"},
+      "found": {"title": "빨간 표시 있는 충전 케이블", "description": "검은색 케이블에 빨간 테이프가 감겨 있습니다.", "locations": [{"location_text": "제2공학관 로비", "anchor": "ENGINEERING_2"}], "event_start_at": "2026-11-21T15:45:00+09:00", "event_end_at": "2026-11-21T16:15:00+09:00"}
+    },
+    {
+      "code": "E3", "category_code": "ELECTRONICS",
+      "lost": {"title": "은색 보조배터리 못 보셨나요", "description": "한쪽 모서리에 검은 스티커가 붙어 있습니다. 강당에서 도서관으로 이동했습니다.", "locations": [{"location_text": "대강당", "anchor": null}, {"location_text": "삼성학술정보관", "anchor": "LIBRARY"}], "event_start_at": "2026-11-21T15:20:00+09:00", "event_end_at": "2026-11-21T16:20:00+09:00"},
+      "found": {"title": "스티커 붙은 보조배터리 습득", "description": "은색 배터리의 모서리에 검은 표시가 있습니다.", "locations": [{"location_text": "삼성학술정보관 2층", "anchor": "LIBRARY"}], "event_start_at": "2026-11-21T15:55:00+09:00", "event_end_at": "2026-11-21T16:25:00+09:00"}
+    },
+    {
+      "code": "E4", "category_code": "ELECTRONICS",
+      "lost": {"title": "작은 회색 보조배터리 잃음", "description": "옆면에 흰 스티커가 붙어 있습니다. 강당, 공학관, 도서관에 갔습니다.", "locations": [{"location_text": "대강당 입구", "anchor": "AUDITORIUM"}, {"location_text": "제2공학관", "anchor": "ENGINEERING_2"}, {"location_text": "삼성학술정보관", "anchor": "LIBRARY"}], "event_start_at": "2026-11-21T15:25:00+09:00", "event_end_at": "2026-11-21T16:25:00+09:00"},
+      "found": {"title": "흰 스티커 보조배터리 발견", "description": "회색 휴대용 배터리이고 옆에 흰색 스티커가 보입니다.", "locations": [{"location_text": "대강당 1층", "anchor": "AUDITORIUM"}, {"location_text": "삼성학술정보관 앞", "anchor": "LIBRARY"}], "event_start_at": "2026-11-21T16:00:00+09:00", "event_end_at": "2026-11-21T16:30:00+09:00"}
+    },
+    {
+      "code": "K1", "category_code": "KEY",
+      "lost": {"title": "곰 키링에 달린 열쇠 분실", "description": "은색 열쇠 두 개와 작은 곰 인형 고리가 있습니다.", "locations": [{"location_text": "기숙사 현관", "anchor": "DORM"}], "event_start_at": "2026-11-22T11:00:00+09:00", "event_end_at": "2026-11-22T12:00:00+09:00"},
+      "found": {"title": "곰 장식 열쇠 두 개 주웠어요", "description": "기숙사 앞에서 은색 열쇠 꾸러미를 발견했습니다.", "locations": [{"location_text": "기숙사 입구", "anchor": "DORM"}], "event_start_at": "2026-11-22T11:35:00+09:00", "event_end_at": "2026-11-22T12:05:00+09:00"}
+    },
+    {
+      "code": "K2", "category_code": "KEY",
+      "lost": {"title": "열쇠 두 개 달린 고리 분실", "description": "은색 열쇠와 별 모양 장식입니다. 기숙사와 정문에서 찾고 있습니다.", "locations": [{"location_text": "기숙사", "anchor": "DORM"}, {"location_text": "정문 앞", "anchor": "GATE"}], "event_start_at": "2026-11-22T11:10:00+09:00", "event_end_at": "2026-11-22T12:10:00+09:00"},
+      "found": {"title": "별 장식이 붙은 열쇠", "description": "열쇠 두 개가 달린 작은 별 키링을 주웠습니다.", "locations": [{"location_text": "정문 버스 정류장", "anchor": "GATE"}], "event_start_at": "2026-11-22T11:45:00+09:00", "event_end_at": "2026-11-22T12:15:00+09:00"}
+    },
+    {
+      "code": "K3", "category_code": "KEY",
+      "lost": {"title": "파란 고리 열쇠가 없어졌어요", "description": "작은 열쇠 세 개가 달려 있습니다. 공학관에서 마지막으로 봤습니다.", "locations": [{"location_text": "제1공학관 계단", "anchor": null}, {"location_text": "제2공학관 로비", "anchor": "ENGINEERING_2"}], "event_start_at": "2026-11-22T11:20:00+09:00", "event_end_at": "2026-11-22T12:20:00+09:00"},
+      "found": {"title": "파란 키링 달린 열쇠 습득", "description": "열쇠가 세 개 붙어 있는 고리입니다.", "locations": [{"location_text": "제2공학관 1층", "anchor": "ENGINEERING_2"}], "event_start_at": "2026-11-22T11:55:00+09:00", "event_end_at": "2026-11-22T12:25:00+09:00"}
+    },
+    {
+      "code": "K4", "category_code": "KEY",
+      "lost": {"title": "초록 고리 열쇠 세 개 분실", "description": "고리에는 작은 금속 이름표도 있습니다. 공학관 두 곳과 강당에 들렀습니다.", "locations": [{"location_text": "제1공학관", "anchor": "ENGINEERING_1"}, {"location_text": "제2공학관", "anchor": "ENGINEERING_2"}, {"location_text": "대강당", "anchor": "AUDITORIUM"}], "event_start_at": "2026-11-22T11:25:00+09:00", "event_end_at": "2026-11-22T12:25:00+09:00"},
+      "found": {"title": "이름표 있는 열쇠를 주웠습니다", "description": "초록 키링에 열쇠 세 개가 묶여 있습니다.", "locations": [{"location_text": "제2공학관 출입구", "anchor": "ENGINEERING_2"}, {"location_text": "대강당 앞", "anchor": "AUDITORIUM"}], "event_start_at": "2026-11-22T12:00:00+09:00", "event_end_at": "2026-11-22T12:30:00+09:00"}
+    },
+    {
+      "code": "O1", "category_code": "OTHER",
+      "lost": {"title": "검은 모자를 잃어버렸어요", "description": "앞에 노란 로고가 있는 야구 모자입니다.", "locations": [{"location_text": "체육관 로비", "anchor": "SPORTS"}], "event_start_at": "2026-11-22T16:00:00+09:00", "event_end_at": "2026-11-22T17:00:00+09:00"},
+      "found": {"title": "체육관에서 모자 습득", "description": "검은 야구모자 앞쪽에 노란색 그림이 있습니다.", "locations": [{"location_text": "체육관 입구", "anchor": "SPORTS"}], "event_start_at": "2026-11-22T16:35:00+09:00", "event_end_at": "2026-11-22T17:05:00+09:00"}
+    },
+    {
+      "code": "O2", "category_code": "OTHER",
+      "lost": {"title": "흰 로고 검은 캡 분실", "description": "검은색 야구모자에 작은 흰 로고가 있습니다. 체육관과 정문을 지났어요.", "locations": [{"location_text": "체육관", "anchor": "SPORTS"}, {"location_text": "정문", "anchor": "GATE"}], "event_start_at": "2026-11-22T16:10:00+09:00", "event_end_at": "2026-11-22T17:10:00+09:00"},
+      "found": {"title": "작은 흰 그림이 있는 모자", "description": "정문 쪽에서 검은 캡을 주웠습니다.", "locations": [{"location_text": "정문 정류장", "anchor": "GATE"}], "event_start_at": "2026-11-22T16:45:00+09:00", "event_end_at": "2026-11-22T17:15:00+09:00"}
+    },
+    {
+      "code": "O3", "category_code": "OTHER",
+      "lost": {"title": "나무 손잡이 접이식 우산 찾습니다", "description": "회색 천이고 손잡이 끝이 나무입니다. 도서관 안에서 사용했습니다.", "locations": [{"location_text": "삼성학술정보관 실내", "anchor": null}, {"location_text": "학생회관 출입구", "anchor": "STUDENT_CENTER"}], "event_start_at": "2026-11-22T16:20:00+09:00", "event_end_at": "2026-11-22T17:20:00+09:00"},
+      "found": {"title": "회색 작은 우산 주웠습니다", "description": "접히는 우산이고 나무 손잡이가 달려 있습니다.", "locations": [{"location_text": "학생회관 입구", "anchor": "STUDENT_CENTER"}], "event_start_at": "2026-11-22T16:55:00+09:00", "event_end_at": "2026-11-22T17:25:00+09:00"}
+    },
+    {
+      "code": "O4", "category_code": "OTHER",
+      "lost": {"title": "회색 접이식 우산 분실", "description": "검은 고무 손잡이에 흰 끈이 매달려 있습니다. 도서관과 학생회관, 강당에 갔어요.", "locations": [{"location_text": "삼성학술정보관", "anchor": "LIBRARY"}, {"location_text": "학생회관", "anchor": "STUDENT_CENTER"}, {"location_text": "대강당", "anchor": "AUDITORIUM"}], "event_start_at": "2026-11-22T16:25:00+09:00", "event_end_at": "2026-11-22T17:25:00+09:00"},
+      "found": {"title": "흰 끈 달린 우산 보관 중", "description": "회색 소형 우산이고 검은 손잡이에 끈이 있습니다.", "locations": [{"location_text": "대강당 앞", "anchor": "AUDITORIUM"}, {"location_text": "학생회관", "anchor": "STUDENT_CENTER"}], "event_start_at": "2026-11-22T17:00:00+09:00", "event_end_at": "2026-11-22T17:30:00+09:00"}
+    }
+  ]
+}

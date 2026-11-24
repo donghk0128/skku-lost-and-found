@@ -1,0 +1,27 @@
+{
+  "name": "multi-location-stress-v1",
+  "note": "Counterfactual extra pins on the fixed benchmark posts. These are deliberately chosen stress cases, not independent real-world validation.",
+  "sweep_single_extra_pin": true,
+  "scenarios": [
+    {
+      "code": "secondary_positive_W3",
+      "hypothesis": "A text-only first location can gain a useful coordinate from a later possible place.",
+      "extra_pins": {"lost:W3": ["LIBRARY"]}
+    },
+    {
+      "code": "both_secondary_K3",
+      "hypothesis": "Both sides can provide a coordinate after their text-only first location.",
+      "extra_pins": {"lost:K3": ["ENGINEERING_1"], "found:K3": ["ENGINEERING_1"]}
+    },
+    {
+      "code": "broad_location_W3",
+      "hypothesis": "Extra plausible places may also boost competing wallet posts.",
+      "extra_pins": {"lost:W3": ["LIBRARY", "STUDENT_CENTER"]}
+    },
+    {
+      "code": "distractor_pin_K3",
+      "hypothesis": "A wrong key post may receive a close secondary pin while the true found post lacks coordinates.",
+      "extra_pins": {"lost:K3": ["ENGINEERING_1"], "found:K1": ["ENGINEERING_1"]}
+    }
+  ]
+}
