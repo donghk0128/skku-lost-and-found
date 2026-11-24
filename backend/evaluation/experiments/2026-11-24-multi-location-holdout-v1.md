@@ -1,9 +1,9 @@
-# 복수 장소 v5 추가 검증: 평가 전 계획
+# 복수 장소 v5 추가 검증: 사전 계획과 결과
 
 - **작성:** 2026-11-24 KST
 - **데이터:** [`benchmark_multi_location_holdout_v1.json`](../benchmark_multi_location_holdout_v1.json)
 - **데이터 SHA-256:** `2e926509f9be9ee8ba37e922600cefc8ed32354be10cb8841e3b03d7ee2c2165`
-- **상태:** 평가셋 작성 및 로컬 JSON 구조 검증 완료. 개발 DB 등록·임베딩 생성·순위 측정 전.
+- **최종 상태:** 개발 DB에 32개 글·임베딩 등록, v4/v5 오프라인 평가와 관련 회귀 테스트 42개 완료. 서비스 배포 API와 실제 사용자 데이터 정확도는 미검증.
 
 ## 왜 한 번 더 평가하는가
 
@@ -49,12 +49,32 @@ v5가 새 데이터에서도 손해 없이 도움이 되면 현재 최소 거리
 가중치를 바로 추가하지 않는다. 16쌍의 점수로 서비스 전반의 정확도를
 주장하지 않으며, 실제 반환 완료 쌍이 쌓이면 별도 현실 평가셋으로 검증한다.
 
-## 실행 상태
+## 실행 전 점검 기록
 
 로컬에서 JSON 파싱, 카테고리별 개수, 장소 앵커, 빈 텍스트, 시간 범위,
-파일 해시를 확인했다. 등록 스크립트의 dry run과 단독 테스트는 EC2에서
-실행하기 전이며, 개발 DB에는 이 데이터셋의 글을 아직 넣지 않았다. 결과가
-나오면 이 문서에 라벨 해시, 명령, 지표, 개별 오류와 다음 결정을 추가한다.
+파일 해시를 확인했다. 이 시점에는 개발 DB에 글을 넣지 않았고 결과를
+보기 전에 비교·해석 규칙을 위에 고정했다. 등록과 평가 결과는 아래에 남겼다.
+
+### 재현 경로
+
+개발 DB의 Alembic 버전 `0014_post_location_limit_policy`, Gemini API 키,
+시험 작성자 계정이 필요하다. 아래 명령은 **백엔드 디렉터리**에서 실행한다.
+첫 명령은 파일만 검증하며, `--apply`가 있는 둘째 명령만 개발 DB에 글과
+임베딩을 만든다. 같은 데이터셋 이름·코드로 재실행하면 기존 글을 검사해
+재사용한다. 라벨 CSV에는 실제 글 UUID가, 상세 결과 JSON에는 개별 점수
+스냅샷이 들어 있으므로 Git에 넣지 않는다.
+
+```sh
+python -m scripts.seed_matching_benchmark --dataset evaluation/benchmark_multi_location_holdout_v1.json --labels evaluation/multi_location_holdout_labels.csv
+python -m scripts.seed_matching_benchmark --dataset evaluation/benchmark_multi_location_holdout_v1.json --labels evaluation/multi_location_holdout_labels.csv --apply --lost-author-id <시험계정UUID>
+python -m scripts.evaluate_matching --labels evaluation/multi_location_holdout_labels.csv --output evaluation/multi_location_holdout_result.json
+```
+
+평가 명령은 DB를 읽기만 한다. `missing_geo_reweighted`는 같은 글에서
+첫 장소의 대표 좌표만 쓰는 v4 점수를 재구성하고, `hybrid_v5`는 저장된
+모든 좌표 장소를 사용한다. 라벨 해시와 데이터 해시가 같아야 아래 수치와
+같은 입력이라고 판단할 수 있다. Gemini 임베딩 모델이나 입력 글이 바뀌면
+별도의 실행으로 기록한다.
 
 ## 개발 DB 첫 평가 결과
 
