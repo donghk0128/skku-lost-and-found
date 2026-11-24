@@ -39,7 +39,7 @@ def test_airpods_synonym_ranks_above_wrong_color_with_observed_semantic_scores()
 
     ranked = rank_candidates(source, [wrong_color, correct], {correct.id: 0.9470, wrong_color.id: 0.8768})
 
-    assert ALGORITHM_VERSION == "hybrid-v4"
+    assert ALGORITHM_VERSION == "hybrid-v5"
     assert [item.post.id for item in ranked] == [correct.id, wrong_color.id]
     assert not ranked[0].signals.color_conflict
     assert ranked[1].signals.color_conflict
@@ -107,10 +107,10 @@ def test_new_version_keeps_old_run_and_records_color_conflict(monkeypatch) -> No
         ranked = rank_candidates(source, [candidate], {candidate.id: 0.9})
         monkeypatch.setattr("app.matching.service.ALGORITHM_VERSION", "hybrid-v2")
         old_id = MatchingService._record_run(db, source, [candidate], ranked, {"post_type": "LOST"})
-        monkeypatch.setattr("app.matching.service.ALGORITHM_VERSION", "hybrid-v4")
+        monkeypatch.setattr("app.matching.service.ALGORITHM_VERSION", "hybrid-v5")
         new_id = MatchingService._record_run(db, source, [candidate], ranked, {"post_type": "LOST"})
         assert old_id != new_id
         assert MatchingService._record_run(db, source, [candidate], ranked, {"post_type": "LOST"}) == new_id
-        assert [run.algorithm_version for run in db.scalars(select(RecommendationRun).order_by(RecommendationRun.algorithm_version))] == ["hybrid-v2", "hybrid-v4"]
+        assert [run.algorithm_version for run in db.scalars(select(RecommendationRun).order_by(RecommendationRun.algorithm_version))] == ["hybrid-v2", "hybrid-v5"]
         assert db.get(RecommendationItem, (new_id, candidate.id)).color_conflict
     engine.dispose()

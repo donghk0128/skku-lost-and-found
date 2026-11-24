@@ -6,7 +6,7 @@ from uuid import UUID
 from app.matching.scoring import RuleSignals, rule_signals
 from app.posts.model import Post
 
-ALGORITHM_VERSION = "hybrid-v4"
+ALGORITHM_VERSION = "hybrid-v5"
 RULE_WEIGHT = 0.5
 SEMANTIC_WEIGHT = 0.5
 COLOR_CONFLICT_PENALTY = 0.25

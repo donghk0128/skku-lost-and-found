@@ -56,4 +56,4 @@ python -m scripts.seed_matching_benchmark --apply --lost-author-id <시험계정
 python -m scripts.evaluate_matching --labels evaluation/labels.csv --output evaluation/result.json
 ```
 
-평가 도구는 동일한 게시글·임베딩에 대해 `hybrid_v3`, `no_color`(색상 감점 없음), `no_color_low_text`(규칙 내 문자열 0.15→0.05, 최종 임베딩 0.50→0.55), `missing_geo_reweighted`(한쪽이라도 좌표가 없을 때 규칙 점수의 위치 30%를 제외하고 나머지를 재정규화)의 전체·방향별 지표를 한 번에 계산합니다. 마지막 방식은 이 브랜치의 `hybrid-v4` 코드와 같습니다. **기존 EC2 API는 계속 v3**이며, 이 브랜치를 배포하기 전까지 서비스 동작은 바뀌지 않습니다. `result.json`에는 게시글 UUID 대신 E1 등의 평가 코드가 표시됩니다.
+평가 도구는 동일한 게시글·임베딩에 대해 `hybrid_v3`, `no_color`(색상 감점 없음), `no_color_low_text`(문자열 축소와 임베딩 가중치 증가), `missing_geo_reweighted`(v4: 대표 좌표가 없으면 위치 가중치 제외), `hybrid_v5`(복수 장소 중 최소 거리)의 전체·방향별 지표를 계산합니다. v3·v4 비교 점수는 대표 좌표 기준으로 재구성하므로 복수 장소를 가진 글에서도 v5와 비교할 수 있습니다. 기존 고정 벤치마크 v1에는 복수 장소가 없어 v4와 v5의 차이를 측정할 수 없습니다. `result.json`에는 게시글 UUID 대신 E1 등의 평가 코드가 표시됩니다.

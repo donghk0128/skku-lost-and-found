@@ -79,7 +79,7 @@ def test_my_posts_and_filtered_ranking(client_and_engine) -> None:
     result = client.get(url)
     assert result.status_code == 200
     body = result.json()
-    assert body["algorithm_version"] == "hybrid-v4"
+    assert body["algorithm_version"] == "hybrid-v5"
     assert body["total"] == 2
     assert [item["post"]["id"] for item in body["items"]] == [str(posts["best"].id), str(posts["bag"].id)]
     assert {item["post"]["author_nickname"] for item in body["items"]} == {"other"}
@@ -96,7 +96,7 @@ def test_my_posts_and_filtered_ranking(client_and_engine) -> None:
     with Session(engine) as db:
         assert len(db.scalars(select(RecommendationRun)).all()) == 3
         assert len(db.scalars(select(RecommendationItem).where(RecommendationItem.run_id == UUID(body["run_id"]))).all()) == 2
-        assert db.get(RecommendationRun, UUID(body["run_id"])).algorithm_version == "hybrid-v4"
+        assert db.get(RecommendationRun, UUID(body["run_id"])).algorithm_version == "hybrid-v5"
 
 
 def test_source_ownership_status_and_query_validation(client_and_engine) -> None:

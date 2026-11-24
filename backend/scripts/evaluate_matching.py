@@ -8,6 +8,7 @@ import argparse
 import csv
 import hashlib
 import json
+from math import exp
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,6 +21,7 @@ from app.matching.embedding import MODEL
 from app.matching.evaluation import ranking_metrics
 from app.matching.ranking import ALGORITHM_VERSION, COLOR_CONFLICT_PENALTY, RULE_WEIGHT, SEMANTIC_WEIGHT, rank_candidates
 from app.matching.repository import MatchingRepository
+from app.matching.scoring import LOCATION_WEIGHT, RuleSignals, _haversine_km
 from app.posts.model import Post
 
 
@@ -53,12 +55,30 @@ def load_codes(path: Path) -> dict[UUID, str]:
     return codes
 
 
+def v4_rule_scores(source: Post, candidate: Post, signals: RuleSignals) -> tuple[float, float]:
+    """Reconstruct v4's representative-coordinate scores for a fair comparison."""
+    if (
+        source.latitude is None or source.longitude is None
+        or candidate.latitude is None or candidate.longitude is None
+    ):
+        old_distance = None
+    else:
+        old_distance = _haversine_km(
+            (float(source.latitude), float(source.longitude)),
+            (float(candidate.latitude), float(candidate.longitude)),
+        )
+    old_location = exp(-old_distance / 3) if old_distance is not None else 0.0
+    old_raw = signals.score - LOCATION_WEIGHT * signals.location + LOCATION_WEIGHT * old_location
+    old_ranked = old_raw / (1 - LOCATION_WEIGHT) if old_distance is None else old_raw
+    return old_raw, old_ranked
+
+
 def evaluate(path: Path) -> dict:
     labels = load_labels(path)
     codes = load_codes(path)
     methods: dict[str, dict[UUID, list[UUID]]] = {
         name: {} for name in (
-            "rule", "semantic", "hybrid_v3", "no_color", "no_color_low_text", "missing_geo_reweighted"
+            "rule", "semantic", "hybrid_v3", "no_color", "no_color_low_text", "missing_geo_reweighted", "hybrid_v5"
         )
     }
     positives: dict[UUID, set[UUID]] = {}
@@ -82,24 +102,32 @@ def evaluate(path: Path) -> dict:
             items = {item.post.id: item for item in ranked}
             if any(item.semantic_score is None for item in ranked):
                 raise ValueError(f"Missing semantic score for source {source_id}")
+            legacy_scores = {
+                candidate_id: v4_rule_scores(source, item.post, item.signals)
+                for candidate_id, item in items.items()
+            }
             scores = {
                 candidate_id: {
-                    "rule": item.signals.score,
+                    "rule": legacy_scores[candidate_id][0],
                     "semantic": item.semantic_score,
                     "hybrid_v3": max(
                         0.0,
-                        RULE_WEIGHT * item.signals.score + SEMANTIC_WEIGHT * item.semantic_score
+                        RULE_WEIGHT * legacy_scores[candidate_id][0] + SEMANTIC_WEIGHT * item.semantic_score
                         - (COLOR_CONFLICT_PENALTY if item.signals.color_conflict else 0.0),
                     ),
-                    "no_color": RULE_WEIGHT * item.signals.score + SEMANTIC_WEIGHT * item.semantic_score,
+                    "no_color": RULE_WEIGHT * legacy_scores[candidate_id][0] + SEMANTIC_WEIGHT * item.semantic_score,
                     # Transfer 0.05 of total weight from lexical text to semantic similarity.
                     # Rule text falls from 0.15 to 0.05; final semantic rises from 0.50 to 0.55.
                     "no_color_low_text": (
-                        RULE_WEIGHT * (item.signals.score - 0.10 * item.signals.text)
+                        RULE_WEIGHT * (legacy_scores[candidate_id][0] - 0.10 * item.signals.text)
                         + (SEMANTIC_WEIGHT + 0.05) * item.semantic_score
                     ),
-                    # Production v4 uses the reweighted score when coordinates are missing.
-                    "missing_geo_reweighted": item.score,
+                    # Production v4 used only the representative coordinates.
+                    "missing_geo_reweighted": max(
+                        0.0, RULE_WEIGHT * legacy_scores[candidate_id][1] + SEMANTIC_WEIGHT * item.semantic_score
+                        - (COLOR_CONFLICT_PENALTY if item.signals.color_conflict else 0.0),
+                    ),
+                    "hybrid_v5": item.score,
                 }
                 for candidate_id, item in items.items()
             }
@@ -128,12 +156,12 @@ def evaluate(path: Path) -> dict:
                     "candidate": codes.get(candidate_id, f"S{source_index}-C{candidate_index}"),
                     "label": int(candidate_labels[candidate_id]),
                     "ranks": {method: ranks[method][candidate_id] for method in methods},
-                    "rule_score": round(item.signals.score, 6),
+                    "rule_score": round(scores[candidate_id]["rule"], 6),
                     "semantic_score": round(item.semantic_score, 6),
                     "hybrid_score": round(scores[candidate_id]["hybrid_v3"], 6),
                     "variant_scores": {
                         method: round(scores[candidate_id][method], 6)
-                        for method in ("no_color", "no_color_low_text", "missing_geo_reweighted")
+                        for method in ("no_color", "no_color_low_text", "missing_geo_reweighted", "hybrid_v5")
                     },
                     "signals": {
                         "text": round(item.signals.text, 6),
@@ -161,6 +189,7 @@ def evaluate(path: Path) -> dict:
             "color_conflict_penalty": COLOR_CONFLICT_PENALTY,
             "no_color_low_text": "rule text 0.05, category 0.25, time 0.30, location 0.30, rule multiplier 0.50, semantic 0.55, no color penalty",
             "missing_geo_reweighted": "v3 except when either coordinate is missing: divide rule score by 0.70 before blending; retain color penalty",
+            "hybrid_v5": "v4 except location uses the nearest coordinate pair across both posts; text-only locations are ignored",
         },
         "embedding_model": MODEL,
         "source_count": len(labels),
