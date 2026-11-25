@@ -25,13 +25,17 @@ import { useAuth } from "@/providers/AuthProvider";
 import { useLocale } from "@/i18n/LocaleProvider";
 import type { TranslateFn } from "@/i18n";
 import { readSession } from "@/lib/session-storage";
+import { newVisitId, trackEvent } from "@/lib/event-logging";
 
-const boardViewabilityConfig = { itemVisiblePercentThreshold: 1 };
+const boardViewabilityConfig = { itemVisiblePercentThreshold: 50, minimumViewTime: 500 };
 
 type BoardItem = {
   post: Post;
   rank?: number;
   reasons?: RecommendationReason[];
+  runId?: string;
+  sourcePostId?: string;
+  visitId?: string;
 };
 
 function relativeTime(date: string, t: TranslateFn) {
@@ -51,6 +55,9 @@ export function PostRow({
   category,
   rank,
   reasons,
+  runId,
+  sourcePostId,
+  visitId,
   showAuthor = true,
   showType = false,
 }: {
@@ -58,6 +65,9 @@ export function PostRow({
   category?: Category;
   rank?: number;
   reasons?: RecommendationReason[];
+  runId?: string;
+  sourcePostId?: string;
+  visitId?: string;
   showAuthor?: boolean;
   showType?: boolean;
 }) {
@@ -90,9 +100,12 @@ export function PostRow({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={post.title}
-      onPress={() =>
-        router.push({ pathname: "/post/[id]", params: { id: post.id } })
-      }
+      onPress={() => {
+        if (runId && sourcePostId && rank && visitId)
+          trackEvent({ event_type: "recommendation_click", visit_id: visitId,
+            source_post_id: sourcePostId, candidate_post_id: post.id, run_id: runId, rank });
+        router.push({ pathname: "/post/[id]", params: { id: post.id } });
+      }}
       style={styles.row}
     >
       <View style={styles.copy}>
@@ -165,20 +178,45 @@ export default function PostBoard({
   filters,
   sortMode,
   sourcePostId,
+  active,
 }: {
   type: "LOST" | "FOUND";
   filters: PostFilters;
   sortMode: "newest" | "candidates";
   sourcePostId: string | null;
+  active: boolean;
 }) {
   const { locale, t } = useLocale();
   const { user } = useAuth();
   const listRef = useRef<FlatList<BoardItem>>(null);
+  const tracking = useRef({ visitId: newVisitId(), seen: new Set<string>(), sortMode, sourcePostId, active });
+  const lastApplied = useRef({ context: "", search: "", filters: "", hadFilters: false });
+  useEffect(() => {
+    tracking.current.sortMode = sortMode;
+    tracking.current.sourcePostId = sourcePostId;
+    tracking.current.active = active;
+    if (active) {
+      tracking.current.visitId = newVisitId();
+      tracking.current.seen.clear();
+    }
+  }, [sortMode, sourcePostId, active]);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken<BoardItem>[] }) => {
       const firstIndex = viewableItems[0]?.index;
       if (firstIndex != null) setShowScrollTop(firstIndex >= 3);
+      if (tracking.current.active && tracking.current.sortMode === "candidates") {
+        for (const { item, isViewable } of viewableItems) {
+          if (!isViewable || !item.runId || !item.rank || !item.sourcePostId
+              || item.visitId !== tracking.current.visitId) continue;
+          const key = `${item.runId}:${item.post.id}`;
+          if (tracking.current.seen.has(key)) continue;
+          tracking.current.seen.add(key);
+          trackEvent({ event_type: "recommendation_impression", visit_id: tracking.current.visitId,
+            run_id: item.runId, source_post_id: item.sourcePostId,
+            candidate_post_id: item.post.id, rank: item.rank });
+        }
+      }
     },
     [],
   );
@@ -237,6 +275,9 @@ export default function PostBoard({
               post,
               rank,
               reasons,
+              runId: ranked.run_id,
+              sourcePostId,
+              visitId: tracking.current.visitId,
             })),
             total: ranked.total,
           };
@@ -248,6 +289,24 @@ export default function PostBoard({
           };
         }
         if (version !== requests.current.generation) return;
+        if (offset === 0 && active) {
+          const context = JSON.stringify({ type, sortMode, sourcePostId });
+          const search = query.q?.trim() ?? "";
+          const filters = JSON.stringify([query.category_id, query.title_terms, query.content_terms,
+            query.location_terms, query.event_at]);
+          const hadFilters = Boolean(query.category_id || query.title_terms.length || query.content_terms.length
+            || query.location_terms.length || query.event_at);
+          const previous = lastApplied.current;
+          const details = { visit_id: tracking.current.visitId, category_id: query.category_id ?? undefined,
+            has_query: Boolean(search), has_title_terms: query.title_terms.length > 0,
+            has_content_terms: query.content_terms.length > 0,
+            has_location_terms: query.location_terms.length > 0, has_event_time: Boolean(query.event_at) };
+          if ((search || previous.search) && (context !== previous.context || search !== previous.search))
+            trackEvent({ event_type: "search_applied", ...details });
+          if ((hadFilters || previous.hadFilters) && (context !== previous.context || filters !== previous.filters))
+            trackEvent({ event_type: "filter_applied", ...details });
+          lastApplied.current = { context, search, filters, hadFilters };
+        }
         setPosts((current) =>
           offset === 0 ? result.items : [...current, ...result.items],
         );
@@ -264,10 +323,12 @@ export default function PostBoard({
         }
       }
     },
-    [type, query, sortMode, sourcePostId, t],
+    [type, query, sortMode, sourcePostId, active, t],
   );
   useEffect(() => {
     const state = requests.current;
+    tracking.current.visitId = newVisitId();
+    tracking.current.seen.clear();
     const timeout = setTimeout(() => {
       listRef.current?.scrollToOffset({ offset: 0, animated: false });
       setShowScrollTop(false);
@@ -296,6 +357,9 @@ export default function PostBoard({
             post={item.post}
             rank={item.rank}
             reasons={item.reasons}
+            runId={item.runId}
+            sourcePostId={item.sourcePostId}
+            visitId={item.visitId}
             category={categories.find(
               (category) => category.id === item.post.category_id,
             )}

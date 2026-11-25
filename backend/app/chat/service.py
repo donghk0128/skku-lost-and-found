@@ -5,10 +5,11 @@ from hashlib import sha256
 from uuid import UUID, uuid4
 
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.chat.model import ChatMessage, ChatMessageImage, ChatRoom, ChatRoomMember
-from app.chat.schemas import MessageImageResponse, MessageResponse, RoomResponse
+from app.chat.model import ChatMessage, ChatMessageImage, ChatRoom, ChatRoomMember, ReturnPair
+from app.chat.schemas import MessageImageResponse, MessageResponse, RoomResponse, ReturnPairResponse
 from app.core.config import get_settings
 from app.core.errors import ApiError
 from app.posts.model import Post, now_utc
@@ -31,6 +32,9 @@ def lock_post(db: Session, post_id: UUID) -> Post:
 def close_post_rooms(db: Session, post_id: UUID, reason: str = "POST_COMPLETED") -> None:
     for room in db.scalars(select(ChatRoom).where(ChatRoom.post_id == post_id, ChatRoom.status == "ACTIVE").with_for_update()):
         room.status, room.close_reason, room.closed_at = "CLOSED", reason, now_utc()
+        pending = db.scalar(select(ReturnPair).where(ReturnPair.room_id == room.id, ReturnPair.status == "PENDING"))
+        if pending is not None:
+            db.delete(pending)
 
 
 def message_response(message: ChatMessage) -> MessageResponse:
@@ -83,6 +87,13 @@ class ChatService:
             other_nickname="탈퇴한 사용자" if other is None else other.nickname,
             is_hidden=member.is_hidden, unread_count=unread,
             last_message=message_response(latest) if latest else None,
+            return_pair=(ReturnPairResponse.model_validate({
+                "id": pair.id, "lost_post_id": pair.lost_post_id, "found_post_id": pair.found_post_id,
+                "counterpart_post_title": (counterpart.title if (counterpart := db.get(
+                    Post, pair.found_post_id if post and post.post_type == "LOST" else pair.lost_post_id
+                )) else "삭제된 게시물입니다."),
+                "proposed_by_id": pair.proposed_by_id, "status": pair.status, "confirmed_at": pair.confirmed_at,
+            }) if (pair := db.scalar(select(ReturnPair).where(ReturnPair.room_id == room.id))) else None),
         )
 
     @staticmethod
@@ -193,6 +204,9 @@ class ChatService:
     @staticmethod
     def close(db: Session, room_id: UUID, user_id: UUID, reason: str) -> RoomResponse:
         room, member = ChatService.member_room(db, room_id, user_id, lock=True)
+        pending = db.scalar(select(ReturnPair).where(ReturnPair.room_id == room_id, ReturnPair.status == "PENDING"))
+        if pending is not None:
+            raise ApiError(409, "return_pair_pending", "반환 게시글 확인 요청을 먼저 처리해 주세요.")
         if room.status == "CLOSED":
             if room.close_reason != reason:
                 raise ApiError(409, "chat_room_closed", "이미 다른 사유로 종료된 채팅방입니다.")
@@ -202,6 +216,83 @@ class ChatService:
                 db.get(Post, room.post_id).status = "COMPLETED"
                 db.flush()
                 close_post_rooms(db, room.post_id)
+        db.commit()
+        return ChatService.room_response(db, room, member)
+
+    @staticmethod
+    def pair_candidates(db: Session, room_id: UUID, user_id: UUID) -> list[Post]:
+        room, _ = ChatService.member_room(db, room_id, user_id)
+        primary = db.get(Post, room.post_id) if room.post_id else None
+        if room.status != "ACTIVE" or primary is None or primary.status != "OPEN":
+            return []
+        return list(db.scalars(select(Post).where(
+            Post.author_id == room.requester_id, Post.post_type != primary.post_type,
+            Post.status == "OPEN", Post.deleted_at.is_(None), Post.id != primary.id,
+        ).order_by(Post.created_at.desc()).limit(100)))
+
+    @staticmethod
+    def propose_pair(db: Session, room_id: UUID, user_id: UUID, counterpart_post_id: UUID) -> RoomResponse:
+        room, member = ChatService.member_room(db, room_id, user_id, lock=True)
+        if room.status != "ACTIVE":
+            raise ApiError(409, "chat_room_closed", "종료된 채팅방입니다.")
+        existing = db.scalar(select(ReturnPair).where(ReturnPair.room_id == room_id))
+        if existing is not None:
+            primary = db.get(Post, room.post_id)
+            existing_counterpart_id = existing.found_post_id if primary.post_type == "LOST" else existing.lost_post_id
+            if existing.proposed_by_id == user_id and counterpart_post_id == existing_counterpart_id:
+                return ChatService.room_response(db, room, member)
+            raise ApiError(409, "return_pair_pending", "이미 확인 요청이 있습니다.")
+        if counterpart_post_id not in {p.id for p in ChatService.pair_candidates(db, room_id, user_id)}:
+            raise ApiError(422, "invalid_return_pair", "상대방의 진행 중인 반대 유형 게시글을 선택해 주세요.")
+        primary = db.get(Post, room.post_id)
+        pair = ReturnPair(
+            room_id=room_id, proposed_by_id=user_id,
+            lost_post_id=primary.id if primary.post_type == "LOST" else counterpart_post_id,
+            found_post_id=primary.id if primary.post_type == "FOUND" else counterpart_post_id,
+        )
+        db.add(pair)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise ApiError(409, "return_pair_pending", "이미 확인 요청이 있습니다.")
+        return ChatService.room_response(db, room, member)
+
+    @staticmethod
+    def reject_pair(db: Session, room_id: UUID, user_id: UUID) -> RoomResponse:
+        room, member = ChatService.member_room(db, room_id, user_id, lock=True)
+        pair = db.scalar(select(ReturnPair).where(ReturnPair.room_id == room_id, ReturnPair.status == "PENDING"))
+        if pair is None:
+            raise ApiError(404, "return_pair_not_found", "확인 요청이 없습니다.")
+        db.delete(pair)
+        db.commit()
+        return ChatService.room_response(db, room, member)
+
+    @staticmethod
+    def confirm_pair(db: Session, room_id: UUID, user_id: UUID) -> RoomResponse:
+        room, member = ChatService.member_room(db, room_id, user_id, lock=True)
+        pair = db.scalar(select(ReturnPair).where(ReturnPair.room_id == room_id).with_for_update())
+        if pair is None:
+            raise ApiError(404, "return_pair_not_found", "확인 요청이 없습니다.")
+        if pair.status == "CONFIRMED":
+            return ChatService.room_response(db, room, member)
+        if user_id == pair.proposed_by_id:
+            raise ApiError(403, "self_confirmation", "상대방의 확인이 필요합니다.")
+        primary = db.get(Post, room.post_id)
+        counterpart_id = pair.found_post_id if primary.post_type == "LOST" else pair.lost_post_id
+        counterpart = lock_post(db, counterpart_id)
+        if (room.status != "ACTIVE" or primary.status != "OPEN" or counterpart.status != "OPEN"
+                or counterpart.deleted_at is not None):
+            raise ApiError(409, "return_pair_unavailable", "게시글 상태가 변경되어 확인할 수 없습니다.")
+        if {primary.author_id, counterpart.author_id} != {room.owner_id, room.requester_id}:
+            raise ApiError(409, "return_pair_unavailable", "채팅 참여자의 게시글이 아닙니다.")
+        now = now_utc()
+        pair.status, pair.confirmed_at = "CONFIRMED", now
+        primary.status = counterpart.status = "COMPLETED"
+        room.status, room.close_reason, room.closed_at = "CLOSED", "RETURNED", now
+        db.flush()
+        close_post_rooms(db, primary.id)
+        close_post_rooms(db, counterpart.id)
         db.commit()
         return ChatService.room_response(db, room, member)
 

@@ -24,6 +24,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import PostLocationMap from "@/components/PostLocationMap";
 import { useLocale } from "@/i18n/LocaleProvider";
 import ChevronLeftIcon from "@/assets/icons/chevron-left.svg";
+import { newVisitId, trackEvent } from "@/lib/event-logging";
 
 const formatDate = (value: string, locale: "en" | "ko") =>
   new Date(value).toLocaleString(locale === "en" ? "en-US" : "ko-KR", {
@@ -91,6 +92,8 @@ export default function PostDetailRoute() {
 }
 
 function PostDetail({ id }: { id: string }) {
+  const visitId = useRef(newVisitId());
+  const viewed = useRef(false);
   const { locale, t, categoryLabel } = useLocale();
   const router = useRouter();
   const { user } = useAuth();
@@ -210,6 +213,12 @@ function PostDetail({ id }: { id: string }) {
       active = false;
     };
   }, [id, attempt, t]);
+  useEffect(() => {
+    if (post?.id === id && !loading && !viewed.current) {
+      viewed.current = true;
+      trackEvent({ event_type: "post_view", post_id: id, visit_id: visitId.current });
+    }
+  }, [post?.id, id, loading]);
   const retry = () => {
     setError("");
     setPhotoError(false);

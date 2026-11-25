@@ -14,6 +14,7 @@ from app.posts.router import categories_router, router as posts_router
 from app.users.router import router as users_router
 from app.users.keyword_conditions import router as keyword_conditions_router
 from app.notifications.router import router as notifications_router
+from app.events.router import router as events_router
 
 app = FastAPI(title="찾자 API", version="0.1.0", openapi_url="/api/v1/openapi.json", docs_url="/docs")
 app.add_middleware(
@@ -51,6 +52,7 @@ app.include_router(ai_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(keyword_conditions_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
+app.include_router(events_router, prefix="/api/v1")
 app.include_router(posts_router, prefix="/api/v1")
 app.include_router(matching_router, prefix="/api/v1")
 app.include_router(categories_router, prefix="/api/v1")

@@ -4,6 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from fastapi.responses import Response
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.service import get_current_user
@@ -15,6 +16,7 @@ from app.posts.model import Category, Post, PostImage
 from app.posts.schemas import CategoryResponse, PostCreateRequest, PostImageResponse, PostLimitsResponse, PostListResponse, PostResponse, PostStatus, PostStatusUpdateRequest, PostType, PostUpdateRequest
 from app.posts.service import PostService
 from app.users.model import User
+from app.events.service import record_business_event
 
 
 router = APIRouter(prefix="/posts", tags=["posts"])
@@ -32,7 +34,9 @@ def create_post(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Post:
-    return PostService.create(db, request, current_user)
+    post = PostService.create(db, request, current_user)
+    record_business_event(db, current_user.id, "post_created", post.id, post_id=post.id, properties={"creation_method": "MANUAL"})
+    return post
 
 
 @router.post("/ai-assisted", response_model=PostResponse, status_code=status.HTTP_201_CREATED)
@@ -43,7 +47,9 @@ def create_ai_assisted_post(
 ) -> Post:
     """Persist a user-confirmed post that began as an AI draft."""
 
-    return PostService.create(db, request, current_user, creation_method="AI_ASSISTED")
+    post = PostService.create(db, request, current_user, creation_method="AI_ASSISTED")
+    record_business_event(db, current_user.id, "post_created", post.id, post_id=post.id, properties={"creation_method": "AI_ASSISTED"})
+    return post
 
 
 @router.get("", response_model=PostListResponse)
@@ -98,7 +104,11 @@ def complete_post(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Post:
-    return PostService.complete(db, post_id, current_user)
+    was_completed = db.scalar(select(Post.status).where(Post.id == post_id)) == "COMPLETED"
+    post = PostService.complete(db, post_id, current_user)
+    if not was_completed:
+        record_business_event(db, current_user.id, "post_completed", post_id, post_id=post_id, properties={"completion_method": "DIRECT"})
+    return post
 
 
 @router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -17,6 +17,26 @@ class RoomClose(Request):
     reason: Literal["RETURNED", "GENERAL"]
 
 
+class ReturnPairProposal(Request):
+    counterpart_post_id: UUID
+
+
+class ReturnPairResponse(BaseModel):
+    id: UUID
+    lost_post_id: UUID
+    found_post_id: UUID
+    counterpart_post_title: str
+    proposed_by_id: UUID
+    status: Literal["PENDING", "CONFIRMED"]
+    confirmed_at: datetime | None
+
+
+class PairCandidate(BaseModel):
+    id: UUID
+    title: str
+    post_type: Literal["LOST", "FOUND"]
+
+
 class TextMessageCreate(Request):
     content: str = Field(min_length=1, max_length=2000)
     client_message_id: str | None = Field(default=None, min_length=1, max_length=64)
@@ -71,6 +91,7 @@ class RoomResponse(BaseModel):
     is_hidden: bool
     unread_count: int
     last_message: MessageResponse | None
+    return_pair: ReturnPairResponse | None = None
 
 
 class RoomListResponse(BaseModel):

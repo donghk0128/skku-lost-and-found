@@ -34,6 +34,24 @@ class ChatRoom(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, server_default=func.now(), nullable=False)
 
 
+class ReturnPair(Base):
+    """A ground-truth pair only after the other chat participant confirms it."""
+
+    __tablename__ = "return_pairs"
+    __table_args__ = (
+        CheckConstraint("lost_post_id <> found_post_id", name="ck_return_pairs_distinct_posts"),
+        CheckConstraint("status IN ('PENDING', 'CONFIRMED')", name="ck_return_pairs_status"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    room_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("chat_rooms.id", ondelete="CASCADE"), unique=True, nullable=False)
+    lost_post_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("posts.id", ondelete="CASCADE"), nullable=False)
+    found_post_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("posts.id", ondelete="CASCADE"), nullable=False)
+    proposed_by_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[str] = mapped_column(String(9), default="PENDING", server_default="PENDING", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, server_default=func.now(), nullable=False)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class ChatRoomMember(Base):
     __tablename__ = "chat_room_members"
     __table_args__ = (

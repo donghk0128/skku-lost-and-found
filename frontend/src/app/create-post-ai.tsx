@@ -44,6 +44,7 @@ import { joinPostDescription } from "@/lib/post-description";
 import { readSession, writeSession } from "@/lib/session-storage";
 import { useLocale } from "@/i18n/LocaleProvider";
 import ChevronLeftIcon from "@/assets/icons/chevron-left.svg";
+import { newVisitId, trackEvent } from "@/lib/event-logging";
 
 function AttachmentIcon({ camera = false }: { camera?: boolean }) {
   return (
@@ -83,6 +84,14 @@ type ChatMessage = {
 };
 
 export default function CreatePostAiScreen() {
+  const visitId = useRef(newVisitId());
+  const viewed = useRef(false);
+  useEffect(() => {
+    if (!viewed.current) {
+      viewed.current = true;
+      trackEvent({ event_type: "screen_view", screen: "create_post", visit_id: visitId.current });
+    }
+  }, []);
   const { locale, t, categoryLabel } = useLocale();
   const router = useRouter();
   const navigation = useNavigation();

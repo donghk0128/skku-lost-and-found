@@ -26,12 +26,14 @@ import {
   chatToken,
   type ChatMessage,
   type ChatRoom,
+  type PairCandidate,
 } from "@/lib/chat-api";
 import { useAuth } from "@/providers/AuthProvider";
 import { useLocale } from "@/i18n/LocaleProvider";
 import ChatComposer from "@/components/ChatComposer";
 import ChatMessageBubble from "@/components/ChatMessageBubble";
 import ChatPostCard from "@/components/ChatPostCard";
+import { newVisitId, trackEvent } from "@/lib/event-logging";
 
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
@@ -41,6 +43,8 @@ export default function ChatRoute() {
 }
 
 function ChatDetail({ id }: { id: string }) {
+  const visitId = useRef(newVisitId());
+  const viewed = useRef(false);
   const router = useRouter();
   const { user } = useAuth();
   const { t, locale } = useLocale();
@@ -60,6 +64,9 @@ function ChatDetail({ id }: { id: string }) {
   const [closeReason, setCloseReason] = useState<"RETURNED" | "GENERAL" | null>(
     null,
   );
+  const [pairCandidates, setPairCandidates] = useState<PairCandidate[]>([]);
+  const [pairCandidatesUnavailable, setPairCandidatesUnavailable] = useState(false);
+  const [selectedPair, setSelectedPair] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
   const menuTrigger = useRef<View>(null);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
@@ -71,6 +78,7 @@ function ChatDetail({ id }: { id: string }) {
     setCloseReason(null);
   };
   const showMenu = () => {
+    void chatApi.room(id).then(setRoom).catch(() => undefined);
     menuTrigger.current?.measureInWindow((x, y, width, height) => {
       setMenuAnchor({
         left: Math.max(
@@ -130,6 +138,10 @@ function ChatDetail({ id }: { id: string }) {
           const detail = await chatApi.room(id);
           if (!active) return;
           setRoom(detail);
+          if (!viewed.current) {
+            viewed.current = true;
+            trackEvent({ event_type: "screen_view", screen: "chat", visit_id: visitId.current });
+          }
           readSequence.current = detail.last_read_sequence;
           let hasMore = true;
           while (hasMore && active) {
@@ -159,6 +171,9 @@ function ChatDetail({ id }: { id: string }) {
             try {
               const data = JSON.parse(String(event.data));
               if (data.type === "message") merge([data.message as ChatMessage]);
+              else if (data.type === "return_pair") {
+                setRoom(current => current ? { ...current, return_pair: data.pair } : current);
+              }
               else if (data.type === "room_closed") {
                 setRoom((current) =>
                   current
@@ -512,6 +527,24 @@ function ChatDetail({ id }: { id: string }) {
           </View>
         ) : (
           <View style={styles.composerContainer}>
+            {room?.return_pair?.status === "PENDING" ? (
+              <View style={styles.closed}>
+                <Text style={styles.small}>
+                  {locale === "ko" ? "반환 게시글 연결 확인 대기 중" : "Waiting for return pair confirmation"}
+                </Text>
+                <Text style={styles.postText}>
+                  {room.post_title} ↔ {room.return_pair.counterpart_post_title}
+                </Text>
+                {room.return_pair.proposed_by_id !== user?.id ? (
+                  <Pressable disabled={busy} onPress={() => void act(async () => setRoom(await chatApi.confirmPair(id)))}>
+                    <Text style={styles.postText}>{locale === "ko" ? "게시글 쌍 확인하고 반환 완료" : "Confirm post pair and return"}</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable disabled={busy} onPress={() => void act(async () => setRoom(await chatApi.rejectPair(id)))}>
+                  <Text style={styles.small}>{locale === "ko" ? "연결 요청 취소 / 거절" : "Cancel or reject pair"}</Text>
+                </Pressable>
+              </View>
+            ) : null}
             {attachments.length ? (
               <View style={styles.attachments}>
                 <Text style={styles.small}>
@@ -619,19 +652,41 @@ function ChatDetail({ id }: { id: string }) {
                       : "chat.confirmGeneral",
                   )}
                 </Text>
+                {closeReason === "RETURNED" && pairCandidates.length > 0 ? (
+                  <ScrollView style={{ maxHeight: 190 }}>
+                    <Text style={styles.small}>{locale === "ko" ? "연결할 상대방 게시글이 있나요?" : "Is there a matching post?"}</Text>
+                    <Pressable style={styles.action} onPress={() => setSelectedPair(null)}>
+                      <Text style={styles.small}>{selectedPair === null ? "✓ " : ""}{locale === "ko" ? "없음: 반환만 완료" : "None: complete return only"}</Text>
+                    </Pressable>
+                    {pairCandidates.map(candidate => (
+                      <Pressable key={candidate.id} style={styles.action} onPress={() => setSelectedPair(candidate.id)}>
+                        <Text style={styles.small}>{selectedPair === candidate.id ? "✓ " : ""}{candidate.title}</Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                ) : null}
+                {closeReason === "RETURNED" && pairCandidatesUnavailable ? (
+                  <Text style={styles.small}>
+                    {locale === "ko" ? "상대 게시글 조회에 실패했습니다. 다시 열어 재시도하거나 반환만 완료할 수 있습니다." : "Could not load matching posts. Reopen to retry or complete the return only."}
+                  </Text>
+                ) : null}
                 <Pressable
                   accessibilityRole="button"
                   disabled={busy}
                   style={styles.action}
                   onPress={() => {
                     void act(async () => {
-                      setRoom(await chatApi.close(id, closeReason));
+                      setRoom(closeReason === "RETURNED" && selectedPair
+                        ? await chatApi.proposePair(id, selectedPair)
+                        : await chatApi.close(id, closeReason));
                       setMenu(false);
                       setCloseReason(null);
                     });
                   }}
                 >
-                  <Text style={styles.danger}>{t("chat.confirmClose")}</Text>
+                  <Text style={styles.danger}>{selectedPair
+                    ? (locale === "ko" ? "상대방에게 게시글 쌍 확인 요청" : "Request pair confirmation")
+                    : t("chat.confirmClose")}</Text>
                 </Pressable>
                 {error ? (
                   <Text accessibilityRole="alert" style={styles.error}>
@@ -697,7 +752,17 @@ function ChatDetail({ id }: { id: string }) {
                         pressed && styles.popoverPressed,
                         (busy || !room || loading) && styles.disabled,
                       ]}
-                      onPress={() => setCloseReason("RETURNED")}
+                      onPress={() => {
+                        void act(async () => {
+                          setPairCandidatesUnavailable(false);
+                          setPairCandidates(await chatApi.pairCandidates(id).catch(() => {
+                            setPairCandidatesUnavailable(true);
+                            return [];
+                          }));
+                          setSelectedPair(null);
+                          setCloseReason("RETURNED");
+                        });
+                      }}
                     >
                       <Svg
                         width={20}
