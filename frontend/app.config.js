@@ -28,6 +28,8 @@ module.exports = ({ config }) => {
       },
     },
     plugins: [
+      // Manifest mods execute in reverse order; apply this after both notification plugins.
+      "./plugins/with-notification-manifest-overrides",
       ...(config.plugins ?? []),
       "@react-native-firebase/app",
       ["@react-native-firebase/messaging", { installationIdEnabled: true }],
