@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useIsFocused, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
   Image,
@@ -92,8 +92,9 @@ export default function PostDetailRoute() {
 }
 
 function PostDetail({ id }: { id: string }) {
-  const visitId = useRef(newVisitId());
+  const visitId = useRef<string | null>(null);
   const viewed = useRef(false);
+  const isFocused = useIsFocused();
   const { locale, t, categoryLabel } = useLocale();
   const router = useRouter();
   const { user } = useAuth();
@@ -214,11 +215,15 @@ function PostDetail({ id }: { id: string }) {
     };
   }, [id, attempt, t]);
   useEffect(() => {
-    if (post?.id === id && !loading && !viewed.current) {
+    if (!isFocused) {
+      viewed.current = false;
+      visitId.current = null;
+    } else if (post?.id === id && !loading && !viewed.current) {
       viewed.current = true;
+      visitId.current = newVisitId();
       trackEvent({ event_type: "post_view", post_id: id, visit_id: visitId.current });
     }
-  }, [post?.id, id, loading]);
+  }, [post?.id, id, loading, isFocused]);
   const retry = () => {
     setError("");
     setPhotoError(false);
