@@ -61,6 +61,9 @@ table is not the same as immediate physical erasure from every storage layer.
    AWS-to-GCP Workload Identity Federation instead of a JSON key.
 4. Copy `airflow/.env.example` to `airflow/.env` and fill in the real values.
    Both paths are Git-ignored. Never paste credentials into DAG code or logs.
+   Generate `AIRFLOW_JWT_SECRET` once with `openssl rand -hex 32`; the API
+   server and scheduler must share it to authenticate task execution. The
+   scheduler reaches the separate API server through the Compose service name.
 5. From `airflow/`, run `docker compose up --build`. Airflow's local API UI is
    bound to `127.0.0.1:8080`. The DAG starts paused. Enable it only after
    checking the source role, BigQuery dataset, credentials, and expected cost.
