@@ -17,6 +17,10 @@ event `properties` column is copied as JSON text; Phase 1 constrains its keys.
 `return_pairs` includes pending rows, so downstream metrics must filter
 `status = 'CONFIRMED'`.
 
+The selected BigQuery destination is
+`project-2d59f32a-6674-4fa9-9a4.skku_finder_raw` in `asia-northeast3` (Seoul).
+Verify the dataset location in the Cloud console before the first load.
+
 ## Agreed Raw deletion policy (2026-11-26)
 
 For Phase 2, Supabase PostgreSQL is the authority for the five Raw tables.
