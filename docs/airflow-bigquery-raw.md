@@ -47,10 +47,18 @@ table is not the same as immediate physical erasure from every storage layer.
    `SELECT` on only the five source tables. Use an SSL connection string. The
    account should not own the tables or have write rights. A read-only
    transaction is also enforced by the loader.
-3. Give the Airflow identity permission to run BigQuery jobs and read/write
-   tables in the chosen dataset. Store its credentials outside Git. For this
-   local Compose example, place the JSON credential at
-   `airflow/secrets/gcp-sa.json`; ADC can be used in another deployment.
+3. Grant the `skku-airflow-loader` service account BigQuery Job User on the
+   project and BigQuery Data Editor on only the Raw dataset. The project policy
+   blocks user-managed service account keys. Do not disable it. For local
+   development, install the Google Cloud CLI and grant the signed-in developer
+   Service Account Token Creator on this service account only. Run
+   `gcloud auth application-default login --impersonate-service-account
+   skku-airflow-loader@project-2d59f32a-6674-4fa9-9a4.iam.gserviceaccount.com`.
+   The CLI creates a local ADC file using short-lived impersonation tokens.
+   Point `GCP_ADC_FILE` in the ignored `.env` to that host file. Compose mounts
+   it read-only inside Airflow. The ADC file still contains a user refresh
+   credential and must not be shared or committed. EC2 deployment should use
+   AWS-to-GCP Workload Identity Federation instead of a JSON key.
 4. Copy `airflow/.env.example` to `airflow/.env` and fill in the real values.
    Both paths are Git-ignored. Never paste credentials into DAG code or logs.
 5. From `airflow/`, run `docker compose up --build`. Airflow's local API UI is

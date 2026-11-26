@@ -20,6 +20,7 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:local-airflow-only@metadata/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp-adc.json
       PYTHONPATH: /opt/airflow
     command: airflow db migrate
     depends_on:
@@ -30,8 +31,8 @@ services:
       - ./pipeline:/opt/airflow/pipeline:ro
       - ./logs:/opt/airflow/logs
       - type: bind
-        source: ./secrets/gcp-sa.json
-        target: /run/secrets/gcp-sa.json
+        source: ${GCP_ADC_FILE:?Set GCP_ADC_FILE to the local gcloud ADC file}
+        target: /run/secrets/gcp-adc.json
         read_only: true
         bind:
           create_host_path: false
