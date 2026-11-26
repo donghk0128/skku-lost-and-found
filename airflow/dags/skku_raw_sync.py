@@ -13,6 +13,7 @@ from pipeline.sync import TABLES, sync_table
     start_date=datetime(2026, 11, 25, tzinfo=timezone.utc),
     catchup=True,
     max_active_runs=1,
+    max_active_tasks=1,
     tags=["skku", "raw"],
 )
 def skku_raw_sync():
