@@ -20,7 +20,11 @@ export type ChatRoom = {
   close_reason: "RETURNED" | "GENERAL" | "POST_COMPLETED" | null;
   closed_at: string | null; is_hidden: boolean; unread_count: number;
   last_read_sequence: number; last_message: ChatMessage | null;
+  return_pair: { id: string; lost_post_id: string; found_post_id: string;
+    counterpart_post_title: string;
+    proposed_by_id: string; status: "PENDING" | "CONFIRMED"; confirmed_at: string | null } | null;
 };
+export type PairCandidate = { id: string; title: string; post_type: "LOST" | "FOUND" };
 
 let refreshing: Promise<string> | null = null;
 export async function chatToken(refresh = false): Promise<string> {
@@ -56,6 +60,10 @@ export const chatApi = {
   send: (id: string, content: string, clientMessageId: string) => withChatToken(token => request<ChatMessage>(`${root}/${id}/messages`, { content, client_message_id: clientMessageId }, token)),
   read: (id: string, sequence: number) => withChatToken(token => request<ChatRoom>(`${root}/${id}/read`, { sequence }, token, "PATCH")),
   close: (id: string, reason: "RETURNED" | "GENERAL") => withChatToken(token => request<ChatRoom>(`${root}/${id}/close`, { reason }, token)),
+  pairCandidates: (id: string) => withChatToken(token => request<PairCandidate[]>(`${root}/${id}/pair-candidates`, undefined, token)),
+  proposePair: (id: string, counterpart_post_id: string) => withChatToken(token => request<ChatRoom>(`${root}/${id}/return-pair`, { counterpart_post_id }, token)),
+  confirmPair: (id: string) => withChatToken(token => request<ChatRoom>(`${root}/${id}/return-pair/confirm`, {}, token)),
+  rejectPair: (id: string) => withChatToken(token => request<ChatRoom>(`${root}/${id}/return-pair/reject`, {}, token)),
   hide: (id: string, is_hidden: boolean) => withChatToken(token => request<ChatRoom>(`${root}/${id}/visibility`, { is_hidden }, token, "PATCH")),
   images: (id: string, assets: ImagePickerAsset[], content: string, clientMessageId: string) => withChatToken(async token => {
     const form = new FormData();

@@ -9,23 +9,30 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import ValidationError
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.service import get_current_user
-from app.chat.model import ChatMessage, ChatMessageImage
-from app.chat.schemas import (MessageListResponse, MessageResponse, ReadUpdate, RoomClose, RoomCreate,
-                              RoomListResponse, RoomResponse, TextMessageCreate, VisibilityUpdate)
+from app.chat.model import ChatMessage, ChatMessageImage, ChatRoom, ReturnPair
+from app.chat.schemas import (MessageListResponse, MessageResponse, PairCandidate, ReadUpdate, ReturnPairProposal,
+                              RoomClose, RoomCreate, RoomListResponse, RoomResponse, TextMessageCreate, VisibilityUpdate)
 from app.chat.service import ChatService, get_chat_image_storage, message_response
 from app.core.database import get_db
 from app.core.errors import ApiError
 from app.users.model import User
+from app.events.service import record_business_event
+from app.posts.model import Post
 
 router = APIRouter(prefix="/chat/rooms", tags=["chat"])
 
 
 @router.post("", response_model=RoomResponse)
 def create_room(request: RoomCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return ChatService.create(db, request.post_id, user.id)
+    existing_id = db.scalar(select(ChatRoom.id).where(ChatRoom.post_id == request.post_id, ChatRoom.requester_id == user.id))
+    room = ChatService.create(db, request.post_id, user.id)
+    if existing_id is None:
+        record_business_event(db, user.id, "chat_started", room.id, post_id=request.post_id)
+    return room
 
 
 @router.get("", response_model=RoomListResponse)
@@ -42,7 +49,36 @@ def get_room(room_id: UUID, user: User = Depends(get_current_user), db: Session 
 
 @router.post("/{room_id}/close", response_model=RoomResponse)
 def close_room(room_id: UUID, request: RoomClose, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return ChatService.close(db, room_id, user.id, request.reason)
+    room = ChatService.close(db, room_id, user.id, request.reason)
+    if request.reason == "RETURNED":
+        record_business_event(db, user.id, "return_completed", room_id, post_id=room.post_id)
+    return room
+
+
+@router.get("/{room_id}/pair-candidates", response_model=list[PairCandidate])
+def pair_candidates(room_id: UUID, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return ChatService.pair_candidates(db, room_id, user.id)
+
+
+@router.post("/{room_id}/return-pair", response_model=RoomResponse)
+def propose_return_pair(room_id: UUID, request: ReturnPairProposal,
+                        user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return ChatService.propose_pair(db, room_id, user.id, request.counterpart_post_id)
+
+
+@router.post("/{room_id}/return-pair/confirm", response_model=RoomResponse)
+def confirm_return_pair(room_id: UUID, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    room = ChatService.confirm_pair(db, room_id, user.id)
+    record_business_event(db, user.id, "return_completed", room_id, post_id=room.post_id, properties={"confirmed_pair": True})
+    record_business_event(db, user.id, "match_confirmed", room.return_pair.id, post_id=room.post_id,
+                          source_post_id=room.return_pair.lost_post_id,
+                          candidate_post_id=room.return_pair.found_post_id)
+    return room
+
+
+@router.post("/{room_id}/return-pair/reject", response_model=RoomResponse)
+def reject_return_pair(room_id: UUID, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return ChatService.reject_pair(db, room_id, user.id)
 
 
 @router.patch("/{room_id}/read", response_model=RoomResponse)
@@ -121,7 +157,16 @@ def socket_step(db_factory, token: str, room_id: UUID, after: int, content: str 
             ChatService.send(db, room_id, user.id, content, client_message_id=client_message_id)
         room, _ = ChatService.member_room(db, room_id, user.id)
         messages = ChatService.messages(db, room_id, user.id, after, 100)
-        return [message_response(row).model_dump(mode="json") for row in messages], room.status, room.close_reason
+        pair = db.scalar(select(ReturnPair).where(ReturnPair.room_id == room_id))
+        primary = db.get(Post, room.post_id) if room.post_id else None
+        counterpart = db.get(Post, pair.found_post_id if primary and primary.post_type == "LOST" else pair.lost_post_id) if pair else None
+        pair_data = ({
+            "id": str(pair.id), "lost_post_id": str(pair.lost_post_id), "found_post_id": str(pair.found_post_id),
+            "counterpart_post_title": counterpart.title if counterpart else "삭제된 게시물입니다.",
+            "proposed_by_id": str(pair.proposed_by_id), "status": pair.status,
+            "confirmed_at": pair.confirmed_at.isoformat() if pair.confirmed_at else None,
+        } if pair is not None else None)
+        return [message_response(row).model_dump(mode="json") for row in messages], room.status, room.close_reason, pair_data
     finally:
         generator.close()
 
@@ -140,8 +185,9 @@ async def room_socket(websocket: WebSocket, room_id: UUID, after: int = Query(0,
             raise ApiError(401, "authentication_required", "로그인이 필요합니다.")
         db_factory = websocket.app.dependency_overrides.get(get_db, get_db)
         pending = None
+        last_pair = None
         while True:
-            messages, room_status, reason = await run_in_threadpool(
+            messages, room_status, reason, pair_data = await run_in_threadpool(
                 socket_step, db_factory, token, room_id, after,
                 pending.content if pending else None, pending.client_message_id if pending else None,
             )
@@ -149,6 +195,9 @@ async def room_socket(websocket: WebSocket, room_id: UUID, after: int = Query(0,
             for message in messages:
                 await websocket.send_json({"type": "message", "message": message})
                 after = message["sequence"]
+            if pair_data != last_pair and (pair_data is not None or last_pair is not None):
+                await websocket.send_json({"type": "return_pair", "pair": pair_data})
+            last_pair = pair_data
             if len(messages) == 100:
                 continue
             if room_status == "CLOSED":

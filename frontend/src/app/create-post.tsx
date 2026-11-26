@@ -47,6 +47,7 @@ import Svg, { Circle, Rect, Path } from "react-native-svg";
 import PinIcon from "@/assets/icons/location.svg";
 import { useLocale } from "@/i18n/LocaleProvider";
 import ChevronLeftIcon from "@/assets/icons/chevron-left.svg";
+import { newVisitId, trackEvent } from "@/lib/event-logging";
 
 import {
   parseLocationEntries,
@@ -84,6 +85,14 @@ function AttachmentIcon({ camera = false }: { camera?: boolean }) {
 }
 
 export default function CreatePostScreen() {
+  const visitId = useRef(newVisitId());
+  const viewed = useRef(false);
+  useEffect(() => {
+    if (!viewed.current) {
+      viewed.current = true;
+      trackEvent({ event_type: "screen_view", screen: "create_post", visit_id: visitId.current });
+    }
+  }, []);
   const { t, categoryLabel } = useLocale();
   const router = useRouter();
   const insets = useSafeAreaInsets();

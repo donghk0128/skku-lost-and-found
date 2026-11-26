@@ -10,7 +10,8 @@ from sqlalchemy import delete, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.auth.service import MAX_VERIFICATION_ATTEMPTS
-from app.chat.model import ChatMessage, ChatMessageImage, ChatRoom, ChatRoomMember
+from app.chat.model import ChatMessage, ChatMessageImage, ChatRoom, ChatRoomMember, ReturnPair
+from app.events.model import EventLog
 from app.chat.service import get_chat_image_storage
 from app.core.config import get_settings
 from app.core.errors import ApiError
@@ -109,6 +110,14 @@ class WithdrawalService:
         rooms = list(db.scalars(select(ChatRoom).where(or_(related, ChatRoom.post_id.in_(owned_ids)))
             .order_by(ChatRoom.id).with_for_update().execution_options(populate_existing=True)))
         room_ids = [room.id for room in rooms]
+        db.execute(delete(ReturnPair).where(or_(
+            ReturnPair.room_id.in_(room_ids), ReturnPair.lost_post_id.in_(owned_ids),
+            ReturnPair.found_post_id.in_(owned_ids), ReturnPair.proposed_by_id == uid,
+        )))
+        db.execute(delete(EventLog).where(or_(
+            EventLog.user_id == uid, EventLog.post_id.in_(owned_ids),
+            EventLog.source_post_id.in_(owned_ids), EventLog.candidate_post_id.in_(owned_ids),
+        )))
         now = utc_now()
         for room in rooms:
             if room.status == "ACTIVE":

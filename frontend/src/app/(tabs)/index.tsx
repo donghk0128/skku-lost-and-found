@@ -28,11 +28,15 @@ import LanguageSelector from "@/components/language-selector";
 import { postsApi, type Category, type Post } from "@/lib/posts-api";
 import { readSession } from "@/lib/session-storage";
 import { useAuth } from "@/providers/AuthProvider";
+import { newVisitId, trackEvent } from "@/lib/event-logging";
 
 type BoardTab = "lost" | "found";
 type SortMode = "newest" | "candidates";
 
 export default function HomeScreen() {
+  useFocusEffect(useCallback(() => {
+    trackEvent({ event_type: "screen_view", screen: "home", visit_id: newVisitId() });
+  }, []));
   const { t } = useLocale();
   const { user } = useAuth();
   const router = useRouter();
@@ -381,6 +385,7 @@ export default function HomeScreen() {
                     filters={filters}
                     sortMode={sortMode}
                     sourcePostId={selectedSourceIds[tab]}
+                    active={activeTab === tab}
                   />
                 </View>
               ) : null,
