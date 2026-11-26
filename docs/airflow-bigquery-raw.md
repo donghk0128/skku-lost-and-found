@@ -96,9 +96,16 @@ real-time streaming.
 
 ## Validation before production
 
-- Run against an isolated PostgreSQL fixture with the Phase 1 migrations.
-- Verify empty, initial, incremental, duplicate rerun, correction, soft delete,
-  hard delete, failed load/retry, and backfill cases.
+- The five source queries were exercised on an isolated PostgreSQL container
+  after applying migrations through `0018_return_pairs`. The integration test
+  covered full and incremental extraction, post updates, and hard-deleted event
+  keys; its fixture transaction was rolled back. The test requires explicit
+  `RUN_SOURCE_INTEGRATION_TESTS=1` and a disposable `SOURCE_DATABASE_URL`.
+- Local impersonated ADC could read the target BigQuery dataset and submit a
+  zero-byte dry-run query from the Airflow image. This did not create Raw tables.
+- Still verify the end-to-end BigQuery load: empty and initial loads,
+  incremental updates, duplicate reruns, corrections, soft and hard deletes,
+  failed load/retry, and backfill.
 - Compare source/target counts and keys; inspect the Airflow task logs and
   BigQuery job history. Record job bytes and storage size before estimating
   actual operating cost from the [BigQuery pricing page](https://cloud.google.com/bigquery/pricing).
