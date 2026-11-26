@@ -190,6 +190,9 @@ class ChatService:
                 written.append(key)
                 message.images.append(ChatMessageImage(storage_key=key, content_type=mime, position=position))
             db.add(message)
+            db.flush()
+            from app.notifications.service import enqueue_chat_notification
+            enqueue_chat_notification(db, room, message)
             db.commit()
         except Exception:
             db.rollback()

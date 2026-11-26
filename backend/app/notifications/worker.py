@@ -17,17 +17,20 @@ def main():
         raise SystemExit("Set PUSH_ENABLED=true after configuring Firebase credentials.")
     sender = FirebaseSender()
     stopping = Event()
+    prefer_chat = False
     for signum in (signal.SIGINT, signal.SIGTERM):
         signal.signal(signum, lambda *_: stopping.set())
     while not stopping.is_set():
         try:
             with SessionLocal() as db:
-                worked = deliver_next(db, sender)
+                worked = deliver_next(db, sender, prefer_chat=prefer_chat)
         except Exception:
             # Do not log exception text, which can include tokens from SDK/SQL parameters.
             logger.error("Push worker transaction failed; retrying after poll interval")
             worked = False
-        if not worked:
+        if worked:
+            prefer_chat = not prefer_chat
+        else:
             stopping.wait(get_settings().push_poll_seconds)
 
 

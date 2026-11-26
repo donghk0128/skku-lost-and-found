@@ -464,6 +464,7 @@ const en = {
   "api.photoUploadFailed": "Could not upload the photo.",
   "push.newPostAlerts": "New post alerts",
   "push.channel": "Keyword alerts",
+  "push.chatChannel": "Chat messages",
   "push.registrationFailed": "Could not finish setting up notifications. Please try again shortly.",
   "push.mobileOnly": "Only new posts published after enabling alerts are included. Turn on Receive notifications in the mobile app and allow notifications in device settings.",
   "push.delete": "Delete condition",

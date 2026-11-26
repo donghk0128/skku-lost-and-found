@@ -4,4 +4,4 @@ export async function enablePush(): Promise<PushPermission> { return "unavailabl
 export async function syncPush(): Promise<void> {}
 export async function clearPush(): Promise<void> {}
 export function initializePushBackground(): void {}
-export function observePush(_userId: string, _openPost: (id: string) => void): () => void { return () => {}; }
+export function observePush(_userId: string, _openPost: (id: string) => void, _openChat: (id: string) => void): () => void { return () => {}; }
