@@ -67,7 +67,10 @@ table is not the same as immediate physical erasure from every storage layer.
 
 The included Compose file is a development configuration. It is not the EC2
 deployment plan. Airflow uses its own PostgreSQL metadata database; it is
-separate from Supabase.
+separate from Supabase. For the EC2 boot-only trial, the host `airflow/logs`
+directory had to be owned by the image's Airflow user (`50000:0`) before the
+dag processor could create its log files. The trial uses a placeholder ADC
+file and a paused DAG; it must not be used for a data load.
 
 ## Loading and recovery
 
@@ -111,4 +114,8 @@ real-time streaming.
   actual operating cost from the [BigQuery pricing page](https://cloud.google.com/bigquery/pricing).
 - Keep the Phase 1 PR review and CI outcome separate from this branch's checks.
 
-No live Supabase, BigQuery, or EC2 run has been performed in this workspace.
+An EC2 boot-only trial on a `t3.small` with a 20 GiB root volume and temporary
+2 GiB swap started the Airflow API server, scheduler, dag processor, and
+metadata database. The API returned HTTP 200, the DAG was registered, and no
+OOM was reported. This checks idle startup only, not stability under a load or
+after a reboot. No live Supabase or BigQuery data load has been performed.
