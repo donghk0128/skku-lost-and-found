@@ -17,6 +17,23 @@ event `properties` column is copied as JSON text; Phase 1 constrains its keys.
 `return_pairs` includes pending rows, so downstream metrics must filter
 `status = 'CONFIRMED'`.
 
+## Agreed Raw deletion policy (2026-11-26)
+
+For Phase 2, Supabase PostgreSQL is the authority for the five Raw tables.
+When an individual source row is hard-deleted (including account withdrawal),
+the next successful sync removes its matching BigQuery Raw row. This is an
+eventual daily sync, not an immediate deletion request handler. A soft-deleted
+post remains in Raw with `deleted_at`, matching its source state. There is no
+exception in this pipeline that preserves a person's deleted event or
+recommendation rows for analytics.
+
+This decision covers the Raw tables only. Before Phase 3, define how derived
+models and truly aggregated statistics respond to withdrawal; they must not
+silently retain user-level rows. Also define a retention period and the
+operational deletion deadline before deploying with real user data. BigQuery's
+time-travel and fail-safe retention mean that deleting a row from the active
+table is not the same as immediate physical erasure from every storage layer.
+
 ## Setup before a real run
 
 1. Create or choose a GCP project and a BigQuery dataset. Choose one location

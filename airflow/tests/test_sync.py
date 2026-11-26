@@ -2,9 +2,11 @@
 
 import unittest
 from datetime import datetime, timezone
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from pipeline.sync import TABLES, _encode, _key_sql, _merge_sql, _source_sql
+from pipeline.sync import TABLES, _encode, _key_sql, _merge_sql, _source_sql, sync_table
 
 
 class ExportContractTest(unittest.TestCase):
@@ -38,6 +40,30 @@ class ExportContractTest(unittest.TestCase):
         self.assertEqual(encoded["id"], str(uid))
         self.assertTrue(encoded["occurred_at"].endswith("+00:00"))
         self.assertEqual(encoded["properties"], '{"screen": "home"}')
+
+    def test_incremental_sync_removes_keys_missing_from_source(self):
+        client = MagicMock()
+        client.query.side_effect = lambda sql, **_kwargs: MagicMock(
+            result=lambda: [SimpleNamespace(n=1, unique_n=1)]
+            if "COUNT(DISTINCT" in sql else
+            [SimpleNamespace(n=0)] if "EXCEPT DISTINCT" in sql else []
+        )
+        connection = MagicMock()
+        connection.__enter__.return_value = connection
+        stamp = datetime(2026, 11, 25, tzinfo=timezone.utc)
+        with (patch("pipeline.sync._config", return_value=(
+                  "postgresql://readonly@example/db", "valid-project", "skku_raw", "asia-northeast3")),
+              patch("pipeline.sync.bigquery.Client", return_value=client),
+              patch("pipeline.sync.psycopg.connect", return_value=connection),
+              patch("pipeline.sync._target_exists", return_value=True),
+              patch("pipeline.sync._load_query", side_effect=[1, 1]) as load):
+            sync_table("event_logs", stamp, stamp)
+        queries = [call.args[0] for call in client.query.call_args_list]
+        self.assertTrue(any(sql.startswith("DELETE FROM") and "NOT EXISTS" in sql
+                            for sql in queries))
+        self.assertIn("SELECT id FROM event_logs", load.call_args_list[1].args[2])
+        connection.execute.assert_called_once_with(
+            "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
 
 
 if __name__ == "__main__":
