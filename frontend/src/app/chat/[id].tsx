@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useIsFocused, useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import {
   ActivityIndicator,
@@ -43,12 +43,23 @@ export default function ChatRoute() {
 }
 
 function ChatDetail({ id }: { id: string }) {
-  const visitId = useRef(newVisitId());
+  const visitId = useRef<string | null>(null);
   const viewed = useRef(false);
+  const isFocused = useIsFocused();
   const router = useRouter();
   const { user } = useAuth();
   const { t, locale } = useLocale();
   const [room, setRoom] = useState<ChatRoom>();
+  useEffect(() => {
+    if (!isFocused) {
+      viewed.current = false;
+      visitId.current = null;
+    } else if (room?.id === id && !viewed.current) {
+      viewed.current = true;
+      visitId.current = newVisitId();
+      trackEvent({ event_type: "screen_view", screen: "chat", visit_id: visitId.current });
+    }
+  }, [id, isFocused, room?.id]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -138,10 +149,6 @@ function ChatDetail({ id }: { id: string }) {
           const detail = await chatApi.room(id);
           if (!active) return;
           setRoom(detail);
-          if (!viewed.current) {
-            viewed.current = true;
-            trackEvent({ event_type: "screen_view", screen: "chat", visit_id: visitId.current });
-          }
           readSequence.current = detail.last_read_sequence;
           let hasMore = true;
           while (hasMore && active) {

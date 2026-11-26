@@ -85,14 +85,6 @@ function AttachmentIcon({ camera = false }: { camera?: boolean }) {
 }
 
 export default function CreatePostScreen() {
-  const visitId = useRef(newVisitId());
-  const viewed = useRef(false);
-  useEffect(() => {
-    if (!viewed.current) {
-      viewed.current = true;
-      trackEvent({ event_type: "screen_view", screen: "create_post", visit_id: visitId.current });
-    }
-  }, []);
   const { t, categoryLabel } = useLocale();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -100,6 +92,9 @@ export default function CreatePostScreen() {
   const pendingPhotoSource = useRef<"camera" | "library" | null>(null);
   const navigation = useNavigation();
   const isFocused = useIsFocused();
+  useEffect(() => {
+    if (isFocused) trackEvent({ event_type: "screen_view", screen: "create_post", visit_id: newVisitId() });
+  }, [isFocused]);
   const {
     type,
     editId,
