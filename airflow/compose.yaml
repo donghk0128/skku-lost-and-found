@@ -14,6 +14,7 @@ services:
       - airflow_metadata:/var/lib/postgresql/data
   airflow-init:
     build: .
+    image: skku-analytics-airflow:3.3.1
     env_file: .env
     environment: &airflow_env
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -41,7 +42,7 @@ services:
         bind:
           create_host_path: false
   airflow-api-server:
-    build: .
+    image: skku-analytics-airflow:3.3.1
     env_file: .env
     environment: *airflow_env
     command: airflow api-server
@@ -52,7 +53,7 @@ services:
         condition: service_completed_successfully
     volumes: *airflow_volumes
   airflow-scheduler:
-    build: .
+    image: skku-analytics-airflow:3.3.1
     env_file: .env
     environment: *airflow_env
     command: airflow scheduler
@@ -61,7 +62,7 @@ services:
         condition: service_completed_successfully
     volumes: *airflow_volumes
   airflow-dag-processor:
-    build: .
+    image: skku-analytics-airflow:3.3.1
     env_file: .env
     environment: *airflow_env
     command: airflow dag-processor
