@@ -2,6 +2,7 @@ name: skku-analytics
 services:
   metadata:
     image: postgres:16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: local-airflow-only
@@ -43,6 +44,7 @@ services:
           create_host_path: false
   airflow-api-server:
     image: skku-analytics-airflow:3.3.1
+    restart: unless-stopped
     env_file: .env
     environment: *airflow_env
     command: airflow api-server
@@ -54,6 +56,7 @@ services:
     volumes: *airflow_volumes
   airflow-scheduler:
     image: skku-analytics-airflow:3.3.1
+    restart: unless-stopped
     env_file: .env
     environment: *airflow_env
     command: airflow scheduler
@@ -63,6 +66,7 @@ services:
     volumes: *airflow_volumes
   airflow-dag-processor:
     image: skku-analytics-airflow:3.3.1
+    restart: unless-stopped
     env_file: .env
     environment: *airflow_env
     command: airflow dag-processor
