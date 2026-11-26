@@ -17,7 +17,9 @@ function AuthContent() {
   const navigation = useRootNavigationState();
   useEffect(() => {
     if (loading || !user || !navigation?.key) return;
-    return observePush(user.id, id => router.push({ pathname: "/post/[id]", params: { id } }));
+    return observePush(user.id,
+      id => router.push({ pathname: "/post/[id]", params: { id } }),
+      id => router.push({ pathname: "/chat/[id]", params: { id } }));
   }, [user, loading, navigation?.key]);
 
   if (loading) return null;

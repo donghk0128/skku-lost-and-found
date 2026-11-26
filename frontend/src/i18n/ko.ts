@@ -471,6 +471,7 @@ const ko = {
   "api.photoUploadFailed": "사진 업로드에 실패했습니다.",
   "push.newPostAlerts": "새 게시물 알림",
   "push.channel": "키워드 알림",
+  "push.chatChannel": "채팅 알림",
   "push.registrationFailed": "알림 수신 설정을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   "push.mobileOnly": "알림을 켠 이후 등록되는 새 글만 알려드립니다. 수신할 모바일 기기의 ‘알림 받기’와 기기 알림 권한도 켜주세요.",
   "push.delete": "조건 삭제",

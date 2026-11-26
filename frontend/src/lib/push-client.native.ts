@@ -6,17 +6,32 @@ import type * as Messaging from "@react-native-firebase/messaging";
 import type * as ExpoNotifications from "expo-notifications";
 import { ApiError, authApi, request } from "@/lib/auth-api";
 import { readSession, writeSession } from "@/lib/session-storage";
-import { parsePostPush } from "@/lib/push-payload";
+import { parseChatPush, parsePostPush } from "@/lib/push-payload";
 import { t } from "@/i18n";
 import { notificationsEnabledOnDevice, writeNotificationPreference } from "@/lib/notification-preference";
 
 export type PushPermission = "granted" | "denied" | "unavailable";
 export function initializePushBackground(): void {
   const native = nativeModules();
-  // Visible background/terminated notifications are presented by the OS.
-  native?.fcm.setBackgroundMessageHandler(native.fcm.getMessaging(), async () => {});
+  if (!native) return;
+  // Android chat pushes are data-only so FCM cannot collapse different rooms.
+  native.notifications.setNotificationHandler({ handleNotification: async notification => {
+    const payload = parseChatPush(notification.request.content.data);
+    const recipient = await SecureStore.getItemAsync(recipientKey);
+    const show = Platform.OS === "android" && payload?.user_id === recipient
+      && await notificationsEnabledOnDevice() && await permitted();
+    return { shouldShowBanner: show, shouldShowList: show, shouldPlaySound: show, shouldSetBadge: false };
+  } });
+  native.fcm.setBackgroundMessageHandler(native.fcm.getMessaging(), async message => {
+    if (Platform.OS !== "android" || !parseChatPush(message.data) || !await readSession()) return;
+    const recipient = await SecureStore.getItemAsync(recipientKey);
+    if (recipient && await permitted()) await presentChat(native, message, recipient);
+  });
 }
 const installationKey = "push-installation-id";
+const recipientKey = "push-recipient-id";
+const chatSequences = new Map<string, number>();
+let observedUserId: string | undefined;
 let modules: { fcm: typeof Messaging; notifications: typeof ExpoNotifications } | undefined;
 let registration: Promise<void> = Promise.resolve();
 let cachedFid: string | undefined;
@@ -54,8 +69,40 @@ async function permitted() {
 
 async function ensureChannel() {
   const native = nativeModules();
-  if (native && Platform.OS === "android") await native.notifications.setNotificationChannelAsync("keyword-posts", {
-    name: t("push.channel"), importance: native.notifications.AndroidImportance.HIGH,
+  if (native && Platform.OS === "android") {
+    await native.notifications.setNotificationChannelAsync("keyword-posts", {
+      name: t("push.channel"), importance: native.notifications.AndroidImportance.HIGH,
+    });
+    await native.notifications.setNotificationChannelAsync("chat-messages", {
+      name: t("push.chatChannel"), importance: native.notifications.AndroidImportance.HIGH,
+    });
+  }
+}
+
+async function presentChat(native: NonNullable<ReturnType<typeof nativeModules>>,
+                           message: Messaging.RemoteMessage, userId: string) {
+  const chat = parseChatPush(message.data);
+  if (!chat || chat.user_id !== userId || !await notificationsEnabledOnDevice()) return;
+  const { notifications } = native;
+  const current = chatSequences.get(chat.room_id) ?? 0;
+  if (chat.sequence <= current) return;
+  chatSequences.set(chat.room_id, chat.sequence);
+  const visible = await notifications.getPresentedNotificationsAsync();
+  const sameRoom = visible.filter(item => {
+    const previous = parseChatPush(item.request.content.data);
+    return previous?.user_id === userId && previous.room_id === chat.room_id;
+  });
+  const latestVisible = Math.max(0, ...sameRoom.map(item => parseChatPush(item.request.content.data)!.sequence));
+  if (latestVisible >= chat.sequence) return;
+  for (const item of sameRoom) await notifications.dismissNotificationAsync(item.request.identifier);
+  if (chatSequences.get(chat.room_id) !== chat.sequence) return;
+  await ensureChannel();
+  const title = typeof message.data?.title === "string" ? message.data.title : message.notification?.title;
+  const body = typeof message.data?.body === "string" ? message.data.body : message.notification?.body;
+  await notifications.scheduleNotificationAsync({
+    identifier: `chat-${chat.room_id}`,
+    content: { title, body, data: message.data, sound: "default" },
+    trigger: Platform.OS === "android" ? { channelId: "chat-messages" } : null,
   });
 }
 
@@ -114,6 +161,7 @@ export async function syncPush(): Promise<void> {
       registeredFid = value => { clearTimeout(timer); registeredFid = undefined; resolve(value); };
     });
     await uploadFid(fid);
+    if (observedUserId) await SecureStore.setItemAsync(recipientKey, observedUserId);
   });
 }
 
@@ -148,6 +196,8 @@ async function detachRegistration(): Promise<void> {
         }
       }
     } finally {
+      chatSequences.clear();
+      await SecureStore.deleteItemAsync(recipientKey);
       try { await native.fcm.unregister(native.fcm.getMessaging()); }
       finally { await native.notifications.dismissAllNotificationsAsync(); }
     }
@@ -157,21 +207,29 @@ export async function clearPush(): Promise<void> {
   return serialize(detachRegistration);
 }
 
-export function observePush(userId: string, openPost: (id: string) => void): () => void {
+export function observePush(userId: string, openPost: (id: string) => void, openChat: (id: string) => void): () => void {
   const native = nativeModules();
   if (!native) return () => {};
   const { fcm, notifications } = native;
   let active = true;
   const seen = new Set<string>();
   const presented = new Set<string>();
+  observedUserId = userId;
+  void serialize(async () => {
+    if (observedUserId === userId) await SecureStore.setItemAsync(recipientKey, userId);
+  }).catch(() => undefined);
   function open(data: unknown) {
-    const payload = parsePostPush(data);
+    const post = parsePostPush(data);
+    const chat = parseChatPush(data);
+    const payload = post ?? chat;
     if (!active || !payload || payload.user_id !== userId || seen.has(payload.notification_id)) return;
     seen.add(payload.notification_id);
-    openPost(payload.post_id);
+    if (post) openPost(post.post_id);
+    else if (chat) openChat(chat.room_id);
   }
   notifications.setNotificationHandler({ handleNotification: async notification => {
-    const payload = parsePostPush(notification.request.content.data);
+    const data = notification.request.content.data;
+    const payload = parsePostPush(data) ?? parseChatPush(data);
     // RN Firebase handles remote receipt; Expo presents only our local banner.
     // Suppress remote auto-presentation so the same message cannot show twice.
     const trigger = notification.request.trigger;
@@ -181,11 +239,17 @@ export function observePush(userId: string, openPost: (id: string) => void): () 
   } });
   const messaging = fcm.getMessaging();
   const stopForeground = fcm.onMessage(messaging, async message => {
-    const payload = parsePostPush(message.data);
+    const post = parsePostPush(message.data);
+    const chat = parseChatPush(message.data);
+    const payload = post ?? chat;
     if (!active || !payload || payload.user_id !== userId || presented.has(payload.notification_id)
       || !await notificationsEnabledOnDevice()) return;
     presented.add(payload.notification_id);
     if (presented.size > 500) presented.delete(presented.values().next().value!);
+    if (chat) {
+      await presentChat(native, message, userId);
+      return;
+    }
     await notifications.scheduleNotificationAsync({
       identifier: payload.notification_id,
       content: { title: message.notification?.title, body: message.notification?.body,
@@ -203,5 +267,9 @@ export function observePush(userId: string, openPost: (id: string) => void): () 
     if (state === "active") void syncPush().catch(() => undefined);
   });
   void syncPush().catch(() => undefined);
-  return () => { active = false; stopForeground(); stopOpened(); response.remove(); appState.remove(); };
+  return () => {
+    active = false;
+    if (observedUserId === userId) observedUserId = undefined;
+    stopForeground(); stopOpened(); response.remove(); appState.remove();
+  };
 }

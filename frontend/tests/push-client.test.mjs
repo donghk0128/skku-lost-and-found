@@ -115,3 +115,44 @@ test("foreground receipt and taps respect recipient, master preference and dedup
   assert.equal((await state.handler.handleNotification(local)).shouldShowBanner, false);
   stop();
 });
+
+test("chat push replaces the room preview and ignores an older arrival", async () => {
+  const { state, client } = runtime();
+  state.store.set(preferenceKey, "on");
+  const stop = client.observePush(ownerId, id => state.opened.push(id), id => state.opened.push(id));
+  await flush();
+  const chat = sequence => ({
+    data: { type: "chat_message", room_id: postId, user_id: ownerId,
+      notification_id: sequence === 2 ? notificationId : installationId, sequence: String(sequence) },
+    notification: { title: "상대방", body: `메시지 ${sequence}` },
+  });
+  await state.message(chat(1));
+  await state.message(chat(2));
+  await state.message(chat(1));
+  assert.equal(state.displayed.length, 1);
+  assert.equal(state.displayed[0].identifier, `chat-${postId}`);
+  assert.equal(state.displayed[0].content.body, "메시지 2");
+  state.openedMessage(chat(2));
+  assert.deepEqual(state.opened, [postId]);
+  stop();
+});
+
+test("Android background data pushes keep separate rooms and replace each room's preview", async () => {
+  const { state, client } = runtime();
+  state.store.set(preferenceKey, "on");
+  state.store.set("push-recipient-id", ownerId);
+  client.initializePushBackground();
+  const chat = (room, sequence, id) => ({ data: {
+    type: "chat_message", room_id: room, user_id: ownerId,
+    notification_id: id, sequence: String(sequence), title: "상대방", body: `메시지 ${sequence}`,
+  } });
+  await state.background(chat(postId, 1, notificationId));
+  await state.background(chat(installationId, 1, postId));
+  await state.background(chat(postId, 2, installationId));
+  assert.equal(state.displayed.length, 2);
+  assert.equal(state.displayed.find(item => item.identifier === `chat-${postId}`).content.body, "메시지 2");
+  assert.equal(state.displayed.find(item => item.identifier === `chat-${installationId}`).content.body, "메시지 1");
+  assert.equal((await state.handler.handleNotification({ request: { content: state.displayed[0].content } })).shouldShowBanner, true);
+  await client.clearPush();
+  assert.equal((await state.handler.handleNotification({ request: { content: state.displayed[0].content } })).shouldShowBanner, false);
+});

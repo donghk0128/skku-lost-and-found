@@ -1,5 +1,30 @@
 # Keyword push notifications
 
+## Chat message notifications
+
+Migration `0019_chat_push_notifications` adds a separate transactional outbox for
+chat messages. Text, image, HTTP and WebSocket sends all use the same chat service;
+only a newly committed message creates push work for the other participant's
+currently registered devices. A retry with the same `client_message_id` does not
+create another push. The existing device-wide notification switch controls chat
+push as well. Per-room switches are not part of this change.
+
+Before sending, the worker cancels work for a read message, a superseded message
+in the same room, a closed room, an expired or revoked session, or a reassigned
+device. Text previews are capped at 200 characters; an image without a caption
+uses a photo placeholder. Android chat sends are high-priority data-only messages,
+so FCM does not collapse different rooms before delivery; the background handler
+displays a local notification and replaces the previous preview for that room.
+On iOS, APNs alerts use a per-room collapse ID. Taps open the room and fetch its
+current history from the server. FCM/APNs can reorder or drop delivery, and
+Android can discard a large offline backlog, so a terminated app cannot guarantee
+that the tray preview always matches the server's newest message at every instant.
+
+Apply migrations through `0019_chat_push_notifications` before deploying an API
+or worker with chat push enabled. Existing Firebase credentials, `PUSH_ENABLED`,
+push worker and device registration are reused. When both kinds of work are
+queued, the worker alternates between them.
+
 Saved conditions opt in individually (`notification_enabled`, default `false`).
 Only posts **created after enabling** are evaluated. Editing an existing post,
 saving a condition, re-enabling it, or registering a new device does not backfill.

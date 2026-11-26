@@ -50,6 +50,10 @@ export function runtime() {
     dismissAllNotificationsAsync: async () => { state.dismissed++; },
     setNotificationHandler: value => { state.handler = value; },
     scheduleNotificationAsync: async value => { state.displayed.push(value); },
+    getPresentedNotificationsAsync: async () => state.displayed.map(value => ({ request: {
+      identifier: value.identifier, content: value.content,
+    } })),
+    dismissNotificationAsync: async id => { state.displayed = state.displayed.filter(value => value.identifier !== id); },
     addNotificationResponseReceivedListener: callback => { state.response = callback; return { remove() {} }; },
     getLastNotificationResponse: () => null,
     clearLastNotificationResponseAsync: async () => {},
@@ -57,7 +61,9 @@ export function runtime() {
   const mocks = {
     "expo-constants": { __esModule: true, default: { executionEnvironment: "standalone" }, ExecutionEnvironment: { StoreClient: "storeClient" } },
     "expo-crypto": { randomUUID: () => installationId },
-    "expo-secure-store": { getItemAsync: async key => store.get(key) ?? null, setItemAsync: async (key, value) => { store.set(key, value); } },
+    "expo-secure-store": { getItemAsync: async key => store.get(key) ?? null,
+      setItemAsync: async (key, value) => { store.set(key, value); },
+      deleteItemAsync: async key => { store.delete(key); } },
     "react-native": { Platform: { OS: "android" }, AppState: { addEventListener: (_event, callback) => { state.appState = callback; return { remove() {} }; } } },
     "@react-native-firebase/messaging": fcm,
     "expo-notifications": notifications,

@@ -34,20 +34,30 @@ class FirebaseSender:
         from firebase_admin import exceptions, messaging
 
         notification_id = str(notification.id)
+        is_chat = hasattr(notification, "room_id")
+        slot = f"chat-{notification.room_id}" if is_chat else notification_id
+        data = ({"type": "chat_message", "room_id": str(notification.room_id),
+                 "sequence": str(notification.sequence), "user_id": str(notification.user_id),
+                 "notification_id": notification_id, "title": notification.title,
+                 "body": notification.body} if is_chat else
+                {"type": "keyword_post", "post_id": str(notification.post_id),
+                 "user_id": str(notification.user_id), "notification_id": notification_id})
         message = messaging.Message(
             fid=fid,
-            notification=messaging.Notification(title=notification.title, body=notification.body),
-            data={"type": "keyword_post", "post_id": str(notification.post_id),
-                  "user_id": str(notification.user_id), "notification_id": notification_id},
+            notification=None if is_chat else messaging.Notification(title=notification.title, body=notification.body),
+            data=data,
             android=messaging.AndroidConfig(
                 priority="high", ttl=timedelta(seconds=get_settings().push_ttl_seconds),
-                collapse_key=notification_id,
-                notification=messaging.AndroidNotification(channel_id="keyword-posts", tag=notification_id),
+                # Android chat data messages remain non-collapsible across rooms.
+                collapse_key=None if is_chat else slot,
+                notification=None if is_chat else messaging.AndroidNotification(channel_id="keyword-posts", tag=slot),
             ),
             apns=messaging.APNSConfig(
-                headers={"apns-push-type": "alert", "apns-priority": "10", "apns-collapse-id": notification_id,
+                headers={"apns-push-type": "alert", "apns-priority": "10", "apns-collapse-id": slot,
                          "apns-expiration": str(int(time()) + get_settings().push_ttl_seconds)},
-                payload=messaging.APNSPayload(aps=messaging.Aps(sound="default")),
+                payload=messaging.APNSPayload(aps=messaging.Aps(
+                    alert=messaging.ApsAlert(title=notification.title, body=notification.body) if is_chat else None,
+                    sound="default")),
             ),
         )
         try:
