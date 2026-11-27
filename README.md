@@ -102,6 +102,10 @@ npx tsc --noEmit
 
 ## 문서
 
+- [프로젝트 문서 안내](./docs/README.md)
+- [백엔드 API](./docs/api/backend-api.md)
+- [이벤트 로그와 반환 정답 쌍](./docs/analytics/event-logging.md)
+- [Airflow → BigQuery Raw](./docs/analytics/airflow-bigquery-raw.md)
 - [AI 게시글 작성 모듈](./backend/app/ai/README.md)
 - [게시글 API](./backend/app/posts/README.md)
 - [게시글 추천과 임베딩](./backend/app/matching/README.md)

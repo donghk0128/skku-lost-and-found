@@ -2,7 +2,7 @@
 
 `GET /api/v1/posts/{post_id}/recommendations`는 분실 글에 습득 글을, 습득 글에 분실 글을 추천합니다. `OPEN`이고 삭제되지 않은 후보만 사용하며 기본 5개, 최대 20개를 돌려줍니다. 응답의 `score`는 순위용 점수이지 같은 물건일 확률이 아닙니다.
 
-홈 화면 후보순에는 인증이 필요한 `GET /api/v1/posts/mine`과 `GET /api/v1/posts/{post_id}/ranked-candidates`를 사용합니다. 상세 요청의 상위 50개 재정렬은 유지하지만, 홈 후보순은 검색·카테고리 필터를 먼저 적용한 **모든** 후보에 혼합 점수를 계산하고 페이지로 나눕니다. API 요청·응답과 근거 코드는 `docs/backend-api.md`에 정리되어 있습니다.
+홈 화면 후보순에는 인증이 필요한 `GET /api/v1/posts/mine`과 `GET /api/v1/posts/{post_id}/ranked-candidates`를 사용합니다. 상세 요청의 상위 50개 재정렬은 유지하지만, 홈 후보순은 검색·카테고리 필터를 먼저 적용한 **모든** 후보에 혼합 점수를 계산하고 페이지로 나눕니다. API 요청·응답과 근거 코드는 [백엔드 API 문서](../../../docs/api/backend-api.md)에 정리되어 있습니다.
 
 ## 추천이 만들어지는 과정
 
