@@ -43,7 +43,7 @@
 - 운영 Mart의 Raw 행 수는 `event_logs=0`, `posts=83`, `return_pairs=0`, `recommendation_runs=6`, `recommendation_items=147`이다. 이벤트와 확정 반환 쌍 지표가 빈 상태인 것은 이 데이터에 부합한다. 사용자별 클릭→채팅→반환 인과 전환율, 신규 가입, 임베딩 성공률은 현재 Raw만으로 계산하지 않는다.
 - 로컬 Streamlit을 운영 분석 데이터 세트로 전환했다. AppTest에서 예외 0개, 성공 표시 1개, 데이터 품질 표 1개와 나머지 빈 상태 안내 4개를 확인했고, HTTP health는 `ok`였다. 로컬 주소는 `http://127.0.0.1:8501`이다.
 - 같은 원본을 대상으로 두 번째 수동 `full_refresh=true` 실행을 시작했고, 최신 `pipeline_status`가 다시 `READY`가 된 것을 확인했다. Mart의 Raw 행 수는 첫 성공 실행과 같은 `0/83/0/6/147`이었다(`event_logs/posts/return_pairs/recommendation_runs/recommendation_items` 순). 두 수동 실행은 `run_after`가 서로 달라 동일 시간 구간의 증분 재실행 증거로 쓰지 않는다. 두 번째 Airflow `dag_run`의 최종 상태는 서버 메타데이터에서 별도로 조회하지 않았다.
-- 이후 테스트 데이터 세트에서 실제 BigQuery `MERGE`와 오류 주입 후 복구, 동일 구간 증분 재실행을 확인했다. 운영 DB의 새 수정·삭제 반영, 운영 Raw에서 발생한 실제 장애, EC2 재부팅 후 자동 복구는 아직 관찰하지 않았다. 격리 시험 결과를 운영 장애를 직접 겪은 증거로 표현하지 않는다.
+- 이후 테스트 데이터 세트에서 실제 BigQuery `MERGE`와 오류 주입 후 복구, 동일 구간 증분 재실행, 일회용 원본 DB의 수정·삭제 전파를 확인했다. EC2 재부팅 후 자동 복구도 별도로 확인했다. 운영 사용자 데이터의 변경·삭제나 BigQuery 서비스 자체 장애를 직접 일으켜 관찰한 것은 아니다.
 - 비용은 서비스 계정 작업의 2026-11-27 기준 24시간 과금 대상 쿼리량 540 MiB와 Raw 저장량 약 24 KB를 기록했지만, 실제 청구액은 확인하지 않았다. 무료 한도와 다른 프로젝트 사용량은 청구 계정 전체 기준으로 봐야 한다.
 
 ## 대시보드 보강과 실제 BigQuery 재처리 시험 (2026-11-29)
@@ -58,3 +58,11 @@
 - **사전 확인:** `skku_raw_sync`의 `queued`·`running` 실행 수가 0인지, 백엔드·Caddy·Airflow 컨테이너가 정상인지, BigQuery 최신 상태가 `READY`인지 확인한다. 현재 Compose 설정과 WIF 파일의 기존 경로를 유지한다. 기존 Airflow 이미지는 `skku-analytics-airflow:pre-dbt-20261129` 태그로 보관했다.
 - **재부팅 후 합격 기준:** SSH 재접속, 백엔드와 Caddy·Airflow 컨테이너 재시작, 공개 `/api/v1/health` HTTP 200, Airflow DAG 등록·최근 실행 상태 확인, BigQuery 최신 `READY`와 Mart 조회 성공을 확인한다. 필요하면 증분 수동 DAG를 한 번 실행해 새 `READY`를 확인한다.
 - **복구 순서:** 백엔드가 뜨지 않으면 `~/skku-lost-and-found`의 `compose.deploy.yaml` 상태와 로그를 확인하고 `sudo docker compose -f compose.deploy.yaml up -d --no-build`로 기존 서비스를 다시 올린다. Airflow가 뜨지 않으면 `~/skku-dbt-capacity/airflow`에서 `sudo docker compose up -d --no-build`를 실행하고 scheduler·api-server·dag-processor 로그를 확인한다. 자동 재시작 실패 원인을 확인하기 전에는 메타데이터 볼륨이나 이미지를 삭제하지 않는다.
+
+## 재부팅과 원본 변경 검증 결과 (2026-11-29)
+
+- 재부팅 직전 `skku_raw_sync`의 대기·실행 중 DAG 수는 0, Docker 자동 시작은 `enabled`, 백엔드 컨테이너는 `healthy`였다. Docker 엔진을 다시 켠 직후 한 차례 백엔드가 `starting`이어서 재부팅 조건 검사가 중단됐고, `healthy`로 돌아온 뒤에만 재시도했다. 이는 헬스 검사 시작 상태를 장애로 단정하지 않으면서 불안정한 시점의 재부팅을 피한 결정이다.
+- 실제 EC2를 재부팅하자 SSH 연결이 끊겼고, 약 2분 뒤 백엔드(`healthy`)·Caddy·Airflow API 서버·DAG processor·scheduler·메타데이터 PostgreSQL(`healthy`)이 자동으로 다시 실행 중이었다. DAG `skku_raw_sync`는 등록돼 있었고 이전 두 전체 실행은 `success`로 남아 있었다. 공개 API `/api/v1/health`는 HTTP 200, BigQuery 최신 `pipeline_status`는 `READY`였다.
+- 재부팅 후 `full_refresh` 없이 수동 증분 DAG를 실행했다. 서버 메타데이터의 최종 상태는 `success`, dbt 로그는 뷰 14개·검사 37개, `PASS=51 WARN=0 ERROR=0 SKIP=0`였다. BigQuery의 최신 상태는 새 `READY`로 바뀌었고 Raw 행 수 `0/83/0/6/147`이 유지됐다. 공개 API는 계속 HTTP 200, 로컬 Streamlit AppTest는 예외 0개와 게시글 83개·추천 실행 6건·후보 147건을 표시했다. 작업 후 서버의 가용 RAM은 649 MiB, 스왑 사용량은 252 MiB, 디스크 여유는 4.8 GiB였다.
+- 운영 DB의 행을 직접 바꾸지 않고, 일회용 PostgreSQL 17과 BigQuery 테스트 분석 데이터 세트의 고유 임시 테이블로 원본 변경을 검증했다. `airflow/tests/bigquery_source_change_probe.py`는 정확한 일회용 DB 호스트·DB 이름, 명시적 실행 플래그, `_test_` 데이터 세트를 요구한다. 게시글 2행을 실제 BigQuery에 적재하고, 한 행의 상태 수정·소프트 삭제를 반영해 2행을 유지했다. 다른 행을 원본에서 하드 삭제하자 BigQuery 대상도 1행이 됐고, 같은 구간 재실행 후에도 1행이었다. 임시 테이블·PostgreSQL 컨테이너·Docker 네트워크를 제거했다.
+- 위 시험은 **동기화 코드가 원본 수정·삭제와 작업 사이 실패를 처리하는지** 실제 BigQuery 작업으로 확인한다. 운영 사용자의 데이터를 임의로 수정·삭제하거나 실제 BigQuery 서비스 장애를 일으키지는 않았다. 운영 `event_logs`·`return_pairs`가 0행이므로 이 두 종류의 실제 사용 행동 지표와 반환 성과는 데이터가 쌓인 뒤 다시 확인해야 한다.
