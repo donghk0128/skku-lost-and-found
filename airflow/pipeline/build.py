@@ -43,7 +43,9 @@ def build_marts() -> None:
     try:
         subprocess.run(
             ["dbt", "build", "--project-dir", "/opt/airflow/dbt",
-             "--profiles-dir", "/opt/airflow/dbt", "--target", "prod"],
+             "--profiles-dir", "/opt/airflow/dbt", "--target", "prod",
+             "--target-path", "/tmp/dbt-target", "--log-path", "/tmp/dbt-logs",
+             "--no-partial-parse"],
             check=True,
             timeout=3600,
         )

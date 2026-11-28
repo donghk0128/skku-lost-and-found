@@ -22,6 +22,10 @@ class BuildGateTest(unittest.TestCase):
             build_marts()
         self.assertEqual(status.call_args_list, [call("RUNNING"), call("READY")])
         self.assertTrue(runner.call_args.kwargs["check"])
+        command = runner.call_args.args[0]
+        self.assertEqual(command[command.index("--target-path") + 1], "/tmp/dbt-target")
+        self.assertEqual(command[command.index("--log-path") + 1], "/tmp/dbt-logs")
+        self.assertIn("--no-partial-parse", command)
 
 
 if __name__ == "__main__":
