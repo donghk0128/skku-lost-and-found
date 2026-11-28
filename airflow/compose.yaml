@@ -1,0 +1,80 @@
+name: skku-analytics
+services:
+  metadata:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: local-airflow-only
+      POSTGRES_DB: airflow
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 5s
+      retries: 10
+    volumes:
+      - airflow_metadata:/var/lib/postgresql/data
+  airflow-init:
+    build: .
+    image: skku-analytics-airflow:3.3.1
+    env_file: .env
+    environment: &airflow_env
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-api-server:8080/execution/
+      AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:?Set AIRFLOW_JWT_SECRET in airflow/.env}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:local-airflow-only@metadata/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+      AIRFLOW__CORE__PARALLELISM: "1"
+      AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: "1"
+      AIRFLOW__DAG_PROCESSOR__PARSING_PROCESSES: "1"
+      AIRFLOW__DAG_PROCESSOR__MIN_FILE_PROCESS_INTERVAL: "120"
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp-adc.json
+      PYTHONPATH: /opt/airflow
+    command: airflow db migrate
+    depends_on:
+      metadata:
+        condition: service_healthy
+    volumes: &airflow_volumes
+      - ./dags:/opt/airflow/dags:ro
+      - ./pipeline:/opt/airflow/pipeline:ro
+      - ./logs:/opt/airflow/logs
+      - type: bind
+        source: ${GCP_ADC_FILE:?Set GCP_ADC_FILE to the local gcloud ADC file}
+        target: /run/secrets/gcp-adc.json
+        read_only: true
+        bind:
+          create_host_path: false
+  airflow-api-server:
+    image: skku-analytics-airflow:3.3.1
+    restart: unless-stopped
+    env_file: .env
+    environment: *airflow_env
+    command: airflow api-server
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    volumes: *airflow_volumes
+  airflow-scheduler:
+    image: skku-analytics-airflow:3.3.1
+    restart: unless-stopped
+    env_file: .env
+    environment: *airflow_env
+    command: airflow scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    volumes: *airflow_volumes
+  airflow-dag-processor:
+    image: skku-analytics-airflow:3.3.1
+    restart: unless-stopped
+    env_file: .env
+    environment: *airflow_env
+    command: airflow dag-processor
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    volumes: *airflow_volumes
+volumes:
+  airflow_metadata:
