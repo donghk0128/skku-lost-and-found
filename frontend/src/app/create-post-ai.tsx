@@ -36,7 +36,11 @@ import ChatMessageBubble from "@/components/ChatMessageBubble";
 import ChatLocationOptions from "@/components/ChatLocationOptions";
 import { parseLocationNumbers } from "@/lib/location-selection";
 import ChatLocations from "@/components/ChatLocations";
-import { locationEntriesFromText, type LocationEntry } from "@/lib/location-entries";
+import {
+  locationEntriesFromText,
+  locationEntriesToPayload,
+  type LocationEntry,
+} from "@/lib/location-entries";
 import { authApi } from "@/lib/auth-api";
 import { postsApi, type PostImageAsset } from "@/lib/posts-api";
 import type { PickedLocation } from "@/lib/location-picker";
@@ -451,6 +455,7 @@ export default function CreatePostAiScreen() {
     try {
       const token = await authenticatedToken();
       if (!postId) {
+        const locations = locationEntriesToPayload(locationEntries);
         const post = await postsApi.createAiAssisted(
           {
             post_type: draft.post_type,
@@ -459,15 +464,7 @@ export default function CreatePostAiScreen() {
             description: joinPostDescription(draft.description, features),
             item_name: draft.item_name ?? undefined,
             category_id: draft.category_id,
-            location_text: confirmedLocation?.address ?? draft.location_text ?? undefined,
-            ...(confirmedLocation
-              ? {
-                  latitude: confirmedLocation.latitude,
-                  longitude: confirmedLocation.longitude,
-                }
-              : !mapSkipped && draft.latitude !== null && draft.longitude !== null
-                ? { latitude: draft.latitude, longitude: draft.longitude }
-                : {}),
+            locations,
             event_start_at: draft.event_start_at ?? undefined,
             event_end_at: draft.event_end_at ?? undefined,
           },

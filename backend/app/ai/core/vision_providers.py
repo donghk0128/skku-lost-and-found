@@ -9,7 +9,8 @@ import httpx
 from pydantic import ValidationError
 
 from .providers import ProviderError
-from .vision_prompt import VISION_SYSTEM_PROMPT, VISION_USER_PROMPT
+from .schemas import Locale
+from .vision_prompt import VISION_USER_PROMPT, vision_system_prompt
 from .vision_schemas import ImageAttributes, VisionResult, VisionUsage, vision_json_schema
 
 
@@ -17,7 +18,7 @@ class VisionProvider(ABC):
     """Analyze one in-memory image without persisting it."""
 
     @abstractmethod
-    def analyze(self, image: bytes, mime_type: str) -> VisionResult:
+    def analyze(self, image: bytes, mime_type: str, locale: Locale) -> VisionResult:
         """Return validated observable attributes for one image."""
 
 
@@ -28,12 +29,12 @@ class HttpVisionProvider(VisionProvider):
         self.model = model
         self.timeout_seconds = timeout_seconds
 
-    def analyze(self, image: bytes, mime_type: str) -> VisionResult:
+    def analyze(self, image: bytes, mime_type: str, locale: Locale) -> VisionResult:
         if mime_type not in {"image/jpeg", "image/png", "image/webp"}:
             raise ProviderError("unsupported_image")
         for attempt in range(3):
             try:
-                return self._analyze_once(image, mime_type)
+                return self._analyze_once(image, mime_type, locale)
             except ProviderError as error:
                 if error.kind not in {"timeout", "rate_limited", "unavailable"} or attempt == 2:
                     raise
@@ -41,7 +42,7 @@ class HttpVisionProvider(VisionProvider):
         raise ProviderError("unavailable")
 
     @abstractmethod
-    def _analyze_once(self, image: bytes, mime_type: str) -> VisionResult:
+    def _analyze_once(self, image: bytes, mime_type: str, locale: Locale) -> VisionResult:
         """Perform one provider request."""
 
     def _post(self, url: str, **kwargs: Any) -> tuple[dict[str, Any], float]:
@@ -72,13 +73,13 @@ class OllamaVisionProvider(HttpVisionProvider):
         super().__init__(model, timeout_seconds)
         self.base_url = base_url.rstrip("/")
 
-    def _analyze_once(self, image: bytes, mime_type: str) -> VisionResult:
+    def _analyze_once(self, image: bytes, mime_type: str, locale: Locale) -> VisionResult:
         payload, duration = self._post(
             f"{self.base_url}/api/chat",
             json={
                 "model": self.model,
                 "messages": [
-                    {"role": "system", "content": VISION_SYSTEM_PROMPT},
+                    {"role": "system", "content": vision_system_prompt(locale)},
                     {
                         "role": "user",
                         "content": VISION_USER_PROMPT,
@@ -114,7 +115,7 @@ class OpenAIVisionProvider(HttpVisionProvider):
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
 
-    def _analyze_once(self, image: bytes, mime_type: str) -> VisionResult:
+    def _analyze_once(self, image: bytes, mime_type: str, locale: Locale) -> VisionResult:
         if not self.api_key:
             raise ProviderError("not_configured")
         data_url = f"data:{mime_type};base64,{base64.b64encode(image).decode('ascii')}"
@@ -125,7 +126,7 @@ class OpenAIVisionProvider(HttpVisionProvider):
                 "model": self.model,
                 "store": False,
                 "input": [
-                    {"role": "system", "content": VISION_SYSTEM_PROMPT},
+                    {"role": "system", "content": vision_system_prompt(locale)},
                     {
                         "role": "user",
                         "content": [

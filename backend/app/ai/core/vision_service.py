@@ -1,7 +1,9 @@
 """Validate and merge in-memory image analysis results."""
 
 import json
+import re
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor
 
 from .providers import ProviderError
 from .schemas import Locale
@@ -9,6 +11,7 @@ from .vision_providers import VisionProvider
 from .vision_schemas import (
     MAX_IMAGE_BYTES,
     MAX_IMAGE_COUNT,
+    ImageAttributes,
     ImageDraftFields,
     ImageInput,
     MergedImageAttributes,
@@ -21,6 +24,25 @@ SIGNATURES = {
     "image/png": lambda content: content.startswith(b"\x89PNG\r\n\x1a\n"),
     "image/webp": lambda content: len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP",
 }
+
+WARNING_MESSAGES = {
+    "ko": {
+        "conflicting_item_name": "사진마다 물품 종류가 다르게 인식되었습니다.",
+        "conflicting_brand": "사진마다 브랜드가 다르게 인식되었습니다.",
+        "conflicting_category": "사진마다 카테고리가 다르게 인식되었습니다.",
+        "conflicting_colors": "사진마다 색상이 다르게 인식되었습니다.",
+        "partial_image_analysis_failure": "일부 사진을 분석하지 못해 성공한 사진만 반영했습니다.",
+    },
+    "en": {
+        "conflicting_item_name": "The item was identified differently across photos.",
+        "conflicting_brand": "The brand was identified differently across photos.",
+        "conflicting_category": "The category was identified differently across photos.",
+        "conflicting_colors": "The colors were identified differently across photos.",
+        "partial_image_analysis_failure": "Some photos could not be analyzed, so only successful results were used.",
+    },
+}
+
+NAME_STOP_WORDS = {"a", "an", "and", "for", "in", "of", "on", "the", "with"}
 
 
 def validate_images(images: list[ImageInput]) -> None:
@@ -51,35 +73,133 @@ def _consensus(values: Iterable[str | None], field: str, warnings: list[str]) ->
     return candidates[0] if candidates else None
 
 
+def _name_tokens(value: str) -> set[str]:
+    return {
+        token
+        for token in re.findall(r"[^\W_]+", value.casefold())
+        if token not in NAME_STOP_WORDS
+        and (len(token) > 1 or any("가" <= character <= "힣" for character in token))
+    }
+
+
+def _names_related(left: str, right: str) -> bool:
+    compact_left = "".join(re.findall(r"[^\W_]+", left.casefold()))
+    compact_right = "".join(re.findall(r"[^\W_]+", right.casefold()))
+    return (
+        compact_left == compact_right
+        or bool(compact_left and compact_right and (compact_left in compact_right or compact_right in compact_left))
+        or bool(_name_tokens(left) & _name_tokens(right))
+    )
+
+
+def _select_item_group(
+    attributes: list[ImageAttributes], warnings: list[str]
+) -> tuple[str | None, list[ImageAttributes]]:
+    named = [(index, item) for index, item in enumerate(attributes) if item.item_name]
+    if not named:
+        return None, attributes
+
+    remaining = set(range(len(named)))
+    groups: list[list[tuple[int, ImageAttributes]]] = []
+    while remaining:
+        pending = [remaining.pop()]
+        group: list[tuple[int, ImageAttributes]] = []
+        while pending:
+            position = pending.pop()
+            candidate = named[position]
+            group.append(candidate)
+            related = {
+                other
+                for other in remaining
+                if _names_related(candidate[1].item_name or "", named[other][1].item_name or "")
+            }
+            remaining -= related
+            pending.extend(related)
+        groups.append(group)
+
+    selected = max(
+        groups,
+        key=lambda group: (sum(item.confidence for _, item in group), len(group), -min(index for index, _ in group)),
+    )
+    if len(groups) > 1:
+        warnings.append("conflicting_item_name")
+
+    selected_indices = {index for index, _ in selected}
+    selected_categories = {
+        item.category_code for _, item in selected if item.category_code != "OTHER"
+    }
+    for index, item in enumerate(attributes):
+        if item.item_name is None and (
+            not selected_categories or item.category_code in selected_categories or item.category_code == "OTHER"
+        ):
+            selected_indices.add(index)
+
+    representative = min(
+        selected,
+        key=lambda entry: (
+            -entry[1].confidence,
+            len((entry[1].item_name or "").split()),
+            len(entry[1].item_name or ""),
+            entry[0],
+        ),
+    )[1].item_name
+    return representative, [item for index, item in enumerate(attributes) if index in selected_indices]
+
+
 class VisionAnalysisService:
-    """Analyze at most five images sequentially and merge their observations."""
+    """Analyze at most five images and merge their observations."""
 
     def __init__(self, provider: VisionProvider):
         self.provider = provider
 
-    def analyze(self, images: list[ImageInput]) -> MergedImageAttributes:
+    def analyze(
+        self,
+        images: list[ImageInput],
+        locale: Locale = "ko",
+        *,
+        max_workers: int = 2,
+    ) -> MergedImageAttributes:
         validate_images(images)
-        results = [self.provider.analyze(image.content, image.mime_type) for image in images]
+
+        def analyze_image(image: ImageInput) -> VisionResult | ProviderError:
+            try:
+                return self.provider.analyze(image.content, image.mime_type, locale)
+            except ProviderError as error:
+                return error
+
+        worker_count = min(max(1, max_workers), len(images))
+        if worker_count == 1:
+            outcomes = [analyze_image(image) for image in images]
+        else:
+            with ThreadPoolExecutor(max_workers=worker_count) as executor:
+                outcomes = list(executor.map(analyze_image, images))
+        failures = [outcome for outcome in outcomes if isinstance(outcome, ProviderError)]
+        results = [outcome for outcome in outcomes if isinstance(outcome, VisionResult)]
+        if not results:
+            raise failures[0]
+
         attributes = [result.attributes for result in results]
         warnings = _unique(warning for item in attributes for warning in item.warnings)
-        item_name = _consensus((item.item_name for item in attributes), "item_name", warnings)
-        brand = _consensus((item.brand for item in attributes), "brand", warnings)
-        categories = _unique(item.category_code for item in attributes if item.category_code != "OTHER")
+        if failures:
+            warnings.append("partial_image_analysis_failure")
+        item_name, selected_attributes = _select_item_group(attributes, warnings)
+        brand = _consensus((item.brand for item in selected_attributes), "brand", warnings)
+        categories = _unique(item.category_code for item in selected_attributes if item.category_code != "OTHER")
         if len(categories) > 1:
             warnings.append("conflicting_category")
-        colors = _unique(value for item in attributes for value in item.colors)
-        if len({frozenset(value.casefold() for value in item.colors) for item in attributes if item.colors}) > 1:
+        colors = _unique(value for item in selected_attributes for value in item.colors)
+        if len({frozenset(value.casefold() for value in item.colors) for item in selected_attributes if item.colors}) > 1:
             warnings.append("conflicting_colors")
         return MergedImageAttributes(
             item_name=item_name,
             category_code=categories[0] if len(categories) == 1 else "OTHER",
             colors=colors,
-            materials=_unique(value for item in attributes for value in item.materials),
+            materials=_unique(value for item in selected_attributes for value in item.materials),
             brand=brand,
-            shapes=_unique(item.shape for item in attributes if item.shape),
-            keywords=_unique(value for item in attributes for value in item.keywords),
-            visible_text=_unique(value for item in attributes for value in item.visible_text),
-            confidence=sum(item.confidence for item in attributes) / len(attributes),
+            shapes=_unique(item.shape for item in selected_attributes if item.shape),
+            keywords=_unique(value for item in selected_attributes for value in item.keywords),
+            visible_text=_unique(value for item in selected_attributes for value in item.visible_text),
+            confidence=sum(item.confidence for item in selected_attributes) / len(selected_attributes),
             image_results=results,
             warnings=_unique(warnings),
             usage=VisionUsage(
@@ -110,7 +230,7 @@ class VisionAnalysisService:
             item_name=attributes.item_name,
             category_code=attributes.category_code,
             keywords=_unique([*(attributes.keywords), *(attributes.colors), *([attributes.item_name] if attributes.item_name else [])])[:10],
-            warnings=attributes.warnings,
+            warnings=[WARNING_MESSAGES[locale].get(warning, warning) for warning in attributes.warnings],
             confidence=attributes.confidence,
         )
 

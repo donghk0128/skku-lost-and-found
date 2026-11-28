@@ -8,8 +8,9 @@ from app.ai.core.vision_schemas import (
     VisionResult,
     VisionUsage,
 )
+from app.ai.knowledge.location_retriever import find_locations
 from app.ai.schemas import AIRequiredFields, LocationOption
-from app.ai.workflow import _image_field_warnings, run_chat_workflow
+from app.ai.workflow import _image_field_warnings, _without_location_item, run_chat_workflow
 
 
 def merged_attributes(*, visible_text: list[str] | None = None) -> MergedImageAttributes:
@@ -36,6 +37,16 @@ def fields(item_name=None) -> AIRequiredFields:
     if item_name is None:
         missing.insert(0, "item_name")
     return AIRequiredFields(item_name=item_name, missing_fields=missing)
+
+
+@pytest.mark.parametrize("location_item", ["기초학문관", "기학관"])
+def test_location_names_and_aliases_cannot_become_item_names(location_item):
+    matches = find_locations("기초학문관에서 잃어버렸어요")
+
+    result = _without_location_item(AIRequiredFields(item_name=location_item), matches)
+
+    assert result.item_name is None
+    assert "item_name" in result.missing_fields
 
 
 def test_image_fills_item_without_entering_text_extraction_context():

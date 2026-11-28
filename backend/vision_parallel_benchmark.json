@@ -1,0 +1,393 @@
+{
+  "model": "gpt-6-luna",
+  "locale": "ko",
+  "runs_per_mode": 1,
+  "sequential": {
+    "max_workers": 1,
+    "wall_seconds": 37.35851699998602,
+    "provider_duration_sum_seconds": 37.296767300053034,
+    "input_tokens": 2568,
+    "output_tokens": 1548,
+    "merged": {
+      "item_name": null,
+      "category_code": "OTHER",
+      "colors": [
+        "검은색",
+        "주황빛 분홍색",
+        "흰색",
+        "주황색",
+        "빨간색"
+      ],
+      "materials": [
+        "종이",
+        "플라스틱"
+      ],
+      "brand": "PANDOROTHU COFFEE",
+      "shapes": [
+        "원통형 컵과 둥근 뚜껑",
+        "위쪽이 넓고 아래쪽이 좁은 원통형",
+        "위쪽이 넓고 아래쪽이 좁은 원통형 컵",
+        "원통형"
+      ],
+      "keywords": [
+        "일회용 컵",
+        "음료 컵",
+        "검은색 뚜껑",
+        "주황색 띠",
+        "체크 표시",
+        "커피 컵",
+        "빨간색 띠지",
+        "QR 코드",
+        "컵",
+        "빨간색 띠",
+        "검은색 테두리"
+      ],
+      "visible_text": [
+        "고객님의 소중한",
+        "더 좋은 서비스로",
+        "보답하겠습니다.",
+        "PANDOROTHU COFFEE"
+      ],
+      "confidence": 0.865,
+      "warnings": [
+        "컵 표면에 글자가 보이지만 작고 흐려 판독할 수 없습니다.",
+        "주황색 띠의 작은 문구 일부는 선명하게 판독하기 어렵습니다.",
+        "작은 글씨는 선명하게 식별하기 어려움",
+        "빨간색 띠에 글자가 보이지만 선명하게 판독되지 않습니다.",
+        "conflicting_item_name",
+        "conflicting_colors"
+      ]
+    },
+    "images": [
+      {
+        "file": "cup-with-guitar.jpg",
+        "provider_duration_seconds": 10.315810200001579,
+        "input_tokens": 642,
+        "output_tokens": 267,
+        "attributes": {
+          "item_name": "뚜껑이 있는 일회용 음료 컵",
+          "category_code": "OTHER",
+          "colors": [
+            "검은색",
+            "주황빛 분홍색",
+            "흰색"
+          ],
+          "materials": [
+            "종이",
+            "플라스틱"
+          ],
+          "brand": null,
+          "shape": "원통형 컵과 둥근 뚜껑",
+          "keywords": [
+            "일회용 컵",
+            "음료 컵",
+            "검은색 뚜껑"
+          ],
+          "visible_text": [],
+          "confidence": 0.86,
+          "warnings": [
+            "컵 표면에 글자가 보이지만 작고 흐려 판독할 수 없습니다."
+          ]
+        }
+      },
+      {
+        "file": "cup-with-guitar-2.jpg",
+        "provider_duration_seconds": 8.375514800020028,
+        "input_tokens": 642,
+        "output_tokens": 562,
+        "attributes": {
+          "item_name": "일회용 컵",
+          "category_code": "OTHER",
+          "colors": [
+            "흰색",
+            "주황색",
+            "검은색"
+          ],
+          "materials": [
+            "종이",
+            "플라스틱"
+          ],
+          "brand": null,
+          "shape": "위쪽이 넓고 아래쪽이 좁은 원통형",
+          "keywords": [
+            "일회용 컵",
+            "검은색 뚜껑",
+            "주황색 띠",
+            "체크 표시"
+          ],
+          "visible_text": [
+            "고객님의 소중한",
+            "더 좋은 서비스로",
+            "보답하겠습니다."
+          ],
+          "confidence": 0.85,
+          "warnings": [
+            "주황색 띠의 작은 문구 일부는 선명하게 판독하기 어렵습니다."
+          ]
+        }
+      },
+      {
+        "file": "cup-with-guitar-3.jpg",
+        "provider_duration_seconds": 6.916296700015664,
+        "input_tokens": 642,
+        "output_tokens": 388,
+        "attributes": {
+          "item_name": "일회용 커피 컵",
+          "category_code": "OTHER",
+          "colors": [
+            "흰색",
+            "빨간색",
+            "검은색"
+          ],
+          "materials": [
+            "종이",
+            "플라스틱"
+          ],
+          "brand": "PANDOROTHU COFFEE",
+          "shape": "위쪽이 넓고 아래쪽이 좁은 원통형 컵",
+          "keywords": [
+            "커피 컵",
+            "일회용 컵",
+            "검은색 뚜껑",
+            "빨간색 띠지",
+            "QR 코드"
+          ],
+          "visible_text": [
+            "PANDOROTHU COFFEE"
+          ],
+          "confidence": 0.91,
+          "warnings": [
+            "작은 글씨는 선명하게 식별하기 어려움"
+          ]
+        }
+      },
+      {
+        "file": "cup-with-guitar-4.jpg",
+        "provider_duration_seconds": 11.689145600015763,
+        "input_tokens": 642,
+        "output_tokens": 331,
+        "attributes": {
+          "item_name": "일회용 컵",
+          "category_code": "OTHER",
+          "colors": [
+            "흰색",
+            "빨간색",
+            "검은색"
+          ],
+          "materials": [
+            "종이",
+            "플라스틱"
+          ],
+          "brand": null,
+          "shape": "원통형",
+          "keywords": [
+            "컵",
+            "빨간색 띠",
+            "검은색 테두리"
+          ],
+          "visible_text": [],
+          "confidence": 0.84,
+          "warnings": [
+            "빨간색 띠에 글자가 보이지만 선명하게 판독되지 않습니다."
+          ]
+        }
+      }
+    ]
+  },
+  "parallel": {
+    "max_workers": 2,
+    "wall_seconds": 23.71906619996298,
+    "provider_duration_sum_seconds": 47.32504589995369,
+    "input_tokens": 2568,
+    "output_tokens": 1233,
+    "merged": {
+      "item_name": null,
+      "category_code": "OTHER",
+      "colors": [
+        "검정색",
+        "연분홍색",
+        "흰색",
+        "주황색",
+        "검은색",
+        "빨간색"
+      ],
+      "materials": [
+        "종이",
+        "플라스틱"
+      ],
+      "brand": "PANDOROTHU COFFEE",
+      "shapes": [
+        "원통형 컵과 둥근 뚜껑",
+        "위쪽이 넓고 아래쪽이 좁은 원통형 컵",
+        "윗부분이 넓고 아래로 갈수록 좁아지는 원통형 컵",
+        "원통형"
+      ],
+      "keywords": [
+        "음료 컵",
+        "검정색 뚜껑",
+        "종이컵",
+        "일회용 컵",
+        "검은색 뚜껑",
+        "주황색 띠",
+        "커피 컵",
+        "빨간색 라벨",
+        "QR 코드",
+        "컵",
+        "빨간색 인쇄"
+      ],
+      "visible_text": [
+        "고객님의 소중한 의견을 들려주세요.",
+        "더 좋은 서비스로 보답하겠습니다.",
+        "PANDOROTHU COFFEE"
+      ],
+      "confidence": 0.8825000000000001,
+      "warnings": [
+        "컵에 인쇄된 작은 글자는 선명하게 판독되지 않음",
+        "작은 글씨와 QR 코드 주변 문구는 판독하기 어렵습니다.",
+        "인쇄된 글자가 선명하지 않아 판독할 수 없습니다.",
+        "conflicting_item_name",
+        "conflicting_colors"
+      ]
+    },
+    "images": [
+      {
+        "file": "cup-with-guitar.jpg",
+        "provider_duration_seconds": 8.932716799958143,
+        "input_tokens": 642,
+        "output_tokens": 252,
+        "attributes": {
+          "item_name": "일회용 음료 컵",
+          "category_code": "OTHER",
+          "colors": [
+            "검정색",
+            "연분홍색",
+            "흰색"
+          ],
+          "materials": [
+            "종이",
+            "플라스틱"
+          ],
+          "brand": null,
+          "shape": "원통형 컵과 둥근 뚜껑",
+          "keywords": [
+            "음료 컵",
+            "검정색 뚜껑",
+            "종이컵"
+          ],
+          "visible_text": [],
+          "confidence": 0.91,
+          "warnings": [
+            "컵에 인쇄된 작은 글자는 선명하게 판독되지 않음"
+          ]
+        }
+      },
+      {
+        "file": "cup-with-guitar-2.jpg",
+        "provider_duration_seconds": 8.685415100015234,
+        "input_tokens": 642,
+        "output_tokens": 311,
+        "attributes": {
+          "item_name": "일회용 음료 컵",
+          "category_code": "OTHER",
+          "colors": [
+            "흰색",
+            "주황색",
+            "검은색"
+          ],
+          "materials": [
+            "종이",
+            "플라스틱"
+          ],
+          "brand": null,
+          "shape": "위쪽이 넓고 아래쪽이 좁은 원통형 컵",
+          "keywords": [
+            "일회용 컵",
+            "음료 컵",
+            "검은색 뚜껑",
+            "주황색 띠"
+          ],
+          "visible_text": [
+            "고객님의 소중한 의견을 들려주세요.",
+            "더 좋은 서비스로 보답하겠습니다."
+          ],
+          "confidence": 0.93,
+          "warnings": []
+        }
+      },
+      {
+        "file": "cup-with-guitar-3.jpg",
+        "provider_duration_seconds": 14.954263299994636,
+        "input_tokens": 642,
+        "output_tokens": 353,
+        "attributes": {
+          "item_name": "일회용 커피 컵",
+          "category_code": "OTHER",
+          "colors": [
+            "흰색",
+            "빨간색",
+            "검은색"
+          ],
+          "materials": [
+            "종이",
+            "플라스틱"
+          ],
+          "brand": "PANDOROTHU COFFEE",
+          "shape": "윗부분이 넓고 아래로 갈수록 좁아지는 원통형 컵",
+          "keywords": [
+            "커피 컵",
+            "일회용 컵",
+            "검은색 뚜껑",
+            "빨간색 라벨",
+            "QR 코드"
+          ],
+          "visible_text": [
+            "PANDOROTHU COFFEE"
+          ],
+          "confidence": 0.86,
+          "warnings": [
+            "작은 글씨와 QR 코드 주변 문구는 판독하기 어렵습니다."
+          ]
+        }
+      },
+      {
+        "file": "cup-with-guitar-4.jpg",
+        "provider_duration_seconds": 14.75265069998568,
+        "input_tokens": 642,
+        "output_tokens": 317,
+        "attributes": {
+          "item_name": "빨간색 띠가 인쇄된 컵",
+          "category_code": "OTHER",
+          "colors": [
+            "흰색",
+            "빨간색",
+            "검은색"
+          ],
+          "materials": [
+            "종이",
+            "플라스틱"
+          ],
+          "brand": null,
+          "shape": "원통형",
+          "keywords": [
+            "컵",
+            "종이컵",
+            "빨간색 인쇄",
+            "검은색 뚜껑"
+          ],
+          "visible_text": [],
+          "confidence": 0.83,
+          "warnings": [
+            "인쇄된 글자가 선명하지 않아 판독할 수 없습니다."
+          ]
+        }
+      }
+    ]
+  },
+  "comparison": {
+    "wall_seconds_saved": 13.639450800023042,
+    "speedup": 1.5750416430830794,
+    "input_token_delta": 0,
+    "output_token_delta": -315,
+    "merged_results_equal": false
+  }
+}

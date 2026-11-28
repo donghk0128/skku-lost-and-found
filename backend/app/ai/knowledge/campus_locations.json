@@ -37,7 +37,7 @@
     {"id":"nsc_global_square","campus":"NSC","names":{"ko":"글로벌광장(디도 앞 잔디밭)","en":"Global Square"},"aliases":{"ko":["잔디밭"],"en":["Global Plaza", "lawn"]}},
     {"id":"nsc_gongja_road","campus":"NSC","names":{"ko":"공자로","en":"Gongja Road"},"aliases":{"ko":[],"en":[]}},
     {"id":"nsc_haeoreum_road","campus":"NSC","names":{"ko":"해오름길","en":"Haeoreum Road"},"aliases":{"ko":[],"en":[]}},
-    {"id":"nsc_large_playground","campus":"NSC","names":{"ko":"자과캠 대운동장","en":"Large Playground"},"aliases":{"ko":["자과캠 대운동장"],"en":["NSC Playground"]}},
+    {"id":"nsc_large_playground","campus":"NSC","names":{"ko":"자과캠 대운동장","en":"NSC Large Playground"},"aliases":{"ko":["자과캠 대운동장"],"en":["NSC Playground"]}},
     
     {"id":"nsc_cns_center","campus":"NSC", "names":{"ko":"CNS 센터","en":"CNS Center"},"aliases":{"ko":["CNS"],"en":[]}},
     {"id":"nsc_e_center","campus":"NSC", "names":{"ko":"E 센터","en":"E Center"},"aliases":{"ko":[],"en":[]}},
@@ -55,7 +55,7 @@
     {"id":"nsc_natural_sciences_building_2","campus":"NSC","building_number":"32","names":{"ko":"제2과학관","en":"Natural Sciences Building 2"},"aliases":{"ko":["2과학관","이과", "벤젠고리관"],"en":["Natural Science Building 2"]}},
     {"id":"nsc_chemistry_building","campus":"NSC","building_number":"33","names":{"ko":"화학관","en":"Chemistry Building"},"aliases":{"ko":[],"en":[]}},
     {"id":"nsc_semiconductor_building","campus":"NSC","building_number":"40","names":{"ko":"반도체관","en":"Semiconductor Building"},"aliases":{"ko":[],"en":[]}},
-    {"id":"nsc_samsung_library","campus":"NSC","building_number":"48","names":{"ko":"삼성학술정보관","en":"Samsung Library"},"aliases":{"ko":["디도","삼도","디지털도서관","삼성도서관","자과캠 도서관","율전 도서관","도서관"],"en":["Samsung Academic Information Center","Digital Library"]}},
+    {"id":"nsc_samsung_library","campus":"NSC","building_number":"48", "names":{"ko":"삼성학술정보관","en":"Samsung Library"},"aliases":{"ko":["디도","삼도","디지털도서관","삼성도서관","자과캠 도서관","율전 도서관","도서관"],"en":["Samsung Academic Information Center","Digital Library"]}},
     {"id":"nsc_yun_yong_jae","campus":"NSC","building_number":"49","names":{"ko":"운용재","en":"Unyong-Jae"},"aliases":{"ko":[],"en":[]}},
     {"id":"nsc_general_studies_building","campus":"NSC","building_number":"51","names":{"ko":"기초학문관","en":"General Studies Building"},"aliases":{"ko":["기학", "벤젠고리관", "기학관"],"en":["General Education Building"]}},
     {"id":"nsc_pharmacy_building","campus":"NSC","building_number":"53","names":{"ko":"약학관","en":"School of Pharmacy Building"},"aliases":{"ko":["약대"],"en":["Pharmacy Building"]}},

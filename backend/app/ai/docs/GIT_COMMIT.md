@@ -1,6 +1,7 @@
 # Git Commit Message Convention
 
-커밋 메시지는 변경 의도를 빠르게 파악할 수 있도록 Gitmoji와 Conventional Commits 형식을 사용합니다.
+커밋 메시지는 변경 의도를 빠르게 파악할 수 있도록 Conventional Commits 형식을 사용합니다.
+한국어로 작성합니다.
 
 ## 작성 전 확인
 
@@ -20,7 +21,7 @@ git diff --staged
 ## 형식
 
 ```text
-<gitmoji> <type>(<scope>): <subject>
+<type>(scope): <subject>
 
 <body>
 

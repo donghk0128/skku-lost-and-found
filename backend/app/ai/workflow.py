@@ -12,7 +12,7 @@ from app.ai.core.vision_schemas import ImageInput, MergedImageAttributes
 
 FieldExtractor = Callable[[str, tuple[LocationMatch, ...]], AIRequiredFields]
 DraftGenerator = Callable[
-    [str, tuple[LocationMatch, ...], MergedImageAttributes | None],
+    [str, tuple[LocationMatch, ...], MergedImageAttributes | None, AIRequiredFields],
     AIDraftResponse,
 ]
 ImageAnalyzer = Callable[[list[ImageInput]], MergedImageAttributes]
@@ -42,6 +42,29 @@ class State(TypedDict, total=False):
 
 def _text(messages: list[str]) -> str:
     return "\n".join(messages)
+
+
+def _without_location_item(
+    fields: AIRequiredFields, matches: tuple[LocationMatch, ...]
+) -> AIRequiredFields:
+    if not fields.item_name:
+        return fields
+    normalized_item = "".join(character for character in fields.item_name.casefold() if character.isalnum())
+    location_names = {
+        "".join(character for character in name.casefold() if character.isalnum())
+        for match in matches
+        for name in (
+            match.matched_name,
+            match.resolved_name,
+            *match.location.search_names(match.locale),
+        )
+    }
+    if normalized_item not in location_names:
+        return fields
+    return fields.model_copy(update={
+        "item_name": None,
+        "missing_fields": list(dict.fromkeys([*fields.missing_fields, "item_name"])),
+    })
 
 
 def _image_field_warnings(state: State, draft_category_code: str) -> list[str]:
@@ -80,6 +103,12 @@ def build_chat_workflow(
     generate_draft: DraftGenerator,
     image_analyzer: ImageAnalyzer | None = None,
 ):
+    def extract_current(state: State) -> AIRequiredFields:
+        return _without_location_item(
+            extract_fields(_text(state["messages"]), state.get("matches", ())),
+            state.get("matches", ()),
+        )
+
     def analyze_images(state: State) -> State:
         images = state.get("images", [])
         if not images or image_analyzer is None:
@@ -105,7 +134,7 @@ def build_chat_workflow(
         return "collect" if previous else "extract"
 
     def extract(state: State) -> State:
-        fields = extract_fields(_text(state["messages"]), state.get("matches", ()))
+        fields = extract_current(state)
         attributes = state.get("image_attributes")
         if not fields.item_name and attributes and attributes.item_name:
             fields = fields.model_copy(update={
@@ -118,7 +147,9 @@ def build_chat_workflow(
 
     def collect(state: State) -> State:
         pending = state.get("pending_field")
-        fields = state["previous_fields"]
+        fields = _without_location_item(
+            state["previous_fields"], state.get("matches", ())
+        )
         if pending == "location_selection":
             options = build_location_options(state.get("matches", ()), state["locale"]) if state.get("location_correction") else fields.location_options
             selected = state.get("selected_location_ids", [])
@@ -139,21 +170,43 @@ def build_chat_workflow(
         if pending == "item_name":
             attributes = state.get("image_attributes")
             if attributes:
-                extracted = extract_fields(_text(state["messages"]), state.get("matches", ()))
+                extracted = extract_current(state)
                 item_name = extracted.item_name or attributes.item_name
                 if not item_name:
                     return {"fields": fields, "pending_field": _pending(fields)}
             else:
                 item_name = state["messages"][-1]
+                if _without_location_item(
+                    fields.model_copy(update={"item_name": item_name}),
+                    state.get("matches", ()),
+                ).item_name is None:
+                    return {"fields": fields, "pending_field": _pending(fields)}
             updated = fields.model_copy(update={
                 "item_name": item_name,
                 "missing_fields": [field for field in fields.missing_fields if field != "item_name"],
             })
             return {"fields": updated, "pending_field": _pending(updated)}
+        if pending == "location":
+            extracted = extract_current(state)
+            attributes = state.get("image_attributes")
+            item_name = fields.item_name or extracted.item_name or (
+                attributes.item_name if attributes else None
+            )
+            missing = list(extracted.missing_fields)
+            if item_name:
+                missing = [field for field in missing if field != "item_name"]
+            updated = extracted.model_copy(update={
+                "item_name": item_name,
+                "missing_fields": missing,
+            })
+            return {"fields": updated, "pending_field": _pending(updated)}
         if pending == "event_time":
-            extracted = extract_fields(_text(state["messages"]), state.get("matches", ()))
+            extracted = extract_current(state)
             missing = [field for field in extracted.missing_fields if field != "location"]
-            item_name = extracted.item_name or fields.item_name
+            attributes = state.get("image_attributes")
+            item_name = fields.item_name or extracted.item_name or (
+                attributes.item_name if attributes else None
+            )
             if item_name:
                 missing = [field for field in missing if field != "item_name"]
             if not fields.location_text:
@@ -187,7 +240,17 @@ def build_chat_workflow(
             _text(state["messages"]),
             state.get("matches", ()),
             state.get("image_attributes"),
+            state["fields"],
         )
+        fields = state["fields"]
+        result = result.model_copy(update={
+            "item_name": fields.item_name,
+            "location_text": fields.location_text,
+            "event_start_at": fields.event_start_at,
+            "event_end_at": fields.event_end_at,
+            "time_precision": fields.time_precision,
+            "missing_fields": fields.missing_fields,
+        })
         warnings = [
             *result.warnings,
             *_image_field_warnings(state, result.category_code),
@@ -233,7 +296,11 @@ def run_chat_workflow(
         "locale": locale,
         "messages": user_messages,
         "previous_fields": previous_required_fields,
-        "pending_field": pending_field,
+        "pending_field": (
+            _pending(previous_required_fields)
+            if previous_required_fields is not None
+            else pending_field
+        ),
         "selected_location_ids": selected_location_ids or [],
         "location_correction": location_correction,
         "images": images or [],
