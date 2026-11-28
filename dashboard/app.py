@@ -31,7 +31,8 @@ client = bigquery.Client(project=project)
 @st.cache_data(ttl=300)
 def read_table(name: str, version: str) -> pd.DataFrame:
     allowed = {"mart_service_daily", "mart_recommendation_daily",
-               "mart_algorithm_daily", "mart_confirmed_pair_rank", "mart_raw_health"}
+               "mart_algorithm_daily", "mart_confirmed_pair_rank", "mart_raw_health",
+               "mart_post_inventory", "mart_recommendation_generation"}
     if name not in allowed:
         raise ValueError("Unknown mart")
     rows = client.query(f"SELECT * FROM `{project}.{dataset}.{name}`",
@@ -62,10 +63,36 @@ try:
     algorithm = read_table("mart_algorithm_daily", version)
     pairs = read_table("mart_confirmed_pair_rank", version)
     health = read_table("mart_raw_health", version)
+    posts = read_table("mart_post_inventory", version)
+    generation = read_table("mart_recommendation_generation", version)
 except Exception as exc:
     st.error("Mart 조회에 실패했습니다. 대시보드가 이전 결과를 보여주지 않습니다.")
     st.caption(type(exc).__name__)
     st.stop()
+
+open_posts = int(posts["open_posts"].sum()) if not posts.empty else 0
+completed_posts = int(posts["completed_posts"].sum()) if not posts.empty else 0
+generated_runs = int(generation["generated_runs"].sum()) if not generation.empty else 0
+generated_items = int(generation["generated_items"].sum()) if not generation.empty else 0
+columns = st.columns(4)
+columns[0].metric("진행 중 게시글", open_posts)
+columns[1].metric("완료 게시글", completed_posts)
+columns[2].metric("추천 생성 기록", generated_runs)
+columns[3].metric("생성된 추천 후보", generated_items)
+
+st.subheader("게시글 현황")
+if posts.empty:
+    st.info("적재된 게시글이 없습니다.")
+else:
+    st.dataframe(posts.sort_values("post_type"), hide_index=True)
+    st.caption("삭제 표시된 게시글은 진행 중·완료 건수에서 제외합니다. AI 보조 작성은 삭제되지 않은 게시글만 셉니다.")
+
+st.subheader("추천 생성 현황")
+if generation.empty:
+    st.info("저장된 추천 생성 기록이 없습니다.")
+else:
+    st.dataframe(generation.sort_values("generated_runs", ascending=False), hide_index=True)
+    st.caption("추천 생성 기록과 후보 수는 실제 화면 노출·클릭 횟수가 아닙니다. 캐시된 실행 ID는 다시 쓰일 수 있습니다.")
 
 st.subheader("서비스 이용")
 if service.empty:
