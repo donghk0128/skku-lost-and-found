@@ -42,6 +42,19 @@
 - 첫 성공한 EC2 전체 실행은 Raw 다섯 작업과 dbt 뷰 12개·검사 33개를 통과했다. dbt 로그는 `PASS=45 WARN=0 ERROR=0 SKIP=0`이고 DAG가 `success`, 최신 상태가 `READY`였다. 실행 직후 가용 RAM은 750 MiB, 스왑 사용량은 426 MiB, 디스크 여유는 4.8 GiB였다.
 - 운영 Mart의 Raw 행 수는 `event_logs=0`, `posts=83`, `return_pairs=0`, `recommendation_runs=6`, `recommendation_items=147`이다. 이벤트와 확정 반환 쌍 지표가 빈 상태인 것은 이 데이터에 부합한다. 사용자별 클릭→채팅→반환 인과 전환율, 신규 가입, 임베딩 성공률은 현재 Raw만으로 계산하지 않는다.
 - 로컬 Streamlit을 운영 분석 데이터 세트로 전환했다. AppTest에서 예외 0개, 성공 표시 1개, 데이터 품질 표 1개와 나머지 빈 상태 안내 4개를 확인했고, HTTP health는 `ok`였다. 로컬 주소는 `http://127.0.0.1:8501`이다.
-- 같은 원본을 대상으로 두 번째 수동 `full_refresh=true` 실행을 시작했고, 최신 `pipeline_status`가 다시 `READY`가 된 것을 확인했다. Mart의 Raw 행 수는 첫 성공 실행과 같은 `0/83/0/6/147`이었다(`event_logs/posts/return_pairs/recommendation_runs/recommendation_items` 순). 이는 현 시점의 전체 적재 반복에서 중복 행이 늘지 않았다는 증거다. 두 수동 실행은 `run_after`가 서로 달라 **동일 시간 구간의 증분 재실행**을 직접 증명하지 않는다. 두 번째 Airflow `dag_run`의 최종 상태는 서버 메타데이터에서 별도로 조회하지 않았다.
-- 실제 BigQuery에서 부분 적재 후 실패·복구, 운영 DB의 새 수정·삭제 반영, EC2 재부팅 후 자동 복구는 아직 관찰하지 않았다. 합성 데이터 검증이나 모의 클라이언트 테스트를 이 운영 상황의 증거로 대체하지 않는다.
+- 같은 원본을 대상으로 두 번째 수동 `full_refresh=true` 실행을 시작했고, 최신 `pipeline_status`가 다시 `READY`가 된 것을 확인했다. Mart의 Raw 행 수는 첫 성공 실행과 같은 `0/83/0/6/147`이었다(`event_logs/posts/return_pairs/recommendation_runs/recommendation_items` 순). 두 수동 실행은 `run_after`가 서로 달라 동일 시간 구간의 증분 재실행 증거로 쓰지 않는다. 두 번째 Airflow `dag_run`의 최종 상태는 서버 메타데이터에서 별도로 조회하지 않았다.
+- 이후 테스트 데이터 세트에서 실제 BigQuery `MERGE`와 오류 주입 후 복구, 동일 구간 증분 재실행을 확인했다. 운영 DB의 새 수정·삭제 반영, 운영 Raw에서 발생한 실제 장애, EC2 재부팅 후 자동 복구는 아직 관찰하지 않았다. 격리 시험 결과를 운영 장애를 직접 겪은 증거로 표현하지 않는다.
 - 비용은 서비스 계정 작업의 2026-11-27 기준 24시간 과금 대상 쿼리량 540 MiB와 Raw 저장량 약 24 KB를 기록했지만, 실제 청구액은 확인하지 않았다. 무료 한도와 다른 프로젝트 사용량은 청구 계정 전체 기준으로 봐야 한다.
+
+## 대시보드 보강과 실제 BigQuery 재처리 시험 (2026-11-29)
+
+운영 `event_logs`와 `return_pairs`가 비어 있어 행동·반환 성과를 더 그릴 근거는 없다. 대신 실제로 데이터가 있는 `posts`, `recommendation_runs`, `recommendation_items`에서 게시글 유형·상태별 현황과 알고리즘별 추천 생성·후보 현황을 추가했다. 생성 기록을 노출이나 클릭으로 표현하지 않도록 새 Mart와 화면에 구분 문구를 넣었다. 합성·운영 BigQuery에서 dbt 14개 뷰와 37개 테스트가 각각 51/51 통과했고, 로컬 운영 대시보드에는 진행 중 게시글 83개, 추천 생성 기록 6건, 생성 후보 147건이 표시됐다.
+
+동일 구간 증분 재실행과 부분 실패 복구는 운영 Raw를 일부러 실패시키지 않고 `skku_finder_analytics_test_20261128`의 고유 임시 테이블에서 검증했다. EC2의 원본 PostgreSQL은 읽기 전용으로 접근했다. 임시 테이블에 게시글 83행을 전체 적재하고, 동일한 `start`·`end`로 증분 동기화를 다시 실행해 83행 유지와 키 일치를 확인했다. 이어 임시 행 하나를 넣고 **실제 BigQuery `MERGE` 성공 직후, `DELETE` 실행 직전에** 예외를 주입했다. 잔여 행 1개가 남음을 확인한 뒤 같은 구간을 재실행하자 83행과 잔여 행 0개로 복구됐다. 임시 테이블은 삭제됐다. 이는 실제 BigQuery 작업을 이용한 통제된 애플리케이션 오류 시험이다. 운영 데이터의 부분 실패나 BigQuery 서비스 장애 자체를 관찰한 것으로 쓰지 않는다.
+
+## EC2 재부팅 검증 계획
+
+- **예상 영향:** 재부팅 동안 공개 API와 Airflow가 잠시 중단된다. 진행 중인 DAG 작업이 있으면 실패하거나 재시도할 수 있으므로 실행 중인 작업이 0개일 때만 시작한다. 로컬 Streamlit은 EC2에 없지만 BigQuery의 최신 상태를 표시하므로, 재부팅 중 새 `READY`가 생기지는 않는다.
+- **사전 확인:** `skku_raw_sync`의 `queued`·`running` 실행 수가 0인지, 백엔드·Caddy·Airflow 컨테이너가 정상인지, BigQuery 최신 상태가 `READY`인지 확인한다. 현재 Compose 설정과 WIF 파일의 기존 경로를 유지한다. 기존 Airflow 이미지는 `skku-analytics-airflow:pre-dbt-20261129` 태그로 보관했다.
+- **재부팅 후 합격 기준:** SSH 재접속, 백엔드와 Caddy·Airflow 컨테이너 재시작, 공개 `/api/v1/health` HTTP 200, Airflow DAG 등록·최근 실행 상태 확인, BigQuery 최신 `READY`와 Mart 조회 성공을 확인한다. 필요하면 증분 수동 DAG를 한 번 실행해 새 `READY`를 확인한다.
+- **복구 순서:** 백엔드가 뜨지 않으면 `~/skku-lost-and-found`의 `compose.deploy.yaml` 상태와 로그를 확인하고 `sudo docker compose -f compose.deploy.yaml up -d --no-build`로 기존 서비스를 다시 올린다. Airflow가 뜨지 않으면 `~/skku-dbt-capacity/airflow`에서 `sudo docker compose up -d --no-build`를 실행하고 scheduler·api-server·dag-processor 로그를 확인한다. 자동 재시작 실패 원인을 확인하기 전에는 메타데이터 볼륨이나 이미지를 삭제하지 않는다.
