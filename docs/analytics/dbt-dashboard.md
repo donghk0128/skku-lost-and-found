@@ -6,9 +6,9 @@
 
 2026-11-28 BigQuery 메타데이터 조회에서는 Raw 행 수가 `event_logs=0`, `posts=83`, `return_pairs=0`, `recommendation_runs=6`, `recommendation_items=147`이었다. 메타데이터 조회만으로 원본 DB와의 동시 일치나 쿼리 결과의 정확성을 확인한 것은 아니다. 현재 이벤트·확인 쌍 지표는 빈 상태로 표시해야 한다.
 
-분석 데이터 세트 `skku_finder_analytics`는 Raw와 같은 `asia-northeast3`에 **별도로 생성**하고 Airflow 서비스 계정에 이 데이터 세트의 Data Editor 권한을 부여해야 한다. 이 브랜치에서는 리소스를 만들거나 권한을 변경하지 않았다. `airflow/.env`에 `BIGQUERY_ANALYTICS_DATASET`을 추가하고 이미 쓰던 WIF/ADC를 그대로 사용한다. `airflow/`에서 `docker compose build` 후 DAG를 실행하면 dbt가 분석 데이터 세트에 뷰와 상태 테이블을 만든다. 처음 적용할 때는 기존 Airflow/서비스 자원 여유와 새 이미지 크기를 확인한다. `dbt-bigquery` 추가로 이미지 크기와 메모리 사용량이 늘 수 있다.
+운영 분석 데이터 세트 `skku_finder_analytics`는 Raw와 같은 `asia-northeast3`에 생성했다. Airflow 서비스 계정 `skku-airflow-loader@project-2d59f32a-6674-4fa9-9a4.iam.gserviceaccount.com`의 **이 데이터 세트 한정** Data Editor 권한 부여는 아직 대기 중이다. 따라서 운영 데이터 세트의 뷰와 상태 테이블은 만들지 않았고 기존 EC2 Airflow도 변경하지 않았다. 권한이 준비되면 `airflow/.env`에 `BIGQUERY_ANALYTICS_DATASET`을 추가하고 이미 쓰던 WIF/ADC를 사용한다. `airflow/`에서 `docker compose build` 후 DAG를 실행하면 dbt가 분석 데이터 세트에 뷰와 상태 테이블을 만든다. 처음 적용할 때는 기존 Airflow/서비스 자원 여유와 새 이미지 크기를 확인한다. `dbt-bigquery` 추가로 이미지 크기와 메모리 사용량이 늘 수 있다.
 
-로컬에서 dbt만 실행하려면 `dbt-bigquery`를 설치하고 `GCP_PROJECT_ID`, `BIGQUERY_DATASET`, `BIGQUERY_ANALYTICS_DATASET`, `BIGQUERY_LOCATION`, ADC를 설정한 뒤 `dbt build --project-dir dbt --profiles-dir dbt`를 실행한다. 이 직접 실행은 대시보드의 `pipeline_status`를 갱신하지 않으므로 검증 결과를 운영 대시보드로 공개하려면 Airflow DAG로 실행한다. 대시보드는 `dashboard/requirements.txt`를 설치하고 같은 프로젝트·분석 데이터 세트·위치를 환경 변수로 설정한 뒤 `streamlit run dashboard/app.py`로 연다. 대시보드 계정에는 분석 데이터 세트의 읽기 권한과 BigQuery Job User만 부여한다. 서비스 운영 데이터와 실험 데이터는 별도 BigQuery 데이터 세트로 격리한다.
+로컬에서 dbt만 실행하려면 `dbt-bigquery`를 설치하고 `GCP_PROJECT_ID`, `BIGQUERY_DATASET`, `BIGQUERY_ANALYTICS_DATASET`, `BIGQUERY_LOCATION`, ADC를 설정한 뒤 `dbt build --project-dir dbt --profiles-dir dbt`를 실행한다. 이 직접 실행은 대시보드의 `pipeline_status`를 갱신하지 않으므로 검증 결과를 운영 대시보드로 공개하려면 Airflow DAG로 실행한다. 대시보드는 **로컬 Streamlit**으로 사용한다. `dashboard/.env.example`을 `dashboard/.env`로 복사해 프로젝트·분석 데이터 세트·호스트 ADC 파일 경로를 채운 뒤 `dashboard/`에서 `docker compose up --build -d`를 실행하고 `http://127.0.0.1:8501`을 연다. 서버에 상시 대시보드 컨테이너를 추가하지 않는다. 대시보드 계정에는 분석 데이터 세트의 읽기 권한과 BigQuery Job User만 부여하는 구성이 목표다. 서비스 운영 데이터와 실험 데이터는 별도 BigQuery 데이터 세트로 격리한다.
 
 ## 모델과 지표
 
@@ -39,4 +39,4 @@ dbt는 Raw 키 유일성·필수 필드·반환 상태, 추천 실행/후보 참
 
 합성 Mart의 실제 조회 결과는 노출 2, 클릭 1, 클릭/노출 0.5였다. `fixture-v1`은 노출 1·클릭 1, `fixture-v2`는 노출 1·클릭 0이었다. 채팅 시작·반환 신고·확정 이벤트는 각각 1건이고, `PENDING` 반환 쌍은 확인된 쌍 모델에 포함되지 않았다. Raw 테스트 데이터 세트에서 확정 쌍과 관련 이벤트를 삭제한 뒤 파생 뷰의 쌍 순위와 확인 이벤트 수가 모두 0이 되는 것을 조회했고, 이후 합성 입력을 복원했다. 테스트 분석 데이터 세트에만 수동 `READY` 상태를 기록한 뒤 Streamlit AppTest로 대시보드를 실행해 예외 0개, 표 5개, **합성 검증 데이터 경고**를 확인했다. 이 수동 상태는 Airflow 통합 실행의 증거가 아니다.
 
-두 테스트 데이터 세트는 `asia-northeast3`에 있고 테이블 기본 만료를 1일로 설정했다. 실제 청구액은 아직 확인하지 않았다. 운영 BigQuery 분석 데이터 세트에서의 `dbt build`, Airflow 전체 실행·동일 구간 재실행·실제 부분 적재 후 복구, EC2에서의 대시보드 실행과 기존 API 상태 확인은 **아직 완료로 표시하지 않는다**. Phase 2의 운영 원본 데이터 변경·삭제와 EC2 재부팅 복구도 별도 관찰이 필요하다. 재부팅이나 운영 DB 변경을 수반하는 검증은 영향과 복구 절차를 먼저 정한다.
+두 테스트 데이터 세트는 `asia-northeast3`에 있고 테이블 기본 만료를 1일로 설정했다. 실제 청구액은 아직 확인하지 않았다. 2026-11-29 로컬 Streamlit 화면을 다시 검증해 합성 데이터 경고, 표 5개, 반환 쌍 ID를 노출하지 않는 집계 표시, 예외 0개를 확인했다. 운영 BigQuery 분석 데이터 세트에서의 `dbt build`, Airflow 전체 실행·동일 구간 재실행·실제 부분 적재 후 복구와 기존 API 상태 확인은 **아직 완료로 표시하지 않는다**. Phase 2의 운영 원본 데이터 변경·삭제와 EC2 재부팅 복구도 별도 관찰이 필요하다. 재부팅이나 운영 DB 변경을 수반하는 검증은 영향과 복구 절차를 먼저 정한다.

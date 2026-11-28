@@ -1,0 +1,17 @@
+name: skku-dashboard-local
+services:
+  dashboard:
+    build: .
+    image: skku-dashboard:local
+    env_file: .env
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp-adc.json
+    ports:
+      - "127.0.0.1:8501:8501"
+    volumes:
+      - type: bind
+        source: ${GCP_ADC_FILE:?Set GCP_ADC_FILE in dashboard/.env}
+        target: /run/secrets/gcp-adc.json
+        read_only: true
+        bind:
+          create_host_path: false

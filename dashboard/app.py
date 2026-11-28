@@ -91,8 +91,14 @@ st.subheader("확인된 반환 쌍의 추천 순위")
 if pairs.empty:
     st.info("추천 실행과 연결되는 양측 확인 반환 쌍이 없습니다.")
 else:
-    st.dataframe(pairs, hide_index=True)
-    st.caption("matched_rank가 비어 있으면 해당 추천 실행에 상대 게시글이 없었습니다. 확인된 쌍만 포함하므로 전체 반환 성과로 일반화할 수 없습니다.")
+    pair_summary = (pairs.assign(
+        rank_label=pairs["matched_rank"].fillna("미노출").astype(str)
+    ).groupby(["algorithm_version", "rank_label"], dropna=False)
+        .agg(recommendation_runs=("run_id", "count"),
+             confirmed_pairs=("pair_id", "nunique"))
+        .reset_index())
+    st.dataframe(pair_summary, hide_index=True)
+    st.caption("확인된 쌍이 연결된 추천 실행만 집계합니다. 전체 반환 성과로 일반화할 수 없습니다.")
 
 st.subheader("데이터 품질과 최신성")
 st.dataframe(health, hide_index=True)
