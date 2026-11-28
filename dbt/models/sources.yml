@@ -1,0 +1,44 @@
+version: 2
+sources:
+  - name: raw
+    database: "{{ env_var('GCP_PROJECT_ID') }}"
+    schema: "{{ env_var('BIGQUERY_DATASET') }}"
+    tables:
+      - name: event_logs
+        columns:
+          - name: id
+            data_tests: [not_null, unique]
+          - name: event_type
+            data_tests: [not_null]
+          - name: received_at
+            data_tests: [not_null]
+      - name: posts
+        columns:
+          - name: id
+            data_tests: [not_null, unique]
+          - name: updated_at
+            data_tests: [not_null]
+      - name: return_pairs
+        columns:
+          - name: id
+            data_tests: [not_null, unique]
+          - name: status
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ['PENDING', 'CONFIRMED']
+      - name: recommendation_runs
+        columns:
+          - name: id
+            data_tests: [not_null, unique]
+          - name: algorithm_version
+            data_tests: [not_null]
+      - name: recommendation_items
+        columns:
+          - name: run_id
+            data_tests: [not_null]
+          - name: candidate_post_id
+            data_tests: [not_null]
+          - name: rank
+            data_tests: [not_null]

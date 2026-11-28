@@ -1,0 +1,11 @@
+skku_finder:
+  target: prod
+  outputs:
+    prod:
+      type: bigquery
+      method: oauth
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: "{{ env_var('BIGQUERY_ANALYTICS_DATASET') }}"
+      location: "{{ env_var('BIGQUERY_LOCATION') }}"
+      threads: 1
+      priority: batch

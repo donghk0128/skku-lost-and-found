@@ -1,0 +1,38 @@
+# Phase 3–4: BigQuery Raw → dbt → 대시보드
+
+## 범위와 실행 순서
+
+이 브랜치는 최신 `develop`의 Raw 다섯 테이블을 입력으로 삼는다. Airflow DAG는 `begin_analytics`가 대시보드 상태를 `RUNNING`으로 바꾼 뒤 다섯 Raw 동기화 작업을 실행한다. 모두 성공해야 `build_analytics`가 `dbt build`를 실행한다. dbt 모델 또는 검사가 실패하면 상태는 `FAILED`, 모두 통과하면 `READY`다. 대시보드는 가장 최근 상태가 `READY`일 때만 Mart를 읽는다. 원본 하드 삭제는 다음 성공한 Raw 적재에서 삭제되고, dbt 모델은 모두 뷰이므로 파생 결과에도 반영된다. 소프트 삭제 게시글은 `deleted_at`을 유지한다.
+
+2026-11-28 BigQuery 메타데이터 조회에서는 Raw 행 수가 `event_logs=0`, `posts=83`, `return_pairs=0`, `recommendation_runs=6`, `recommendation_items=147`이었다. 메타데이터 조회만으로 원본 DB와의 동시 일치나 쿼리 결과의 정확성을 확인한 것은 아니다. 현재 이벤트·확인 쌍 지표는 빈 상태로 표시해야 한다.
+
+분석 데이터 세트 `skku_finder_analytics`는 Raw와 같은 `asia-northeast3`에 **별도로 생성**하고 Airflow 서비스 계정에 이 데이터 세트의 Data Editor 권한을 부여해야 한다. 이 브랜치에서는 리소스를 만들거나 권한을 변경하지 않았다. `airflow/.env`에 `BIGQUERY_ANALYTICS_DATASET`을 추가하고 이미 쓰던 WIF/ADC를 그대로 사용한다. `airflow/`에서 `docker compose build` 후 DAG를 실행하면 dbt가 분석 데이터 세트에 뷰와 상태 테이블을 만든다. 처음 적용할 때는 기존 Airflow/서비스 자원 여유와 새 이미지 크기를 확인한다. `dbt-bigquery` 추가로 이미지 크기와 메모리 사용량이 늘 수 있다.
+
+로컬에서 dbt만 실행하려면 `dbt-bigquery`를 설치하고 `GCP_PROJECT_ID`, `BIGQUERY_DATASET`, `BIGQUERY_ANALYTICS_DATASET`, `BIGQUERY_LOCATION`, ADC를 설정한 뒤 `dbt build --project-dir dbt --profiles-dir dbt`를 실행한다. 이 직접 실행은 대시보드의 `pipeline_status`를 갱신하지 않으므로 검증 결과를 운영 대시보드로 공개하려면 Airflow DAG로 실행한다. 대시보드는 `dashboard/requirements.txt`를 설치하고 같은 프로젝트·분석 데이터 세트·위치를 환경 변수로 설정한 뒤 `streamlit run dashboard/app.py`로 연다. 대시보드 계정에는 분석 데이터 세트의 읽기 권한과 BigQuery Job User만 부여한다. 서비스 운영 데이터와 실험 데이터는 별도 BigQuery 데이터 세트로 격리한다.
+
+## 모델과 지표
+
+| 모델 | 의미 |
+| --- | --- |
+| `stg_*` | Raw 다섯 테이블의 컬럼 정리. 원본 삭제가 보이도록 뷰 사용 |
+| `int_recommendation_events` | 실행·후보·순위가 일치하는 실제 노출/클릭 이벤트만 연결 |
+| `int_confirmed_pairs` | `CONFIRMED`이고 `confirmed_at`이 있는 반환 쌍만 유지 |
+| `mart_service_daily` | KST 일별 화면/게시글 조회·생성, 검색·필터, 채팅 시작, 반환 신고, 쌍 확인 이벤트 수와 이벤트가 있는 사용자 수 |
+| `mart_recommendation_daily` | KST 일별 후보 노출 수, 클릭 수, 클릭 수 ÷ 노출 수 |
+| `mart_algorithm_daily` | 같은 지표를 실행 기록의 알고리즘 버전별로 집계 |
+| `mart_confirmed_pair_rank` | 확인된 쌍의 게시글을 기준으로 생성된 각 추천 실행에서 상대 글의 순위. 없으면 `matched_rank`가 NULL |
+| `mart_raw_health` | 다섯 원본 테이블의 현재 행 수와 원본에서 기록된 최신 시각 |
+
+클릭/노출의 분자는 수집된 `recommendation_click` 이벤트 수, 분모는 수집된 `recommendation_impression` 이벤트 수다. 분모가 0이면 NULL이다. 이 값은 후보 이벤트 비율이며 사용자별 전환율이 아니다. `recommendation_runs`는 캐시된 실행 ID를 재사용할 수 있으므로 노출의 분모로 쓰지 않는다. `chat_started`와 `return_completed`에는 추천 `run_id`가 없어 클릭→채팅→반환의 인과 전환율을 계산할 수 없다. 대시보드는 이들을 별도 전체 건수로 표시한다. 신규 가입, 임베딩 성공률도 Raw 다섯 테이블에 근거가 없어 표시하지 않는다.
+
+`mart_confirmed_pair_rank`는 **사용자가 확인한 쌍과 추천 실행이 동시에 존재하는 경우**만 포함한다. 이 기록은 독립 검증된 실제 반환이 아니고, 쌍을 등록하지 않은 반환이 빠져 있다. 따라서 전체 서비스 `Recall@K`나 알고리즘 성과로 표현하지 않는다. 추후 지표로 쓰려면 확인된 쌍 중 평가 대상이 된 실행의 범위와 시점, 누락된 레이블의 편향을 함께 정의해야 한다.
+
+이벤트 기록은 기능 성공 후 별도로 시도하므로 유실될 수 있다. 이벤트 수와 활성 사용자 수는 관찰 가능한 하한이다. `mart_raw_health.latest_source_at`은 마지막 *원본 변경 시각*이므로 새 행동이 없으면 오래된 값이 정상일 수 있다. 파이프라인 실행 최신성은 `pipeline_status.recorded_at`을 확인한다. 빈 테이블은 0행과 NULL 최신 시각으로 표시한다.
+
+## 검증 기준과 아직 필요한 현장 확인
+
+dbt는 Raw 키 유일성·필수 필드·반환 상태, 추천 실행/후보 참조, 후보 복합키와 순위 유일성, 추천 이벤트의 실행·후보·순위 일치, 확인된 반환 쌍의 게시글 유형을 검사한다. 한 검사라도 실패하면 대시보드 상태가 `READY`가 되지 않는다. 테스트용 데이터는 운영 Raw에 넣지 않고 별도 데이터 세트에서 실행한다.
+
+2026-11-28 로컬 검증에서는 Airflow+dbt 이미지를 빌드했고 dbt 1.11.17/BigQuery adapter 1.11.3으로 12개 모델·33개 테스트·5개 원본을 경고 없이 파싱했다. 기존 로컬 ADC를 읽기 전용으로 마운트한 실제 BigQuery 연결에서도 `dbt compile`이 성공했다. 이 작업은 모델 SQL 컴파일이며 BigQuery에 뷰를 만들거나 테스트 쿼리를 실행한 것은 아니다. Airflow 3 DAG를 실제 로더로 읽어 import 오류가 없고, `begin_analytics` → Raw 다섯 작업 → `build_analytics` 의존성을 확인했다. 일회용 PostgreSQL 17/pgvector에 전체 Alembic 마이그레이션을 적용한 뒤 데이터가 든 `event_logs`·`return_pairs`, 게시글 수정·소프트 삭제, 원본 이벤트·게시글 하드 삭제의 추출·키 스캔을 실행했다. Airflow 테스트 10개가 통과했다. 부분 적재 후 삭제 단계가 한 번 실패하고 재실행하는 경로는 **모의 BigQuery 클라이언트**에서 검증했으므로 실제 BigQuery의 실패 복구 증거는 아니다. 일회용 DB는 검증 후 제거했다.
+
+운영 BigQuery에서의 `dbt build`, Airflow 전체 실행·동일 구간 재실행·부분 적재 후 복구, 실제 대시보드 화면, 비용, EC2 자원 측정은 **아직 완료로 표시하지 않는다**. Phase 2의 운영 원본 데이터 변경·삭제와 EC2 재부팅 복구도 별도 관찰이 필요하다. 재부팅이나 운영 DB 변경을 수반하는 검증은 영향과 복구 절차를 먼저 정한다.

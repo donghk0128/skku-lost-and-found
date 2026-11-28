@@ -19,7 +19,8 @@ class SourceIntegrationTest(unittest.TestCase):
     def test_all_sources_and_incremental_changes(self):
         now = datetime.now(timezone.utc)
         ids = {name: uuid4() for name in (
-            "user_a", "user_b", "lost", "found", "room", "pair", "run", "event")}
+            "user_a", "user_b", "lost", "found", "room", "pair", "run", "event",
+            "impression", "visit")}
         with psycopg.connect(os.environ["SOURCE_DATABASE_URL"], autocommit=False) as conn:
             try:
                 with conn.cursor() as cur:
@@ -60,6 +61,13 @@ class SourceIntegrationTest(unittest.TestCase):
                         "VALUES (%s,%s,'test',%s,'{}')",
                         (ids["event"], ids["user_a"], now),
                     )
+                    cur.execute(
+                        "INSERT INTO event_logs (id,user_id,event_type,occurred_at,visit_id,"
+                        "source_post_id,candidate_post_id,run_id,rank,properties) "
+                        "VALUES (%s,%s,'recommendation_impression',%s,%s,%s,%s,%s,1,'{}')",
+                        (ids["impression"], ids["user_a"], now, ids["visit"],
+                         ids["lost"], ids["found"], ids["run"]),
+                    )
 
                 params = {"start": now - timedelta(minutes=1), "end": now + timedelta(minutes=1)}
                 for name, spec in TABLES.items():
@@ -76,16 +84,35 @@ class SourceIntegrationTest(unittest.TestCase):
                             self.assertTrue(cur.fetchall())
 
                 with conn.cursor() as cur:
-                    cur.execute("UPDATE posts SET status='COMPLETED', updated_at=%s WHERE id=%s",
-                                (now + timedelta(seconds=1), ids["lost"]))
+                    cur.execute("UPDATE posts SET status='COMPLETED', deleted_at=%s, updated_at=%s "
+                                "WHERE id=%s", (now, now + timedelta(seconds=1), ids["lost"]))
+                    cur.execute("UPDATE return_pairs SET status='CONFIRMED', confirmed_at=%s "
+                                "WHERE id=%s", (now, ids["pair"]))
                     cur.execute("DELETE FROM event_logs WHERE id=%s", (ids["event"],))
                 with conn.cursor(row_factory=dict_row) as cur:
                     cur.execute(_source_sql(TABLES["posts"], False),
                                 {"start": now, "end": now + timedelta(minutes=1)})
                     self.assertTrue(any(row["id"] == ids["lost"] and row["status"] == "COMPLETED"
+                                        and row["deleted_at"] is not None
+                                        for row in cur.fetchall()))
+                    cur.execute(_source_sql(TABLES["return_pairs"], False),
+                                {"start": now - timedelta(minutes=1),
+                                 "end": now + timedelta(minutes=1)})
+                    self.assertTrue(any(row["id"] == ids["pair"] and row["status"] == "CONFIRMED"
                                         for row in cur.fetchall()))
                     cur.execute(_key_sql(TABLES["event_logs"]))
                     self.assertNotIn(ids["event"], [row["id"] for row in cur.fetchall()])
+                # Model account/post cleanup before a source hard delete.
+                with conn.cursor() as cur:
+                    cur.execute("DELETE FROM event_logs WHERE id=%s", (ids["impression"],))
+                    cur.execute("DELETE FROM recommendation_items WHERE candidate_post_id=%s",
+                                (ids["found"],))
+                    cur.execute("DELETE FROM posts WHERE id=%s", (ids["found"],))
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute(_key_sql(TABLES["posts"]))
+                    self.assertNotIn(ids["found"], [row["id"] for row in cur.fetchall()])
+                    cur.execute(_key_sql(TABLES["return_pairs"]))
+                    self.assertNotIn(ids["pair"], [row["id"] for row in cur.fetchall()])
             finally:
                 conn.rollback()
 

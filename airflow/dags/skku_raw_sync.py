@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from airflow.sdk import dag, get_current_context, task
 
+from pipeline.build import build_marts, record_status
 from pipeline.sync import TABLES, sync_table
 
 
@@ -28,6 +29,10 @@ def _sync_window(context):
     tags=["skku", "raw"],
 )
 def skku_raw_sync():
+    @task
+    def begin_analytics():
+        record_status("RUNNING")
+
     @task(retries=2)
     def sync(name: str) -> dict[str, int]:
         context = get_current_context()
@@ -36,8 +41,13 @@ def skku_raw_sync():
         start, end = _sync_window(context)
         return sync_table(name, start, end, full_refresh)
 
-    for table_name in TABLES:
-        sync.override(task_id=f"sync_{table_name}")(table_name)
+    @task(retries=1)
+    def build_analytics():
+        build_marts()
+
+    raw_tasks = [sync.override(task_id=f"sync_{table_name}")(table_name)
+                 for table_name in TABLES]
+    begin_analytics() >> raw_tasks >> build_analytics()
 
 
 skku_raw_sync()

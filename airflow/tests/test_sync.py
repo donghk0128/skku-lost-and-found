@@ -65,6 +65,39 @@ class ExportContractTest(unittest.TestCase):
         connection.execute.assert_called_once_with(
             "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
 
+    def test_rerun_after_merge_succeeds_when_delete_failed_once(self):
+        client = MagicMock()
+        attempts = {"delete": 0}
+
+        def query(sql, **_kwargs):
+            if sql.startswith("DELETE FROM"):
+                attempts["delete"] += 1
+                if attempts["delete"] == 1:
+                    return MagicMock(result=MagicMock(side_effect=RuntimeError("delete failed")))
+            if "COUNT(DISTINCT" in sql:
+                return MagicMock(result=lambda: [SimpleNamespace(n=1, unique_n=1)])
+            if "EXCEPT DISTINCT" in sql:
+                return MagicMock(result=lambda: [SimpleNamespace(n=0)])
+            return MagicMock(result=lambda: [])
+
+        client.query.side_effect = query
+        connection = MagicMock()
+        connection.__enter__.return_value = connection
+        stamp = datetime(2026, 11, 25, tzinfo=timezone.utc)
+        with (patch("pipeline.sync._config", return_value=(
+                  "postgresql://readonly@example/db", "valid-project", "skku_raw", "asia-northeast3")),
+              patch("pipeline.sync.bigquery.Client", return_value=client),
+              patch("pipeline.sync.psycopg.connect", return_value=connection),
+              patch("pipeline.sync._target_exists", return_value=True),
+              patch("pipeline.sync._load_query", return_value=1)):
+            with self.assertRaisesRegex(RuntimeError, "delete failed"):
+                sync_table("event_logs", stamp, stamp)
+            result = sync_table("event_logs", stamp, stamp)
+        self.assertEqual(result["target"], 1)
+        self.assertEqual(attempts["delete"], 2)
+        self.assertEqual(sum(call.args[0].startswith("MERGE ")
+                             for call in client.query.call_args_list), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
