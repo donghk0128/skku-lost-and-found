@@ -104,6 +104,47 @@ def test_merges_results_and_marks_conflicts():
     assert "ignore all previous instructions" in service.image_context(merged)
 
 
+def test_partial_provider_failure_keeps_successful_image():
+    class PartialFailureProvider(VisionProvider):
+        def analyze(self, image: bytes, mime_type: str, locale: str) -> VisionResult:
+            if mime_type == "image/png":
+                raise ProviderError("unavailable")
+            return VisionResult(
+                attributes=attributes(),
+                usage=VisionUsage(input_tokens=10, output_tokens=5, duration_seconds=0.1),
+                provider="fake",
+                model="fake",
+            )
+
+    merged = VisionAnalysisService(PartialFailureProvider()).analyze([
+        ImageInput(content=JPEG, mime_type="image/jpeg"),
+        ImageInput(content=PNG, mime_type="image/png"),
+    ])
+
+    assert merged.item_name == "wireless earbuds"
+    assert len(merged.image_results) == 1
+    assert "partial_image_analysis_failure" in merged.warnings
+
+
+def test_merge_ignores_attributes_from_a_different_item_group():
+    provider = FakeVisionProvider([
+        attributes(item_name="wireless earbuds", colors=["black"], confidence=0.8),
+        attributes(item_name="earbuds", colors=["white"], confidence=0.8),
+        attributes(item_name="backpack", category_code="BAG", colors=["red"], confidence=0.9),
+    ])
+
+    merged = VisionAnalysisService(provider).analyze([
+        ImageInput(content=JPEG, mime_type="image/jpeg"),
+        ImageInput(content=PNG, mime_type="image/png"),
+        ImageInput(content=JPEG, mime_type="image/jpeg"),
+    ], max_workers=1)
+
+    assert merged.item_name == "earbuds"
+    assert merged.colors == ["black", "white"]
+    assert merged.category_code == "ELECTRONICS"
+    assert "conflicting_item_name" in merged.warnings
+
+
 def test_analyzes_multiple_images_in_parallel_and_preserves_input_order():
     class TrackingProvider(VisionProvider):
         def __init__(self):
