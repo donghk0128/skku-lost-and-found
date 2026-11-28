@@ -2,6 +2,7 @@
 
 import json
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor
 
 from .providers import ProviderError
 from .schemas import Locale
@@ -20,6 +21,21 @@ SIGNATURES = {
     "image/jpeg": lambda content: content.startswith(b"\xff\xd8\xff"),
     "image/png": lambda content: content.startswith(b"\x89PNG\r\n\x1a\n"),
     "image/webp": lambda content: len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP",
+}
+
+WARNING_MESSAGES = {
+    "ko": {
+        "conflicting_item_name": "사진마다 물품 종류가 다르게 인식되었습니다.",
+        "conflicting_brand": "사진마다 브랜드가 다르게 인식되었습니다.",
+        "conflicting_category": "사진마다 카테고리가 다르게 인식되었습니다.",
+        "conflicting_colors": "사진마다 색상이 다르게 인식되었습니다.",
+    },
+    "en": {
+        "conflicting_item_name": "The item was identified differently across photos.",
+        "conflicting_brand": "The brand was identified differently across photos.",
+        "conflicting_category": "The category was identified differently across photos.",
+        "conflicting_colors": "The colors were identified differently across photos.",
+    },
 }
 
 
@@ -52,14 +68,28 @@ def _consensus(values: Iterable[str | None], field: str, warnings: list[str]) ->
 
 
 class VisionAnalysisService:
-    """Analyze at most five images sequentially and merge their observations."""
+    """Analyze at most five images and merge their observations."""
 
     def __init__(self, provider: VisionProvider):
         self.provider = provider
 
-    def analyze(self, images: list[ImageInput]) -> MergedImageAttributes:
+    def analyze(
+        self,
+        images: list[ImageInput],
+        locale: Locale = "ko",
+        *,
+        max_workers: int = 2,
+    ) -> MergedImageAttributes:
         validate_images(images)
-        results = [self.provider.analyze(image.content, image.mime_type) for image in images]
+        worker_count = min(max(1, max_workers), len(images))
+        if worker_count == 1:
+            results = [self.provider.analyze(image.content, image.mime_type, locale) for image in images]
+        else:
+            with ThreadPoolExecutor(max_workers=worker_count) as executor:
+                results = list(executor.map(
+                    lambda image: self.provider.analyze(image.content, image.mime_type, locale),
+                    images,
+                ))
         attributes = [result.attributes for result in results]
         warnings = _unique(warning for item in attributes for warning in item.warnings)
         item_name = _consensus((item.item_name for item in attributes), "item_name", warnings)
@@ -110,7 +140,7 @@ class VisionAnalysisService:
             item_name=attributes.item_name,
             category_code=attributes.category_code,
             keywords=_unique([*(attributes.keywords), *(attributes.colors), *([attributes.item_name] if attributes.item_name else [])])[:10],
-            warnings=attributes.warnings,
+            warnings=[WARNING_MESSAGES[locale].get(warning, warning) for warning in attributes.warnings],
             confidence=attributes.confidence,
         )
 

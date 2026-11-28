@@ -32,3 +32,6 @@ backend/evaluation/multi_location_labels.csv
 backend/evaluation/multi_location_result.json
 backend/evaluation/multi_location_holdout_labels.csv
 backend/evaluation/multi_location_holdout_result.json
+
+# test image files
+/image/

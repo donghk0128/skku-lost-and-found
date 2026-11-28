@@ -14,7 +14,10 @@ from app.core.errors import ApiError
 
 
 class FakeVisionProvider(VisionProvider):
-    def analyze(self, image: bytes, mime_type: str) -> VisionResult:
+    locale = None
+
+    def analyze(self, image: bytes, mime_type: str, locale: str) -> VisionResult:
+        self.locale = locale
         return VisionResult(
             attributes=ImageAttributes(
                 item_name="wireless earbuds",
@@ -42,7 +45,7 @@ class RecordingProvider(FakeProvider):
 
 
 class FailingVisionProvider(VisionProvider):
-    def analyze(self, image: bytes, mime_type: str) -> VisionResult:
+    def analyze(self, image: bytes, mime_type: str, locale: str) -> VisionResult:
         raise ProviderError("unavailable")
 
 
@@ -65,16 +68,18 @@ def test_multipart_chat_returns_reusable_attributes_without_text_context_leak():
         missing_fields=[],
     ))
 
+    vision_provider = FakeVisionProvider()
     response = asyncio.run(continue_post_draft_chat_with_images(
         payload=payload,
         images=[image],
         _=None,
         db=None,
         provider=draft_provider,
-        vision_provider=FakeVisionProvider(),
+        vision_provider=vision_provider,
     ))
 
     assert response.images_analyzed is True
+    assert vision_provider.locale == "en"
     assert response.image_attributes is not None
     assert response.image_attributes.visible_text == [
         "Samsung Library",

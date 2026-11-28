@@ -25,8 +25,8 @@ Keywords must be observable traits only, unique, short, and no more than 10.
 """
 
 LANGUAGE_INSTRUCTIONS = {
-    "ko": "Write title, description, item_name, keywords, and warnings in Korean.",
-    "en": "Write title, description, item_name, keywords, and warnings in English.",
+    "ko": "Write title, description, item_name, keywords, and warnings in Korean. Preserve brand names and quoted source text exactly as provided; never translate them.",
+    "en": "Write title, description, item_name, keywords, and warnings in English. Preserve brand names and quoted source text exactly as provided; never translate them.",
 }
 
 REQUIRED_FIELDS_PROMPT = """Extract only the required item identity and event date/time.

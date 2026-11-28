@@ -267,7 +267,9 @@ class AIDraftService:
             location_correction=request.location_correction,
             images=images,
             image_analyzer=(
-                VisionAnalysisService(vision_provider).analyze
+                lambda image_inputs: VisionAnalysisService(vision_provider).analyze(
+                    image_inputs, request.locale
+                )
                 if images and vision_provider
                 else None
             ),
