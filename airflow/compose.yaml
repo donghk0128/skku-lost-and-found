@@ -37,6 +37,7 @@ services:
     volumes: &airflow_volumes
       - ./dags:/opt/airflow/dags:ro
       - ./pipeline:/opt/airflow/pipeline:ro
+      - ../dbt:/opt/airflow/dbt:ro
       - ./logs:/opt/airflow/logs
       - type: bind
         source: ${GCP_ADC_FILE:?Set GCP_ADC_FILE to the local gcloud ADC file}

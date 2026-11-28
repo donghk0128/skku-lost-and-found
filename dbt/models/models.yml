@@ -1,0 +1,46 @@
+version: 2
+models:
+  - name: stg_recommendation_items
+    columns:
+      - name: run_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_recommendation_runs')
+                field: id
+  - name: stg_recommendation_runs
+    columns:
+      - name: source_post_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_posts')
+                field: id
+  - name: int_recommendation_events
+    columns:
+      - name: event_id
+        data_tests: [not_null, unique]
+  - name: int_confirmed_pairs
+    columns:
+      - name: id
+        data_tests: [not_null, unique]
+  - name: mart_service_daily
+    columns:
+      - name: activity_date
+        data_tests: [not_null, unique]
+  - name: mart_recommendation_daily
+    columns:
+      - name: event_date
+        data_tests: [not_null, unique]
+  - name: mart_confirmed_pair_rank
+    columns:
+      - name: pair_id
+        data_tests: [not_null]
+  - name: mart_post_inventory
+    columns:
+      - name: post_type
+        data_tests: [not_null, unique]
+  - name: mart_recommendation_generation
+    columns:
+      - name: algorithm_version
+        data_tests: [not_null, unique]
