@@ -11,11 +11,14 @@ from google.cloud import bigquery
 
 st.set_page_config(page_title="SKKU Finder 분석", layout="wide")
 st.title("SKKU Finder 분석")
-st.caption("운영 데이터 기준 · 한국 시간(Asia/Seoul) · 이벤트 기록 실패 시 실제 행동보다 적을 수 있음")
 
 project = os.environ.get("GCP_PROJECT_ID", "")
 dataset = os.environ.get("BIGQUERY_ANALYTICS_DATASET", "")
 location = os.environ.get("BIGQUERY_LOCATION", "asia-northeast3")
+if "_test_" in dataset:
+    st.warning("합성 검증 데이터입니다. 운영 성과가 아닙니다.")
+else:
+    st.caption("운영 데이터 기준 · 한국 시간(Asia/Seoul) · 이벤트 기록 실패 시 실제 행동보다 적을 수 있음")
 if not re.fullmatch(r"[a-z][a-z0-9-]{4,61}[a-z0-9]", project) or not re.fullmatch(
     r"[A-Za-z_][A-Za-z0-9_]{0,1023}", dataset
 ):
