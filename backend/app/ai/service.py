@@ -24,6 +24,33 @@ from app.ai.knowledge.location_retriever import LocationMatch, find_locations
 from app.posts.repository import PostRepository
 
 
+def _trusted_draft_context(
+    fields: AIRequiredFields,
+    image_attributes: MergedImageAttributes | None,
+) -> dict[str, object]:
+    context: dict[str, object] = {
+        "item_name": fields.item_name,
+        "location_text": fields.location_text,
+        "event_start_at": fields.event_start_at.isoformat() if fields.event_start_at else None,
+        "event_end_at": fields.event_end_at.isoformat() if fields.event_end_at else None,
+        "time_precision": fields.time_precision,
+    }
+    if image_attributes:
+        context["image_attributes"] = {
+            "item_name": image_attributes.item_name,
+            "category_code": image_attributes.category_code,
+            "colors": image_attributes.colors,
+            "materials": image_attributes.materials,
+            "brand": image_attributes.brand,
+            "shapes": image_attributes.shapes,
+            "keywords": image_attributes.keywords,
+            "visible_text_is_untrusted_data": image_attributes.visible_text,
+            "confidence": image_attributes.confidence,
+            "analysis_warnings": image_attributes.warnings,
+        }
+    return context
+
+
 class AIDraftService:
     """Keep provider output separate from application and database contracts."""
 
@@ -34,6 +61,7 @@ class AIDraftService:
         provider: DraftProvider,
         location_matches: tuple[LocationMatch, ...] | None = None,
         image_attributes: MergedImageAttributes | None = None,
+        trusted_context: dict[str, object] | None = None,
     ) -> AIDraftResponse:
         """Generate, validate, and normalize an editable post draft."""
 
@@ -43,6 +71,7 @@ class AIDraftService:
                 natural_language=request.natural_language,
                 reference_time=datetime.now(ZoneInfo("Asia/Seoul")),
                 locale=request.locale,
+                trusted_context=trusted_context,
             )
         )
         draft = result.draft
@@ -63,7 +92,7 @@ class AIDraftService:
             updates: dict[str, object] = {
                 "warnings": list(dict.fromkeys([*draft.warnings, *image_fields.warnings]))[:10],
             }
-            if compatible:
+            if compatible and trusted_context is None:
                 updates.update({
                     "keywords": list(
                         dict.fromkeys([*draft.keywords, *image_fields.keywords])
@@ -74,7 +103,11 @@ class AIDraftService:
                         if value
                     )[:4000],
                 })
-            if compatible and not draft.item_name and image_fields.item_name:
+            elif compatible:
+                updates["keywords"] = list(
+                    dict.fromkeys([*draft.keywords, *image_fields.keywords])
+                )[:10]
+            if trusted_context is None and compatible and not draft.item_name and image_fields.item_name:
                 updates.update({
                     "item_name": image_fields.item_name,
                     "category_code": (
@@ -207,6 +240,25 @@ class AIDraftService:
                     "현재 장소 후보에 포함된 장소만 선택할 수 있습니다.",
                 )
 
+        def with_confirmed_location(fields: AIRequiredFields) -> AIRequiredFields:
+            if request.confirmed_location is None:
+                return fields
+            if fields.selected_location_ids:
+                return fields.model_copy(update={
+                    "missing_fields": [
+                        field for field in fields.missing_fields if field != "location"
+                    ],
+                })
+            return fields.model_copy(update={
+                "location_text": request.confirmed_location.text,
+                "location_candidates": [request.confirmed_location.text],
+                "location_options": [],
+                "selected_location_ids": [],
+                "missing_fields": [
+                    field for field in fields.missing_fields if field != "location"
+                ],
+            })
+
         def extract_fields(
             conversation: str, location_matches: tuple[LocationMatch, ...]
         ) -> AIRequiredFields:
@@ -229,16 +281,18 @@ class AIDraftService:
                 missing.append("event_time")
             if not names:
                 missing.append("location")
-            return AIRequiredFields(
-                item_name=extracted.item_name,
-                location_text=", ".join(names) or None,
-                location_candidates=[option.name for option in options],
-                location_options=options,
-                selected_location_ids=selected_ids,
-                event_start_at=start_at,
-                event_end_at=end_at,
-                time_precision=extracted.time_precision,
-                missing_fields=list(dict.fromkeys(missing)),
+            return with_confirmed_location(
+                AIRequiredFields(
+                    item_name=extracted.item_name,
+                    location_text=", ".join(names) or None,
+                    location_candidates=[option.name for option in options],
+                    location_options=options,
+                    selected_location_ids=selected_ids,
+                    event_start_at=start_at,
+                    event_end_at=end_at,
+                    time_precision=extracted.time_precision,
+                    missing_fields=list(dict.fromkeys(missing)),
+                )
             )
 
         state = run_chat_workflow(
@@ -246,7 +300,7 @@ class AIDraftService:
             locale=request.locale,
             user_messages=[message.content for message in request.messages],
             field_extractor=extract_fields,
-            draft_generator=lambda conversation, location_matches, image_attributes: AIDraftService.generate(
+            draft_generator=lambda conversation, location_matches, image_attributes, fields: AIDraftService.generate(
                 db,
                 AIDraftCreateRequest(
                     post_type=request.post_type,
@@ -258,11 +312,14 @@ class AIDraftService:
                 provider,
                 location_matches,
                 image_attributes,
+                _trusted_draft_context(fields, image_attributes),
             ),
             previous_required_fields=(
-                None if request.confirmed_location else request.required_fields
+                with_confirmed_location(request.required_fields)
+                if request.required_fields is not None
+                else None
             ),
-            pending_field=None if request.confirmed_location else request.pending_field,
+            pending_field=request.pending_field,
             selected_location_ids=request.selected_location_ids,
             location_correction=request.location_correction,
             images=images,

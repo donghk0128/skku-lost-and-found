@@ -46,6 +46,7 @@ class DraftRequest(BaseModel):
     natural_language: str = Field(min_length=1, max_length=4000)
     reference_time: AwareDatetime
     locale: Locale = "ko"
+    trusted_context: dict[str, object] | None = None
 
 
 class PostDraft(BaseModel):
